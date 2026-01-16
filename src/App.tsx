@@ -1794,11 +1794,14 @@ const SantiagoTechRDApp = () => {
                                 />
                             </div>
                             <div className="w-full md:w-1/3">
-                                <Select onValueChange={setSelectedSpecialization} value={selectedSpecialization}>
+                                <Select onValueChange={(val: string) => setSelectedSpecialization(val === 'all' ? '' : val)} value={selectedSpecialization || 'all'}>
                                     <SelectTrigger className="w-full border-gray-200 focus:border-blue-500 focus:ring-blue-500 h-12 text-lg">
                                         <SelectValue placeholder="Especialización" />
                                     </SelectTrigger>
                                     <SelectContent>
+                                        <SelectItem key="all" value="all">
+                                            Todas las Especializaciones
+                                        </SelectItem>
                                         {SPECIALIZATIONS.map((specialization) => (
                                             <SelectItem key={specialization} value={specialization}>
                                                 {specialization}
@@ -1808,11 +1811,14 @@ const SantiagoTechRDApp = () => {
                                 </Select>
                             </div>
                             <div className="w-full md:w-1/3">
-                                <Select onValueChange={setSelectedLocation} value={selectedLocation}>
+                                <Select onValueChange={(val: string) => setSelectedLocation(val === 'all' ? '' : val)} value={selectedLocation || 'all'}>
                                     <SelectTrigger className="w-full border-gray-200 focus:border-blue-500 focus:ring-blue-500 h-12 text-lg">
                                         <SelectValue placeholder="Ubicación" />
                                     </SelectTrigger>
                                     <SelectContent>
+                                        <SelectItem key="all" value="all">
+                                            Todas las Ubicaciones
+                                        </SelectItem>
                                         {SANTIAGO_LOCATIONS.map((location) => (
                                             <SelectItem key={location} value={location}>
                                                 {location}
