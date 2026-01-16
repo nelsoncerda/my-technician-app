@@ -630,6 +630,17 @@ const SantiagoTechRDApp = () => {
         }
     };
 
+    // Get unique specializations and locations from registered technicians
+    const availableSpecializations = React.useMemo(() => {
+        const specs = Array.from(new Set(technicians.map(t => t.specialization)));
+        return specs.sort();
+    }, [technicians]);
+
+    const availableLocations = React.useMemo(() => {
+        const locs = Array.from(new Set(technicians.map(t => t.location)));
+        return locs.sort();
+    }, [technicians]);
+
     // Filtered Technicians based on search and filters
     const filteredTechnicians = technicians.filter((technician) => {
         const searchMatch =
@@ -1802,7 +1813,7 @@ const SantiagoTechRDApp = () => {
                                         <SelectItem key="all" value="all">
                                             Todas las Especializaciones
                                         </SelectItem>
-                                        {SPECIALIZATIONS.map((specialization) => (
+                                        {availableSpecializations.map((specialization) => (
                                             <SelectItem key={specialization} value={specialization}>
                                                 {specialization}
                                             </SelectItem>
@@ -1819,7 +1830,7 @@ const SantiagoTechRDApp = () => {
                                         <SelectItem key="all" value="all">
                                             Todas las Ubicaciones
                                         </SelectItem>
-                                        {SANTIAGO_LOCATIONS.map((location) => (
+                                        {availableLocations.map((location) => (
                                             <SelectItem key={location} value={location}>
                                                 {location}
                                             </SelectItem>
