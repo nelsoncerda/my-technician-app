@@ -1,0 +1,285 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ============================================
+// USER & TECHNICIAN MODELS (Updated)
+// ============================================
+
+model User {
+  id                String      @id @default(uuid())
+  email             String      @unique
+  password          String
+  name              String
+  phone             String?
+  role              String      @default("user") // "user", "technician", "admin"
+  emailVerified     Boolean     @default(false)
+  verificationToken String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  technician        Technician?
+
+  // Gamification relations
+  points             UserPoints?
+  pointTransactions  PointTransaction[]
+  achievements       UserAchievement[]
+  rewardRedemptions  RewardRedemption[]
+  leaderboardEntries LeaderboardEntry[]
+
+  // Booking relations
+  bookingsAsCustomer Booking[] @relation("CustomerBookings")
+}
+
+model Technician {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id])
+  specialization String
+  location       String
+  rating         Float    @default(0)
+  verified       Boolean  @default(false)
+  reviews        Review[]
+
+  // Booking relations
+  bookings          Booking[]
+  availabilitySlots AvailabilitySlot[]
+  timeOffs          TimeOff[]
+
+  // Gamification stats (denormalized for performance)
+  totalJobsCompleted Int   @default(0)
+  totalReviews       Int   @default(0)
+  responseRate       Float @default(0)
+  completionRate     Float @default(0)
+}
+
+model Review {
+  id           String     @id @default(uuid())
+  technicianId String
+  technician   Technician @relation(fields: [technicianId], references: [id])
+  author       String
+  authorId     String?    // Link to user who wrote the review
+  comment      String
+  rating       Int
+  date         DateTime   @default(now())
+}
+
+// ============================================
+// BOOKING SYSTEM MODELS
+// ============================================
+
+model AvailabilitySlot {
+  id           String     @id @default(uuid())
+  technicianId String
+  technician   Technician @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+  dayOfWeek    Int        // 0=Sunday, 1=Monday, etc.
+  startTime    String     // "09:00" format
+  endTime      String     // "17:00" format
+  isRecurring  Boolean    @default(true)
+  specificDate DateTime?  // For non-recurring specific date slots
+  isAvailable  Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([technicianId, dayOfWeek, startTime, specificDate])
+}
+
+model TimeOff {
+  id           String     @id @default(uuid())
+  technicianId String
+  technician   Technician @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+  startDate    DateTime
+  endDate      DateTime
+  reason       String?
+  createdAt    DateTime   @default(now())
+}
+
+model Booking {
+  id                String        @id @default(uuid())
+  customerId        String
+  customer          User          @relation("CustomerBookings", fields: [customerId], references: [id])
+  technicianId      String
+  technician        Technician    @relation(fields: [technicianId], references: [id])
+  scheduledDate     DateTime
+  scheduledTime     String        // "09:00" format
+  estimatedDuration Int           @default(60) // minutes
+  status            BookingStatus @default(PENDING)
+  serviceType       String        // e.g., "Reparación", "Instalación", "Mantenimiento"
+  description       String?
+  address           String
+  city              String
+  phone             String
+  totalPrice        Float?
+  cancelReason      String?
+  cancelledBy       String?       // "customer" | "technician" | "admin"
+  completedAt       DateTime?
+  confirmedAt       DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // Gamification relation
+  pointsAwarded PointTransaction[]
+
+  @@index([customerId])
+  @@index([technicianId])
+  @@index([status])
+  @@index([scheduledDate])
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model BookingReminder {
+  id        String   @id @default(uuid())
+  bookingId String
+  type      String   // "email" | "sms" | "push"
+  sendAt    DateTime
+  sent      Boolean  @default(false)
+  sentAt    DateTime?
+  createdAt DateTime @default(now())
+}
+
+// ============================================
+// GAMIFICATION SYSTEM MODELS
+// ============================================
+
+model UserPoints {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  totalPoints    Int      @default(0)
+  currentLevel   Int      @default(1)
+  levelProgress  Int      @default(0)
+  lifetimePoints Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model PointTransaction {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  points      Int      // Can be negative for redemptions
+  type        String   // "EARNED" | "REDEEMED" | "BONUS" | "PENALTY"
+  source      String   // "BOOKING_COMPLETED" | "REVIEW_GIVEN" | "FIRST_BOOKING" | "REFERRAL" etc.
+  sourceId    String?  // Reference to booking, review, etc.
+  booking     Booking? @relation(fields: [sourceId], references: [id])
+  description String
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Achievement {
+  id            String   @id @default(uuid())
+  code          String   @unique
+  name          String
+  nameEs        String
+  description   String
+  descriptionEs String
+  iconUrl       String?
+  badgeColor    String   @default("#3B82F6")
+  category      String   // "MILESTONE" | "QUALITY" | "ENGAGEMENT" | "SPECIAL"
+  pointsReward  Int      @default(0)
+  isActive      Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  requirements  Json     // e.g., {"jobsCompleted": 10}
+
+  userAchievements UserAchievement[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+}
+
+model UserAchievement {
+  id            String      @id @default(uuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+  unlockedAt    DateTime    @default(now())
+  notified      Boolean     @default(false)
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+}
+
+model Level {
+  id          String  @id @default(uuid())
+  levelNumber Int     @unique
+  name        String
+  nameEs      String
+  minPoints   Int
+  maxPoints   Int
+  perks       Json?
+  iconUrl     String?
+}
+
+model Reward {
+  id            String   @id @default(uuid())
+  code          String   @unique
+  name          String
+  nameEs        String
+  description   String
+  descriptionEs String
+  pointsCost    Int
+  category      String   // "DISCOUNT" | "FEATURE" | "PHYSICAL" | "EXPERIENCE"
+  value         Json     // e.g., {"discountPercent": 10}
+  imageUrl      String?
+  isActive      Boolean  @default(true)
+  stock         Int?     // null = unlimited
+  validFrom     DateTime?
+  validUntil    DateTime?
+  createdAt     DateTime @default(now())
+
+  redemptions RewardRedemption[]
+}
+
+model RewardRedemption {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  rewardId    String
+  reward      Reward    @relation(fields: [rewardId], references: [id])
+  pointsUsed  Int
+  status      String    @default("PENDING") // "PENDING" | "FULFILLED" | "EXPIRED" | "CANCELLED"
+  redeemedAt  DateTime  @default(now())
+  fulfilledAt DateTime?
+  expiresAt   DateTime?
+  code        String?   // Unique redemption code
+
+  @@index([userId])
+}
+
+model LeaderboardEntry {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  period        String   // "WEEKLY" | "MONTHLY" | "ALL_TIME"
+  periodStart   DateTime
+  periodEnd     DateTime
+  rank          Int
+  points        Int
+  jobsCompleted Int      @default(0)
+  averageRating Float    @default(0)
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, period, periodStart])
+  @@index([period, periodStart, rank])
+}

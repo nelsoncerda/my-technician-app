@@ -1,6 +1,6 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "Santiago Tech",
+  "name": "Santiago Tech RD - Encuentra Tu Tecnico",
   "icons": [
     {
       "src": "favicon.ico",
@@ -20,6 +20,7 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#10B981",
+  "background_color": "#ffffff",
+  "description": "Los mejores tecnicos de Santiago de los Caballeros, Republica Dominicana"
 }
