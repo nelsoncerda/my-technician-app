@@ -45,6 +45,7 @@ const SelectValue = ({ placeholder }: any) => {
 const SelectContent = ({ children }: any) => {
     const context = React.useContext(SelectContext)
     const [position, setPosition] = React.useState({ top: 0, left: 0, width: 0 })
+    const contentRef = React.useRef<HTMLDivElement>(null)
 
     React.useEffect(() => {
         if (context?.open && context.triggerRef.current) {
@@ -61,7 +62,10 @@ const SelectContent = ({ children }: any) => {
         if (!context?.open) return
 
         const handleClickOutside = (e: MouseEvent) => {
-            if (context.triggerRef.current?.contains(e.target as Node)) return
+            const target = e.target as Node
+            // Don't close if clicking on trigger or inside content
+            if (context.triggerRef.current?.contains(target)) return
+            if (contentRef.current?.contains(target)) return
             context.setOpen(false)
         }
 
@@ -69,9 +73,14 @@ const SelectContent = ({ children }: any) => {
             if (e.key === 'Escape') context.setOpen(false)
         }
 
-        document.addEventListener('mousedown', handleClickOutside)
+        // Use setTimeout to avoid catching the same click that opened the dropdown
+        const timeoutId = setTimeout(() => {
+            document.addEventListener('mousedown', handleClickOutside)
+        }, 0)
         document.addEventListener('keydown', handleEscape)
+
         return () => {
+            clearTimeout(timeoutId)
             document.removeEventListener('mousedown', handleClickOutside)
             document.removeEventListener('keydown', handleEscape)
         }
@@ -81,6 +90,7 @@ const SelectContent = ({ children }: any) => {
 
     return createPortal(
         <div
+            ref={contentRef}
             className="fixed z-[9999] overflow-hidden rounded-md border bg-white dark:bg-gray-800 p-1 text-gray-950 dark:text-gray-100 shadow-lg max-h-60 overflow-y-auto"
             style={{
                 top: position.top,
