@@ -4,7 +4,7 @@ import {
     MapPin, Phone, Mail, Star, Search, Filter, Wrench, User,
     CheckCircle, PlusCircle, Loader2, X, LogIn, LogOut, Shield, Edit,
     Calendar, Trophy, Gift, Home, Users, BarChart3, TrendingUp, Clock,
-    DollarSign, Activity, AlertCircle, UserCheck, UserX, Trash2, Eye
+    DollarSign, Activity, AlertCircle, UserCheck, UserX, Trash2, Eye, Settings, Plus
 } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
@@ -26,8 +26,8 @@ import RewardCard from './components/gamification/RewardCard';
 import AchievementUnlocked from './components/gamification/AchievementUnlocked';
 import { API_BASE_URL } from './config/constants';
 
-// Mock Data (Replace with actual API calls)
-const SPECIALIZATIONS = [
+// Default data (will be managed via state)
+const DEFAULT_SPECIALIZATIONS = [
     'Electricista',
     'Plomero',
     'Mecánico',
@@ -69,7 +69,7 @@ interface Review {
     date: string;
 }
 
-const SANTIAGO_LOCATIONS = [
+const DEFAULT_LOCATIONS = [
     "Santiago de los Caballeros",
     "Puñal",
     "Tamboril",
@@ -165,7 +165,13 @@ const SantiagoTechRDApp = () => {
     const [loadingGamification, setLoadingGamification] = useState(false);
 
     // Admin panel state
-    const [adminTab, setAdminTab] = useState<'technicians' | 'users' | 'bookings' | 'reports'>('technicians');
+    const [adminTab, setAdminTab] = useState<'technicians' | 'users' | 'bookings' | 'reports' | 'settings'>('technicians');
+
+    // Specializations and Locations state (editable by admin)
+    const [specializations, setSpecializations] = useState<string[]>(DEFAULT_SPECIALIZATIONS);
+    const [locations, setLocations] = useState<string[]>(DEFAULT_LOCATIONS);
+    const [newSpecialization, setNewSpecialization] = useState('');
+    const [newLocation, setNewLocation] = useState('');
     const [adminStats, setAdminStats] = useState<{
         totalUsers: number;
         totalTechnicians: number;
@@ -1131,6 +1137,7 @@ const SantiagoTechRDApp = () => {
                             { id: 'users', label: 'Usuarios', icon: Users, color: 'blue' },
                             { id: 'bookings', label: 'Reservas', icon: Calendar, color: 'emerald' },
                             { id: 'reports', label: 'Reportes', icon: BarChart3, color: 'purple' },
+                            { id: 'settings', label: 'Configuración', icon: Settings, color: 'gray' },
                         ].map((tab) => (
                             <button
                                 key={tab.id}
@@ -1144,7 +1151,8 @@ const SantiagoTechRDApp = () => {
                                 style={adminTab === tab.id ? {
                                     backgroundColor: tab.color === 'amber' ? '#f59e0b' :
                                         tab.color === 'blue' ? '#3b82f6' :
-                                            tab.color === 'emerald' ? '#10b981' : '#8b5cf6'
+                                            tab.color === 'emerald' ? '#10b981' :
+                                                tab.color === 'gray' ? '#6b7280' : '#8b5cf6'
                                 } : {}}
                             >
                                 <tab.icon className="w-4 h-4" />
@@ -1639,6 +1647,171 @@ const SantiagoTechRDApp = () => {
                                         <p>No hay datos de reportes disponibles</p>
                                     </div>
                                 )}
+                            </motion.div>
+                        )}
+
+                        {/* Settings Tab */}
+                        {adminTab === 'settings' && (
+                            <motion.div
+                                key="settings"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                className="space-y-6"
+                            >
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {/* Specializations Management */}
+                                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
+                                        <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-4">
+                                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                                <Wrench className="w-5 h-5" />
+                                                Especializaciones ({specializations.length})
+                                            </h3>
+                                        </div>
+                                        <div className="p-4">
+                                            {/* Add new specialization */}
+                                            <div className="flex gap-2 mb-4">
+                                                <Input
+                                                    placeholder="Nueva especialización..."
+                                                    value={newSpecialization}
+                                                    onChange={(e) => setNewSpecialization(e.target.value)}
+                                                    className="flex-1"
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' && newSpecialization.trim()) {
+                                                            if (!specializations.includes(newSpecialization.trim())) {
+                                                                setSpecializations([...specializations, newSpecialization.trim()]);
+                                                            }
+                                                            setNewSpecialization('');
+                                                        }
+                                                    }}
+                                                />
+                                                <Button
+                                                    onClick={() => {
+                                                        if (newSpecialization.trim() && !specializations.includes(newSpecialization.trim())) {
+                                                            setSpecializations([...specializations, newSpecialization.trim()]);
+                                                            setNewSpecialization('');
+                                                        }
+                                                    }}
+                                                    className="bg-amber-500 hover:bg-amber-600"
+                                                >
+                                                    <Plus className="w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                            {/* List of specializations */}
+                                            <div className="max-h-80 overflow-y-auto space-y-2">
+                                                {specializations.map((spec, idx) => (
+                                                    <div
+                                                        key={idx}
+                                                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                                                    >
+                                                        <span className="flex items-center gap-2">
+                                                            <Wrench className="w-4 h-4 text-amber-500" />
+                                                            {spec}
+                                                        </span>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() => {
+                                                                // Check if any technician uses this specialization
+                                                                const inUse = technicians.some(t => t.specialization === spec);
+                                                                if (inUse) {
+                                                                    alert(`No se puede eliminar "${spec}" porque hay técnicos registrados con esta especialización.`);
+                                                                } else {
+                                                                    setSpecializations(specializations.filter(s => s !== spec));
+                                                                }
+                                                            }}
+                                                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Locations Management */}
+                                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
+                                        <div className="bg-gradient-to-r from-blue-500 to-indigo-500 p-4">
+                                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                                <MapPin className="w-5 h-5" />
+                                                Ubicaciones ({locations.length})
+                                            </h3>
+                                        </div>
+                                        <div className="p-4">
+                                            {/* Add new location */}
+                                            <div className="flex gap-2 mb-4">
+                                                <Input
+                                                    placeholder="Nueva ubicación..."
+                                                    value={newLocation}
+                                                    onChange={(e) => setNewLocation(e.target.value)}
+                                                    className="flex-1"
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' && newLocation.trim()) {
+                                                            if (!locations.includes(newLocation.trim())) {
+                                                                setLocations([...locations, newLocation.trim()]);
+                                                            }
+                                                            setNewLocation('');
+                                                        }
+                                                    }}
+                                                />
+                                                <Button
+                                                    onClick={() => {
+                                                        if (newLocation.trim() && !locations.includes(newLocation.trim())) {
+                                                            setLocations([...locations, newLocation.trim()]);
+                                                            setNewLocation('');
+                                                        }
+                                                    }}
+                                                    className="bg-blue-500 hover:bg-blue-600"
+                                                >
+                                                    <Plus className="w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                            {/* List of locations */}
+                                            <div className="max-h-80 overflow-y-auto space-y-2">
+                                                {locations.map((loc, idx) => (
+                                                    <div
+                                                        key={idx}
+                                                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                                                    >
+                                                        <span className="flex items-center gap-2">
+                                                            <MapPin className="w-4 h-4 text-blue-500" />
+                                                            {loc}
+                                                        </span>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() => {
+                                                                // Check if any technician uses this location
+                                                                const inUse = technicians.some(t => t.location === loc);
+                                                                if (inUse) {
+                                                                    alert(`No se puede eliminar "${loc}" porque hay técnicos registrados en esta ubicación.`);
+                                                                } else {
+                                                                    setLocations(locations.filter(l => l !== loc));
+                                                                }
+                                                            }}
+                                                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Info note */}
+                                <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+                                    <p className="text-blue-700 dark:text-blue-300 text-sm flex items-start gap-2">
+                                        <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                                        <span>
+                                            Las especializaciones y ubicaciones que agregues estarán disponibles inmediatamente
+                                            para que los nuevos técnicos las seleccionen durante el registro.
+                                            No se pueden eliminar opciones que estén siendo utilizadas por técnicos registrados.
+                                        </span>
+                                    </p>
+                                </div>
                             </motion.div>
                         )}
                     </AnimatePresence>
@@ -2264,7 +2437,7 @@ const SantiagoTechRDApp = () => {
                                                         <SelectValue placeholder="Selecciona tu especialización" />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        {SPECIALIZATIONS.map((specialization) => (
+                                                        {specializations.map((specialization) => (
                                                             <SelectItem key={specialization} value={specialization}>
                                                                 {specialization}
                                                             </SelectItem>
@@ -2300,7 +2473,7 @@ const SantiagoTechRDApp = () => {
                                                         <SelectValue placeholder="Selecciona tu ubicación" />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        {SANTIAGO_LOCATIONS.map((location) => (
+                                                        {locations.map((location) => (
                                                             <SelectItem key={location} value={location}>
                                                                 {location}
                                                             </SelectItem>
@@ -2588,7 +2761,7 @@ const SantiagoTechRDApp = () => {
                                                                             <SelectValue placeholder="Selecciona tu especialización" />
                                                                         </SelectTrigger>
                                                                         <SelectContent>
-                                                                            {SPECIALIZATIONS.map((spec) => (
+                                                                            {specializations.map((spec) => (
                                                                                 <SelectItem key={spec} value={spec}>
                                                                                     {spec}
                                                                                 </SelectItem>
@@ -2617,7 +2790,7 @@ const SantiagoTechRDApp = () => {
                                                                             <SelectValue placeholder="Selecciona tu ubicación" />
                                                                         </SelectTrigger>
                                                                         <SelectContent>
-                                                                            {SANTIAGO_LOCATIONS.map((loc) => (
+                                                                            {locations.map((loc) => (
                                                                                 <SelectItem key={loc} value={loc}>
                                                                                     {loc}
                                                                                 </SelectItem>
