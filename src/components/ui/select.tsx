@@ -5,6 +5,8 @@ import { ChevronDown } from "lucide-react"
 
 const SelectContext = React.createContext<{
     value: string
+    displayValue: string
+    setDisplayValue: (value: string) => void
     onValueChange: (value: string) => void
     open: boolean
     setOpen: (open: boolean) => void
@@ -13,10 +15,11 @@ const SelectContext = React.createContext<{
 
 const Select = ({ children, value, onValueChange }: any) => {
     const [open, setOpen] = React.useState(false)
+    const [displayValue, setDisplayValue] = React.useState('')
     const triggerRef = React.useRef<HTMLButtonElement>(null)
 
     return (
-        <SelectContext.Provider value={{ value, onValueChange, open, setOpen, triggerRef }}>
+        <SelectContext.Provider value={{ value, displayValue, setDisplayValue, onValueChange, open, setOpen, triggerRef }}>
             <div className="relative">{children}</div>
         </SelectContext.Provider>
     )
@@ -39,7 +42,8 @@ const SelectTrigger = ({ children, className }: any) => {
 
 const SelectValue = ({ placeholder }: any) => {
     const context = React.useContext(SelectContext)
-    return <span className={!context?.value ? "text-muted-foreground" : ""}>{context?.value || placeholder}</span>
+    const showPlaceholder = !context?.value || !context?.displayValue
+    return <span className={showPlaceholder ? "text-muted-foreground" : ""}>{context?.displayValue || placeholder}</span>
 }
 
 const SelectContent = ({ children }: any) => {
@@ -108,9 +112,20 @@ const SelectContent = ({ children }: any) => {
 const SelectItem = ({ children, value }: any) => {
     const context = React.useContext(SelectContext)
     const isSelected = context?.value === value
+
+    // Update display value when this item is selected
+    React.useEffect(() => {
+        if (isSelected && context?.setDisplayValue) {
+            const text = typeof children === 'string' ? children : String(children)
+            context.setDisplayValue(text)
+        }
+    }, [isSelected, children, context])
+
     return (
         <div
             onClick={() => {
+                const text = typeof children === 'string' ? children : String(children)
+                context?.setDisplayValue(text)
                 context?.onValueChange(value)
                 context?.setOpen(false)
             }}
