@@ -919,7 +919,7 @@ const SantiagoTechRDApp = () => {
                                     ¡Únete!
                                 </Button>
                                 <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                                    <Button onClick={() => setShowRegisterForm(true)} className="bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white shadow-lg border-2 border-white/30">
+                                    <Button onClick={() => setShowUserRegisterForm(true)} className="bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white shadow-lg border-2 border-white/30">
                                         <PlusCircle className="mr-2 w-4 h-4" />
                                         <span className="hidden sm:inline">¡Soy Técnico!</span>
                                         <span className="sm:hidden">Técnico</span>
@@ -2091,7 +2091,7 @@ const SantiagoTechRDApp = () => {
                                     🔍 Buscar Técnicos
                                 </Button>
                                 <Button
-                                    onClick={() => setShowRegisterForm(true)}
+                                    onClick={() => setShowUserRegisterForm(true)}
                                     variant="outline"
                                     className="border-emerald-500 text-emerald-600 hover:bg-emerald-50 px-8 py-3 text-lg"
                                 >
@@ -2127,7 +2127,7 @@ const SantiagoTechRDApp = () => {
                         <ul className="space-y-2 text-sm">
                             <li><button onClick={() => setCurrentView('home')} className="hover:text-emerald-400 transition-colors">🏠 Inicio</button></li>
                             <li><button onClick={() => setCurrentView('home')} className="hover:text-emerald-400 transition-colors">🔍 Buscar Técnicos</button></li>
-                            <li><button onClick={() => setShowRegisterForm(true)} className="hover:text-emerald-400 transition-colors">📝 Registrarse</button></li>
+                            <li><button onClick={() => setShowUserRegisterForm(true)} className="hover:text-emerald-400 transition-colors">📝 Registrarse</button></li>
                             <li><button onClick={() => setCurrentView('about')} className="hover:text-emerald-400 transition-colors">ℹ️ Sobre Nosotros</button></li>
                         </ul>
                     </div>
@@ -2940,7 +2940,7 @@ const SantiagoTechRDApp = () => {
                                     <Button
                                         onClick={() => {
                                             setShowProfileModal(false);
-                                            setShowRegisterForm(true);
+                                            setShowUserRegisterForm(true);
                                         }}
                                         className="w-full bg-green-600 hover:bg-green-700 text-white"
                                     >
