@@ -4,7 +4,8 @@ import {
     MapPin, Phone, Mail, Star, Search, Filter, Wrench, User,
     CheckCircle, PlusCircle, Loader2, X, LogIn, LogOut, Shield, Edit,
     Calendar, Trophy, Gift, Home, Users, BarChart3, TrendingUp, Clock,
-    DollarSign, Activity, AlertCircle, UserCheck, UserX, Trash2, Eye, Settings, Plus
+    DollarSign, Activity, AlertCircle, UserCheck, UserX, Trash2, Eye, Settings, Plus,
+    Camera, History, Save
 } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
@@ -58,7 +59,18 @@ interface User {
     email: string;
     role: 'user' | 'technician' | 'admin';
     phone?: string;
+    photoUrl?: string;
     password?: string; // In a real app, this would be hashed
+}
+
+interface ProfileChangeHistory {
+    id: string;
+    userId: string;
+    fieldName: string;
+    oldValue: string | null;
+    newValue: string | null;
+    changedBy: string | null;
+    createdAt: string;
 }
 
 interface Review {
@@ -172,6 +184,13 @@ const SantiagoTechRDApp = () => {
     const [locations, setLocations] = useState<string[]>(DEFAULT_LOCATIONS);
     const [newSpecialization, setNewSpecialization] = useState('');
     const [newLocation, setNewLocation] = useState('');
+
+    // Profile editing state
+    const [isEditingProfile, setIsEditingProfile] = useState(false);
+    const [profileHistory, setProfileHistory] = useState<ProfileChangeHistory[]>([]);
+    const [showProfileHistory, setShowProfileHistory] = useState(false);
+    const [uploadingPhoto, setUploadingPhoto] = useState(false);
+    const [savingProfile, setSavingProfile] = useState(false);
     const [adminStats, setAdminStats] = useState<{
         totalUsers: number;
         totalTechnicians: number;
@@ -782,13 +801,15 @@ const SantiagoTechRDApp = () => {
         e.preventDefault();
         if (!currentUser) return;
 
+        setSavingProfile(true);
+
         // Get form data
         const form = e.target as HTMLFormElement;
         const name = (form.elements.namedItem('name') as HTMLInputElement).value;
         const phone = (form.elements.namedItem('phone') as HTMLInputElement).value;
 
         try {
-            const response = await fetch(`${API_BASE_URL}/api/users/${currentUser.id}`, {
+            const response = await fetch(`${API_BASE_URL}/api/users/${currentUser.id}/profile`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, phone }),
@@ -797,14 +818,96 @@ const SantiagoTechRDApp = () => {
             if (response.ok) {
                 const updatedUser = await response.json();
                 setCurrentUser({ ...currentUser, ...updatedUser });
-                setShowProfileModal(false);
+                setIsEditingProfile(false);
+                // Refresh history
+                fetchProfileHistory();
             } else {
                 alert("Error al actualizar perfil");
             }
         } catch (error) {
             console.error("Error updating profile:", error);
             alert("Error al actualizar perfil");
+        } finally {
+            setSavingProfile(false);
         }
+    };
+
+    // Fetch profile change history
+    const fetchProfileHistory = useCallback(async () => {
+        if (!currentUser) return;
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/users/${currentUser.id}/profile-history`);
+            if (response.ok) {
+                const history = await response.json();
+                setProfileHistory(history);
+            }
+        } catch (error) {
+            console.error("Error fetching profile history:", error);
+        }
+    }, [currentUser]);
+
+    // Upload profile photo
+    const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!currentUser || !e.target.files || e.target.files.length === 0) return;
+
+        const file = e.target.files[0];
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            alert('Por favor selecciona una imagen válida');
+            return;
+        }
+
+        // Validate file size (2MB max)
+        if (file.size > 2 * 1024 * 1024) {
+            alert('La imagen no puede ser mayor a 2MB');
+            return;
+        }
+
+        setUploadingPhoto(true);
+
+        try {
+            // Convert to base64
+            const reader = new FileReader();
+            reader.onload = async () => {
+                const photoBase64 = reader.result as string;
+
+                const response = await fetch(`${API_BASE_URL}/api/users/${currentUser.id}/photo`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ photoBase64 }),
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    setCurrentUser({ ...currentUser, photoUrl: result.photoUrl });
+                    fetchProfileHistory();
+                } else {
+                    alert('Error al subir la foto');
+                }
+                setUploadingPhoto(false);
+            };
+            reader.onerror = () => {
+                alert('Error al leer el archivo');
+                setUploadingPhoto(false);
+            };
+            reader.readAsDataURL(file);
+        } catch (error) {
+            console.error("Error uploading photo:", error);
+            alert('Error al subir la foto');
+            setUploadingPhoto(false);
+        }
+    };
+
+    // Format field name for display
+    const formatFieldName = (fieldName: string): string => {
+        const names: { [key: string]: string } = {
+            name: 'Nombre',
+            phone: 'Teléfono',
+            photoUrl: 'Foto de Perfil',
+            email: 'Correo',
+        };
+        return names[fieldName] || fieldName;
     };
 
     // Handle Review Form Submission
@@ -3074,71 +3177,269 @@ const SantiagoTechRDApp = () => {
                     )}
             </AnimatePresence>
 
-            {/* Profile Modal */}
+            {/* Profile Modal - Enhanced with Photo and History */}
             <AnimatePresence>
                 {showProfileModal && currentUser && (
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50"
+                        className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4"
+                        onClick={() => { setShowProfileModal(false); setShowProfileHistory(false); setIsEditingProfile(false); }}
                     >
                         <motion.div
                             initial={{ scale: 0.8, y: -20 }}
                             animate={{ scale: 1, y: 0 }}
                             exit={{ scale: 0.8, y: -20 }}
-                            className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6 relative"
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
                         >
-                            <button
-                                onClick={() => setShowProfileModal(false)}
-                                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                            <h2 className="text-2xl font-semibold text-gray-800 dark:text-white mb-6 text-center">
-                                Mi Perfil
-                            </h2>
-                            <form onSubmit={handleUpdateProfile} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre</label>
-                                    <Input name="name" defaultValue={currentUser.name} className="mt-1" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Correo</label>
-                                    <Input defaultValue={currentUser.email} disabled className="mt-1 bg-gray-100 dark:bg-gray-700" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Teléfono</label>
-                                    <Input name="phone" defaultValue={currentUser.phone || ''} className="mt-1" />
-                                </div>
-                                <div className="flex justify-end gap-2 mt-4">
-                                    <Button type="button" variant="outline" onClick={() => setShowProfileModal(false)}>
-                                        Cancelar
-                                    </Button>
-                                    <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
-                                        Guardar Cambios
-                                    </Button>
-                                </div>
-                            </form>
+                            {/* Header */}
+                            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-6 rounded-t-2xl relative">
+                                <button
+                                    onClick={() => { setShowProfileModal(false); setShowProfileHistory(false); setIsEditingProfile(false); }}
+                                    className="absolute top-4 right-4 text-white/80 hover:text-white"
+                                >
+                                    <X className="w-6 h-6" />
+                                </button>
 
-                            {currentUser.role === 'user' && (
-                                <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                                    <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-2">¿Eres un profesional?</h3>
-                                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                                        Regístrate como técnico para ofrecer tus servicios en nuestra plataforma.
-                                    </p>
-                                    <Button
-                                        onClick={() => {
-                                            setShowProfileModal(false);
-                                            setShowUserRegisterForm(true);
-                                        }}
-                                        className="w-full bg-green-600 hover:bg-green-700 text-white"
-                                    >
-                                        <Wrench className="w-4 h-4 mr-2" />
-                                        Convertirme en Técnico
-                                    </Button>
+                                {/* Profile Photo */}
+                                <div className="flex flex-col items-center">
+                                    <div className="relative group">
+                                        <div className="w-24 h-24 rounded-full bg-white/20 flex items-center justify-center overflow-hidden border-4 border-white shadow-lg">
+                                            {currentUser.photoUrl ? (
+                                                <img
+                                                    src={currentUser.photoUrl}
+                                                    alt={currentUser.name}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            ) : (
+                                                <User className="w-12 h-12 text-white" />
+                                            )}
+                                        </div>
+                                        {/* Upload button overlay */}
+                                        <label className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                                            {uploadingPhoto ? (
+                                                <Loader2 className="w-6 h-6 text-white animate-spin" />
+                                            ) : (
+                                                <Camera className="w-6 h-6 text-white" />
+                                            )}
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={handlePhotoUpload}
+                                                disabled={uploadingPhoto}
+                                            />
+                                        </label>
+                                    </div>
+                                    <h2 className="text-xl font-bold text-white mt-3">{currentUser.name}</h2>
+                                    <p className="text-white/80 text-sm">{currentUser.email}</p>
+                                    <span className={cn(
+                                        "mt-2 px-3 py-1 rounded-full text-xs font-semibold",
+                                        currentUser.role === 'admin' ? "bg-purple-200 text-purple-800" :
+                                            currentUser.role === 'technician' ? "bg-amber-200 text-amber-800" :
+                                                "bg-blue-200 text-blue-800"
+                                    )}>
+                                        {currentUser.role === 'admin' ? 'Administrador' :
+                                            currentUser.role === 'technician' ? 'Técnico' : 'Cliente'}
+                                    </span>
                                 </div>
-                            )}
+                            </div>
+
+                            {/* Body */}
+                            <div className="p-6">
+                                {/* Tabs: Info / History */}
+                                <div className="flex gap-2 mb-6">
+                                    <button
+                                        onClick={() => setShowProfileHistory(false)}
+                                        className={cn(
+                                            "flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2",
+                                            !showProfileHistory
+                                                ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                                                : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200"
+                                        )}
+                                    >
+                                        <User className="w-4 h-4" />
+                                        Mi Información
+                                    </button>
+                                    <button
+                                        onClick={() => { setShowProfileHistory(true); fetchProfileHistory(); }}
+                                        className={cn(
+                                            "flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2",
+                                            showProfileHistory
+                                                ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                                                : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200"
+                                        )}
+                                    >
+                                        <History className="w-4 h-4" />
+                                        Historial
+                                    </button>
+                                </div>
+
+                                {!showProfileHistory ? (
+                                    /* Profile Info */
+                                    <>
+                                        {isEditingProfile ? (
+                                            <form onSubmit={handleUpdateProfile} className="space-y-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                        Nombre
+                                                    </label>
+                                                    <Input
+                                                        name="name"
+                                                        defaultValue={currentUser.name}
+                                                        className="w-full"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                        Correo Electrónico
+                                                    </label>
+                                                    <Input
+                                                        defaultValue={currentUser.email}
+                                                        disabled
+                                                        className="w-full bg-gray-100 dark:bg-gray-700"
+                                                    />
+                                                    <p className="text-xs text-gray-500 mt-1">El correo no se puede cambiar</p>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                        Teléfono
+                                                    </label>
+                                                    <Input
+                                                        name="phone"
+                                                        defaultValue={currentUser.phone || ''}
+                                                        placeholder="Ej: 809-555-1234"
+                                                        className="w-full"
+                                                    />
+                                                </div>
+                                                <div className="flex gap-2 pt-4">
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        className="flex-1"
+                                                        onClick={() => setIsEditingProfile(false)}
+                                                    >
+                                                        Cancelar
+                                                    </Button>
+                                                    <Button
+                                                        type="submit"
+                                                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                                                        disabled={savingProfile}
+                                                    >
+                                                        {savingProfile ? (
+                                                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                                        ) : (
+                                                            <Save className="w-4 h-4 mr-2" />
+                                                        )}
+                                                        Guardar
+                                                    </Button>
+                                                </div>
+                                            </form>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                                                    <User className="w-5 h-5 text-gray-400" />
+                                                    <div>
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400">Nombre</p>
+                                                        <p className="font-medium text-gray-800 dark:text-white">{currentUser.name}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                                                    <Mail className="w-5 h-5 text-gray-400" />
+                                                    <div>
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400">Correo</p>
+                                                        <p className="font-medium text-gray-800 dark:text-white">{currentUser.email}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                                                    <Phone className="w-5 h-5 text-gray-400" />
+                                                    <div>
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400">Teléfono</p>
+                                                        <p className="font-medium text-gray-800 dark:text-white">
+                                                            {currentUser.phone || 'No registrado'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <Button
+                                                    onClick={() => setIsEditingProfile(true)}
+                                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white mt-4"
+                                                >
+                                                    <Edit className="w-4 h-4 mr-2" />
+                                                    Editar Perfil
+                                                </Button>
+                                            </div>
+                                        )}
+
+                                        {/* Become Technician Section */}
+                                        {currentUser.role === 'user' && !isEditingProfile && (
+                                            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                                                <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-2">
+                                                    ¿Eres un profesional?
+                                                </h3>
+                                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                                                    Regístrate como técnico para ofrecer tus servicios.
+                                                </p>
+                                                <Button
+                                                    onClick={() => {
+                                                        setShowProfileModal(false);
+                                                        setShowUserRegisterForm(true);
+                                                    }}
+                                                    className="w-full bg-green-600 hover:bg-green-700 text-white"
+                                                >
+                                                    <Wrench className="w-4 h-4 mr-2" />
+                                                    Convertirme en Técnico
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    /* Profile History */
+                                    <div className="space-y-3">
+                                        {profileHistory.length === 0 ? (
+                                            <div className="text-center py-8 text-gray-500">
+                                                <History className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                                                <p>No hay cambios registrados</p>
+                                            </div>
+                                        ) : (
+                                            profileHistory.map((change) => (
+                                                <div
+                                                    key={change.id}
+                                                    className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                                                >
+                                                    <div className="flex items-start justify-between">
+                                                        <div>
+                                                            <p className="font-medium text-gray-800 dark:text-white">
+                                                                {formatFieldName(change.fieldName)}
+                                                            </p>
+                                                            <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                                                {change.oldValue && (
+                                                                    <p className="text-red-500 line-through">
+                                                                        {change.oldValue}
+                                                                    </p>
+                                                                )}
+                                                                <p className="text-green-600">
+                                                                    {change.newValue || 'Valor eliminado'}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <span className="text-xs text-gray-400">
+                                                            {new Date(change.createdAt).toLocaleDateString('es-DO', {
+                                                                day: '2-digit',
+                                                                month: 'short',
+                                                                year: 'numeric',
+                                                                hour: '2-digit',
+                                                                minute: '2-digit'
+                                                            })}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </motion.div>
                     </motion.div>
                 )}

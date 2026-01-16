@@ -23,6 +23,7 @@ model User {
   password          String
   name              String
   phone             String?
+  photoUrl          String?     // Profile photo URL
   role              String      @default("user") // "user", "technician", "admin"
   emailVerified     Boolean     @default(false)
   verificationToken String?
@@ -39,6 +40,29 @@ model User {
 
   // Booking relations
   bookingsAsCustomer Booking[] @relation("CustomerBookings")
+
+  // Profile change history
+  profileChanges     ProfileChangeHistory[]
+}
+
+// ============================================
+// PROFILE CHANGE HISTORY MODEL
+// ============================================
+
+model ProfileChangeHistory {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fieldName   String   // "name", "email", "phone", "photoUrl"
+  oldValue    String?
+  newValue    String?
+  changedBy   String?  // userId of who made the change (for admin changes)
+  changeReason String? // Optional reason for the change
+  ipAddress   String?  // IP address from where change was made
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model Technician {
