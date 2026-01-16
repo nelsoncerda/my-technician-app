@@ -54,9 +54,10 @@ const SelectContent = ({ children }: any) => {
     React.useEffect(() => {
         if (context?.open && context.triggerRef.current) {
             const rect = context.triggerRef.current.getBoundingClientRect()
+            // For position: fixed, use viewport-relative coordinates (no scroll offset needed)
             setPosition({
-                top: rect.bottom + window.scrollY + 4,
-                left: rect.left + window.scrollX,
+                top: rect.bottom + 4,
+                left: rect.left,
                 width: rect.width
             })
         }
