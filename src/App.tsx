@@ -271,14 +271,14 @@ const SantiagoTechRDApp = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const techResponse = await fetch('http://localhost:3001/api/technicians');
+                const techResponse = await fetch(`${API_BASE_URL}/api/technicians`);
                 const techData = await techResponse.json();
                 setTechnicians(techData);
 
                 // Only fetch users if admin (in a real app, this would be protected)
                 // For now, let's fetch them to populate the admin view if we are admin
                 // Or just fetch them all the time for this demo since we don't have persistent auth token storage yet
-                const userResponse = await fetch('http://localhost:3001/api/users');
+                const userResponse = await fetch(`${API_BASE_URL}/api/users`);
                 const userData = await userResponse.json();
                 setUsers(userData);
             } catch (error) {
@@ -647,7 +647,7 @@ const SantiagoTechRDApp = () => {
         try {
             if (!currentUser) return;
 
-            const response = await fetch('http://localhost:3001/api/technicians', {
+            const response = await fetch(`${API_BASE_URL}/api/technicians`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -679,7 +679,7 @@ const SantiagoTechRDApp = () => {
     const handleUserRegistration = async (data: z.infer<typeof userFormSchema>) => {
         setLoading(true);
         try {
-            const response = await fetch('http://localhost:3001/api/auth/register', {
+            const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
@@ -705,7 +705,7 @@ const SantiagoTechRDApp = () => {
     const handleLogin = async (data: z.infer<typeof loginFormSchema>) => {
         setLoading(true);
         try {
-            const response = await fetch('http://localhost:3001/api/auth/login', {
+            const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
@@ -736,7 +736,7 @@ const SantiagoTechRDApp = () => {
     // Handle Verify Technician
     const handleVerifyTechnician = async (id: string) => {
         try {
-            const response = await fetch(`http://localhost:3001/api/technicians/${id}/verify`, {
+            const response = await fetch(`${API_BASE_URL}/api/technicians/${id}/verify`, {
                 method: 'PUT',
             });
             if (response.ok) {
@@ -750,7 +750,7 @@ const SantiagoTechRDApp = () => {
     // Handle Delete Technician
     const handleDeleteTechnician = async (id: string) => {
         try {
-            const response = await fetch(`http://localhost:3001/api/technicians/${id}`, {
+            const response = await fetch(`${API_BASE_URL}/api/technicians/${id}`, {
                 method: 'DELETE',
             });
             if (response.ok) {
@@ -771,7 +771,7 @@ const SantiagoTechRDApp = () => {
         const phone = (form.elements.namedItem('phone') as HTMLInputElement).value;
 
         try {
-            const response = await fetch(`http://localhost:3001/api/users/${currentUser.id}`, {
+            const response = await fetch(`${API_BASE_URL}/api/users/${currentUser.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, phone }),
