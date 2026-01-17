@@ -5,7 +5,7 @@ import {
     CheckCircle, PlusCircle, Loader2, X, LogIn, LogOut, Shield, Edit,
     Calendar, Trophy, Gift, Home, Users, BarChart3, TrendingUp, Clock,
     DollarSign, Activity, AlertCircle, UserCheck, UserX, Trash2, Eye, Settings, Plus,
-    Camera, History, Save
+    Camera, History, Save, MailWarning, RefreshCw, CheckCircle2
 } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
@@ -60,6 +60,7 @@ interface User {
     role: 'user' | 'technician' | 'admin';
     phone?: string;
     photoUrl?: string;
+    emailVerified?: boolean;
     password?: string; // In a real app, this would be hashed
 }
 
@@ -191,6 +192,10 @@ const SantiagoTechRDApp = () => {
     const [showProfileHistory, setShowProfileHistory] = useState(false);
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
     const [savingProfile, setSavingProfile] = useState(false);
+
+    // Email verification state
+    const [resendingVerification, setResendingVerification] = useState(false);
+    const [verificationEmailSent, setVerificationEmailSent] = useState(false);
     const [adminStats, setAdminStats] = useState<{
         totalUsers: number;
         totalTechnicians: number;
@@ -767,6 +772,34 @@ const SantiagoTechRDApp = () => {
     const handleLogout = () => {
         setCurrentUser(null);
         setCurrentView('home');
+        setVerificationEmailSent(false);
+    };
+
+    // Handle Resend Verification Email
+    const handleResendVerification = async () => {
+        if (!currentUser?.email) return;
+
+        setResendingVerification(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/auth/resend-verification`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: currentUser.email }),
+            });
+
+            if (response.ok) {
+                setVerificationEmailSent(true);
+                setTimeout(() => setVerificationEmailSent(false), 10000); // Hide after 10s
+            } else {
+                const data = await response.json();
+                alert(data.message || 'Error al reenviar verificacion');
+            }
+        } catch (error) {
+            console.error('Error resending verification:', error);
+            alert('Error al reenviar verificacion');
+        } finally {
+            setResendingVerification(false);
+        }
     };
 
     // Handle Verify Technician
@@ -1050,6 +1083,53 @@ const SantiagoTechRDApp = () => {
                     </div>
                 </div>
             </header>
+
+            {/* Email Verification Banner */}
+            {currentUser && currentUser.emailVerified === false && (
+                <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    className="bg-gradient-to-r from-amber-500 to-orange-500 shadow-md"
+                >
+                    <div className="container mx-auto px-4 py-3">
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 text-white">
+                                <MailWarning className="w-5 h-5 flex-shrink-0" />
+                                <p className="text-sm font-medium">
+                                    Tu correo electronico no ha sido verificado. Revisa tu bandeja de entrada.
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {verificationEmailSent ? (
+                                    <span className="flex items-center gap-2 text-white text-sm bg-white/20 px-3 py-1.5 rounded-full">
+                                        <CheckCircle2 className="w-4 h-4" />
+                                        Correo enviado!
+                                    </span>
+                                ) : (
+                                    <Button
+                                        onClick={handleResendVerification}
+                                        disabled={resendingVerification}
+                                        size="sm"
+                                        className="bg-white text-orange-600 hover:bg-orange-50 font-medium"
+                                    >
+                                        {resendingVerification ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                Enviando...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <RefreshCw className="w-4 h-4 mr-2" />
+                                                Reenviar verificacion
+                                            </>
+                                        )}
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </motion.div>
+            )}
 
             {/* Bookings View */}
             {currentView === 'bookings' && currentUser && (
