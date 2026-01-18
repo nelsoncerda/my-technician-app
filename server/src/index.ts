@@ -13,7 +13,9 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 app.use(cors());
-app.use(express.json());
+// Increase JSON body limit to 5MB for base64 image uploads
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ limit: '5mb', extended: true }));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/technicians', technicianRoutes);
