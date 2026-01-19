@@ -14,12 +14,16 @@ interface Booking {
   description?: string;
   customer?: {
     name: string;
+    email?: string;
     phone?: string;
+    photoUrl?: string;
   };
   technician?: {
     user: {
       name: string;
+      email?: string;
       phone?: string;
+      photoUrl?: string;
     };
   };
 }

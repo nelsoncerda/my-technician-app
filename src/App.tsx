@@ -45,12 +45,15 @@ interface Technician {
     id: string;
     name: string;
     specialization: string;
+    specializations?: string[]; // Array of specializations
     location: string;
     phone: string;
     email: string;
+    photoUrl?: string; // Profile photo URL
     rating: number;
     reviews: Review[];
     verified: boolean;
+    companyName?: string;
 }
 
 interface User {
@@ -62,6 +65,11 @@ interface User {
     photoUrl?: string;
     emailVerified?: boolean;
     password?: string; // In a real app, this would be hashed
+    // Technician-specific fields (only present if role is 'technician')
+    technicianId?: string;
+    specializations?: string[];
+    location?: string;
+    companyName?: string;
 }
 
 interface ProfileChangeHistory {
@@ -97,7 +105,8 @@ const DEFAULT_LOCATIONS = [
 
 // Form Schemas
 const technicianFormSchema = z.object({
-    name: z.string().min(3, { message: 'El nombre debe tener al menos 3 caracteres.' }),
+    firstName: z.string().min(2, { message: 'El nombre debe tener al menos 2 caracteres.' }),
+    lastName: z.string().min(2, { message: 'El apellido debe tener al menos 2 caracteres.' }),
     specialization: z.string().min(1, { message: 'Debe seleccionar una especialización.' }),
     location: z.string().min(1, { message: 'Debe seleccionar una ubicación.' }),
     phone: z.string().regex(/^\d{3}-\d{3}-\d{4}$/, { message: 'Formato de teléfono inválido (XXX-XXX-XXXX).' }),
@@ -111,23 +120,25 @@ const reviewFormSchema = z.object({
 });
 
 const userFormSchema = z.object({
-    name: z.string().min(3, { message: 'El nombre debe tener al menos 3 caracteres.' }),
+    firstName: z.string().min(2, { message: 'El nombre debe tener al menos 2 caracteres.' }),
+    lastName: z.string().min(2, { message: 'El apellido debe tener al menos 2 caracteres.' }),
     email: z.string().email({ message: 'Formato de correo electrónico inválido.' }),
     phone: z.string().regex(/^\d{3}-\d{3}-\d{4}$/, { message: 'Formato de teléfono inválido (XXX-XXX-XXXX).' }),
     password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
     accountType: z.enum(['user', 'technician'], { required_error: 'Debes seleccionar un tipo de cuenta.' }),
     // Campos condicionales para técnicos
-    specialization: z.string().optional(),
+    specializations: z.array(z.string()).optional(), // Array of specializations
     location: z.string().optional(),
+    companyName: z.string().optional(), // Optional company name for technicians
 }).refine((data) => {
-    // Si es técnico, debe tener especialización y ubicación
+    // Si es técnico, debe tener al menos una especialización y ubicación
     if (data.accountType === 'technician') {
-        return data.specialization && data.specialization.length > 0 && data.location && data.location.length > 0;
+        return data.specializations && data.specializations.length > 0 && data.location && data.location.length > 0;
     }
     return true;
 }, {
-    message: 'Los técnicos deben seleccionar una especialización y ubicación.',
-    path: ['specialization'],
+    message: 'Los técnicos deben seleccionar al menos una especialización y ubicación.',
+    path: ['specializations'],
 });
 
 const loginFormSchema = z.object({
@@ -192,10 +203,36 @@ const SantiagoTechRDApp = () => {
     const [showProfileHistory, setShowProfileHistory] = useState(false);
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
     const [savingProfile, setSavingProfile] = useState(false);
+    const [editingSpecializations, setEditingSpecializations] = useState<string[]>([]);
+
+    // Availability state for technicians
+    const [profileTab, setProfileTab] = useState<'info' | 'history' | 'availability'>('info');
+    const [availability, setAvailability] = useState<{
+        dayOfWeek: number;
+        startTime: string;
+        endTime: string;
+        isAvailable: boolean;
+    }[]>([]);
+    const [loadingAvailability, setLoadingAvailability] = useState(false);
+    const [savingAvailability, setSavingAvailability] = useState(false);
+
+    // Registration photo state
+    const [registrationPhoto, setRegistrationPhoto] = useState<string | null>(null);
 
     // Email verification state
     const [resendingVerification, setResendingVerification] = useState(false);
     const [verificationEmailSent, setVerificationEmailSent] = useState(false);
+
+    // Password reset state
+    const [showForgotPasswordForm, setShowForgotPasswordForm] = useState(false);
+    const [showResetPasswordForm, setShowResetPasswordForm] = useState(false);
+    const [resetToken, setResetToken] = useState<string | null>(null);
+    const [resetEmail, setResetEmail] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+    const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
+    const [forgotPasswordMessage, setForgotPasswordMessage] = useState('');
     const [adminStats, setAdminStats] = useState<{
         totalUsers: number;
         totalTechnicians: number;
@@ -211,6 +248,10 @@ const SantiagoTechRDApp = () => {
     } | null>(null);
     const [loadingStats, setLoadingStats] = useState(false);
     const [allBookings, setAllBookings] = useState<any[]>([]);
+    const [reportDetailModal, setReportDetailModal] = useState<{
+        type: 'users' | 'technicians' | 'bookings' | null;
+        title: string;
+    }>({ type: null, title: '' });
 
     // Form for Technician Registration
     const {
@@ -222,7 +263,8 @@ const SantiagoTechRDApp = () => {
     } = useForm<z.infer<typeof technicianFormSchema>>({
         resolver: zodResolver(technicianFormSchema),
         defaultValues: {
-            name: '',
+            firstName: '',
+            lastName: '',
             specialization: '',
             location: '',
             phone: '',
@@ -233,8 +275,10 @@ const SantiagoTechRDApp = () => {
     // Pre-fill Technician Form with User Profile
     useEffect(() => {
         if (showRegisterForm && currentUser) {
+            const nameParts = currentUser.name?.split(' ') || ['', ''];
             resetTechnicianForm({
-                name: currentUser.name,
+                firstName: nameParts[0] || '',
+                lastName: nameParts.slice(1).join(' ') || '',
                 email: currentUser.email,
                 phone: currentUser.phone || '',
                 specialization: '',
@@ -270,13 +314,15 @@ const SantiagoTechRDApp = () => {
     } = useForm<z.infer<typeof userFormSchema>>({
         resolver: zodResolver(userFormSchema),
         defaultValues: {
-            name: '',
+            firstName: '',
+            lastName: '',
             email: '',
             phone: '',
             password: '',
             accountType: undefined,
-            specialization: '',
+            specializations: [],
             location: '',
+            companyName: '',
         },
     });
 
@@ -301,16 +347,27 @@ const SantiagoTechRDApp = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
+                // Fetch technicians
                 const techResponse = await fetch(`${API_BASE_URL}/api/technicians`);
                 const techData = await techResponse.json();
                 setTechnicians(techData);
 
-                // Only fetch users if admin (in a real app, this would be protected)
-                // For now, let's fetch them to populate the admin view if we are admin
-                // Or just fetch them all the time for this demo since we don't have persistent auth token storage yet
+                // Fetch users (for admin view)
                 const userResponse = await fetch(`${API_BASE_URL}/api/users`);
                 const userData = await userResponse.json();
                 setUsers(userData);
+
+                // Fetch app settings (specializations and locations)
+                const settingsResponse = await fetch(`${API_BASE_URL}/api/settings`);
+                if (settingsResponse.ok) {
+                    const settingsData = await settingsResponse.json();
+                    if (settingsData.specializations?.length > 0) {
+                        setSpecializations(settingsData.specializations);
+                    }
+                    if (settingsData.locations?.length > 0) {
+                        setLocations(settingsData.locations);
+                    }
+                }
             } catch (error) {
                 console.error("Error fetching data:", error);
             } finally {
@@ -326,12 +383,31 @@ const SantiagoTechRDApp = () => {
         if (!currentUser) return;
         setLoadingBookings(true);
         try {
-            const endpoint = currentUser.role === 'technician'
-                ? `${API_BASE_URL}/api/bookings/technician/${currentUser.id}`
-                : `${API_BASE_URL}/api/bookings/customer/${currentUser.id}`;
-            const response = await fetch(endpoint);
-            const data = await response.json();
-            setUserBookings(Array.isArray(data) ? data : []);
+            // For technicians, fetch BOTH: bookings where they are the technician AND where they are the customer
+            // (technicians can also book services from other technicians)
+            if (currentUser.role === 'technician' && currentUser.technicianId) {
+                const [technicianRes, customerRes] = await Promise.all([
+                    fetch(`${API_BASE_URL}/api/bookings/technician/${currentUser.technicianId}`),
+                    fetch(`${API_BASE_URL}/api/bookings/customer/${currentUser.id}`)
+                ]);
+                const technicianBookings = technicianRes.ok ? await technicianRes.json() : [];
+                const customerBookings = customerRes.ok ? await customerRes.json() : [];
+
+                // Combine and deduplicate (in case of any overlap)
+                const allBookings = [...(Array.isArray(technicianBookings) ? technicianBookings : [])];
+                const customerBookingsArray = Array.isArray(customerBookings) ? customerBookings : [];
+                customerBookingsArray.forEach((booking: any) => {
+                    if (!allBookings.find((b: any) => b.id === booking.id)) {
+                        allBookings.push(booking);
+                    }
+                });
+                setUserBookings(allBookings);
+            } else {
+                // For regular customers, only fetch their bookings
+                const response = await fetch(`${API_BASE_URL}/api/bookings/customer/${currentUser.id}`);
+                const data = await response.json();
+                setUserBookings(Array.isArray(data) ? data : []);
+            }
         } catch (error) {
             console.error('Error fetching bookings:', error);
             setUserBookings([]);
@@ -339,6 +415,14 @@ const SantiagoTechRDApp = () => {
             setLoadingBookings(false);
         }
     }, [currentUser]);
+
+    // Check if user has a completed booking with a specific technician
+    const hasCompletedBookingWithTechnician = useCallback((technicianId: string): boolean => {
+        if (!currentUser || !userBookings || userBookings.length === 0) return false;
+        return userBookings.some(
+            (booking: any) => booking.technicianId === technicianId && booking.status === 'COMPLETED'
+        );
+    }, [currentUser, userBookings]);
 
     // Fetch gamification data
     const fetchGamificationData = useCallback(async () => {
@@ -398,10 +482,11 @@ const SantiagoTechRDApp = () => {
             // Fetch stats from backend and bookings
             const [statsRes, bookingsRes] = await Promise.all([
                 fetch(`${API_BASE_URL}/api/users/admin/stats`),
-                fetch(`${API_BASE_URL}/api/bookings`)
+                fetch(`${API_BASE_URL}/api/bookings/all`)
             ]);
 
-            const bookingsData = bookingsRes.ok ? await bookingsRes.json() : [];
+            const bookingsJson = bookingsRes.ok ? await bookingsRes.json() : { bookings: [] };
+            const bookingsData = bookingsJson.bookings || [];
             setAllBookings(bookingsData);
 
             // If backend stats available, use them
@@ -660,16 +745,92 @@ const SantiagoTechRDApp = () => {
         }
     };
 
-    // Get unique specializations and locations from registered technicians
+    // Use specializations and locations from app settings (loaded from API)
+    // These are already sorted alphabetically in the settings
     const availableSpecializations = React.useMemo(() => {
-        const specs = Array.from(new Set(technicians.map(t => t.specialization)));
-        return specs.sort();
-    }, [technicians]);
+        return [...specializations].sort();
+    }, [specializations]);
 
     const availableLocations = React.useMemo(() => {
-        const locs = Array.from(new Set(technicians.map(t => t.location)));
-        return locs.sort();
-    }, [technicians]);
+        return [...locations].sort();
+    }, [locations]);
+
+    // API functions for managing specializations and locations
+    const addSpecializationToAPI = async (spec: string) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/settings/specializations`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ specialization: spec }),
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setSpecializations(data.specializations);
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Error adding specialization:', error);
+            return false;
+        }
+    };
+
+    const removeSpecializationFromAPI = async (spec: string) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/settings/specializations`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ specialization: spec }),
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setSpecializations(data.specializations);
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Error removing specialization:', error);
+            return false;
+        }
+    };
+
+    const addLocationToAPI = async (loc: string) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/settings/locations`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ location: loc }),
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setLocations(data.locations);
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Error adding location:', error);
+            return false;
+        }
+    };
+
+    const removeLocationFromAPI = async (loc: string) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/settings/locations`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ location: loc }),
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setLocations(data.locations);
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Error removing location:', error);
+            return false;
+        }
+    };
 
     // Filtered Technicians based on search and filters
     const filteredTechnicians = technicians.filter((technician) => {
@@ -720,10 +881,16 @@ const SantiagoTechRDApp = () => {
     const handleUserRegistration = async (data: z.infer<typeof userFormSchema>) => {
         setLoading(true);
         try {
+            // Combine firstName and lastName into name for backend
+            const { firstName, lastName, ...restData } = data;
             const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
+                body: JSON.stringify({
+                    ...restData,
+                    name: `${firstName} ${lastName}`,
+                    photoBase64: registrationPhoto, // Include photo if selected
+                }),
             });
 
             if (response.ok) {
@@ -731,6 +898,7 @@ const SantiagoTechRDApp = () => {
                 setUsers([...users, newUser]);
                 setUserRegistrationSuccess(true);
                 resetUserForm();
+                setRegistrationPhoto(null); // Clear the photo state
             } else {
                 const errorData = await response.json();
                 alert(`Error: ${errorData.message}`);
@@ -759,11 +927,13 @@ const SantiagoTechRDApp = () => {
                 setShowLoginForm(false);
                 resetLoginForm();
             } else {
-                alert("Credenciales inválidas");
+                const errorData = await response.json().catch(() => ({}));
+                console.error("Login failed:", response.status, errorData);
+                alert(errorData.message || "Credenciales inválidas");
             }
         } catch (error) {
             console.error("Error logging in:", error);
-            alert("Error al iniciar sesión");
+            alert(`Error al iniciar sesión: ${error instanceof Error ? error.message : 'Error de conexión'}`);
         } finally {
             setLoading(false);
         }
@@ -774,6 +944,103 @@ const SantiagoTechRDApp = () => {
         setCurrentView('home');
         setVerificationEmailSent(false);
     };
+
+    // Handle Forgot Password
+    const handleForgotPassword = async () => {
+        if (!resetEmail.trim()) {
+            alert('Por favor ingresa tu correo electrónico');
+            return;
+        }
+
+        setForgotPasswordLoading(true);
+        setForgotPasswordMessage('');
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: resetEmail }),
+            });
+
+            const data = await response.json();
+            setForgotPasswordMessage(data.message || 'Si el correo existe, recibirás un enlace para restablecer tu contraseña');
+        } catch (error) {
+            console.error('Error requesting password reset:', error);
+            setForgotPasswordMessage('Error al procesar la solicitud. Intenta de nuevo.');
+        } finally {
+            setForgotPasswordLoading(false);
+        }
+    };
+
+    // Handle Reset Password
+    const handleResetPassword = async () => {
+        if (!newPassword || !confirmPassword) {
+            alert('Por favor completa todos los campos');
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            alert('Las contraseñas no coinciden');
+            return;
+        }
+
+        if (newPassword.length < 6) {
+            alert('La contraseña debe tener al menos 6 caracteres');
+            return;
+        }
+
+        setResetPasswordLoading(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: resetToken, newPassword }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                alert('Tu contraseña ha sido actualizada exitosamente');
+                setShowResetPasswordForm(false);
+                setResetToken(null);
+                setNewPassword('');
+                setConfirmPassword('');
+                // Remove token from URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+                setShowLoginForm(true);
+            } else {
+                alert(data.message || 'Error al restablecer la contraseña');
+            }
+        } catch (error) {
+            console.error('Error resetting password:', error);
+            alert('Error al restablecer la contraseña. Intenta de nuevo.');
+        } finally {
+            setResetPasswordLoading(false);
+        }
+    };
+
+    // Check for reset token in URL on mount
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('reset');
+        if (token) {
+            // Verify token is valid
+            fetch(`${API_BASE_URL}/api/auth/verify-reset-token?token=${token}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.valid) {
+                        setResetToken(token);
+                        setShowResetPasswordForm(true);
+                    } else {
+                        alert('El enlace de recuperación es inválido o ha expirado');
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }
+                })
+                .catch(() => {
+                    alert('Error al verificar el enlace');
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                });
+        }
+    }, []);
 
     // Handle Resend Verification Email
     const handleResendVerification = async () => {
@@ -842,10 +1109,18 @@ const SantiagoTechRDApp = () => {
         const phone = (form.elements.namedItem('phone') as HTMLInputElement).value;
 
         try {
+            // Build request body
+            const requestBody: Record<string, unknown> = { name, phone };
+
+            // If user is a technician, include specializations
+            if (currentUser.role === 'technician' && editingSpecializations.length > 0) {
+                requestBody.specializations = editingSpecializations;
+            }
+
             const response = await fetch(`${API_BASE_URL}/api/users/${currentUser.id}/profile`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, phone }),
+                body: JSON.stringify(requestBody),
             });
 
             if (response.ok) {
@@ -878,6 +1153,82 @@ const SantiagoTechRDApp = () => {
             console.error("Error fetching profile history:", error);
         }
     }, [currentUser]);
+
+    // Fetch technician availability
+    const fetchAvailability = useCallback(async () => {
+        if (!currentUser || currentUser.role !== 'technician' || !currentUser.technicianId) return;
+        setLoadingAvailability(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/bookings/technician/${currentUser.technicianId}/availability`);
+            if (response.ok) {
+                const data = await response.json();
+                if (data.length > 0) {
+                    setAvailability(data.map((slot: any) => ({
+                        dayOfWeek: slot.dayOfWeek,
+                        startTime: slot.startTime,
+                        endTime: slot.endTime,
+                        isAvailable: slot.isAvailable,
+                    })));
+                } else {
+                    // Initialize with default availability (Mon-Sat, 8am-6pm)
+                    const defaultSlots = [];
+                    for (let day = 1; day <= 6; day++) {
+                        defaultSlots.push({
+                            dayOfWeek: day,
+                            startTime: '08:00',
+                            endTime: '18:00',
+                            isAvailable: true,
+                        });
+                    }
+                    // Sunday off by default
+                    defaultSlots.push({
+                        dayOfWeek: 0,
+                        startTime: '08:00',
+                        endTime: '18:00',
+                        isAvailable: false,
+                    });
+                    setAvailability(defaultSlots);
+                }
+            }
+        } catch (error) {
+            console.error("Error fetching availability:", error);
+        } finally {
+            setLoadingAvailability(false);
+        }
+    }, [currentUser]);
+
+    // Save technician availability
+    const saveAvailability = async () => {
+        if (!currentUser || currentUser.role !== 'technician' || !currentUser.technicianId) return;
+        setSavingAvailability(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/bookings/technician/${currentUser.technicianId}/availability`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ slots: availability }),
+            });
+            if (response.ok) {
+                alert('¡Disponibilidad guardada exitosamente!');
+            } else {
+                alert('Error al guardar disponibilidad');
+            }
+        } catch (error) {
+            console.error("Error saving availability:", error);
+            alert('Error al guardar disponibilidad');
+        } finally {
+            setSavingAvailability(false);
+        }
+    };
+
+    // Update availability for a specific day
+    const updateDayAvailability = (dayOfWeek: number, field: string, value: string | boolean) => {
+        setAvailability(prev => prev.map(slot =>
+            slot.dayOfWeek === dayOfWeek ? { ...slot, [field]: value } : slot
+        ));
+    };
+
+    // Day names in Spanish
+    const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
     // Upload profile photo
     const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -930,6 +1281,35 @@ const SantiagoTechRDApp = () => {
             alert('Error al subir la foto');
             setUploadingPhoto(false);
         }
+    };
+
+    // Handle photo selection during registration (stores in state, doesn't upload yet)
+    const handleRegistrationPhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+
+        const file = e.target.files[0];
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            alert('Por favor selecciona una imagen válida');
+            return;
+        }
+
+        // Validate file size (2MB max)
+        if (file.size > 2 * 1024 * 1024) {
+            alert('La imagen no puede ser mayor a 2MB');
+            return;
+        }
+
+        // Convert to base64 and store in state
+        const reader = new FileReader();
+        reader.onload = () => {
+            setRegistrationPhoto(reader.result as string);
+        };
+        reader.onerror = () => {
+            alert('Error al leer el archivo');
+        };
+        reader.readAsDataURL(file);
     };
 
     // Format field name for display
@@ -1002,10 +1382,13 @@ const SantiagoTechRDApp = () => {
                 <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 via-orange-500 to-red-500" />
 
                 <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-                    <h1 className="text-2xl font-bold text-white flex items-center gap-2 drop-shadow-md">
+                    <h1
+                        className="text-2xl font-bold text-white flex items-center gap-2 drop-shadow-md cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={() => setCurrentView('home')}
+                    >
                         <span className="text-3xl">🔧</span>
-                        <span className="hidden sm:inline">Santiago Tech RD</span>
-                        <span className="sm:hidden">STech</span>
+                        <span className="hidden sm:inline">Técnicos en RD</span>
+                        <span className="sm:hidden">TecRD</span>
                         <span className="text-2xl">🌴</span>
                     </h1>
                     <div className="flex gap-2 items-center">
@@ -1013,15 +1396,15 @@ const SantiagoTechRDApp = () => {
                             <div className="flex items-center gap-2 md:gap-4">
                                 {/* Points display (compact) */}
                                 {userPoints && (
-                                    <motion.button
+                                    <motion.div
                                         whileHover={{ scale: 1.05 }}
                                         whileTap={{ scale: 0.95 }}
                                         onClick={() => setCurrentView('gamification')}
-                                        className="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 text-white shadow-md hover:shadow-lg transition-all border-2 border-white/30"
+                                        className="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 text-white shadow-md hover:shadow-lg transition-all border-2 border-white/30 cursor-pointer"
                                     >
                                         <span className="text-sm">⚡</span>
                                         <span className="font-bold text-sm">{userPoints.totalPoints?.toLocaleString() || 0}</span>
-                                    </motion.button>
+                                    </motion.div>
                                 )}
                                 <span className="text-sm font-medium text-white/90 hidden md:block">
                                     ¡Klk, {currentUser.name}!
@@ -1385,9 +1768,17 @@ const SantiagoTechRDApp = () => {
                                                     <tr key={tech.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
                                                         <td className="px-6 py-4 whitespace-nowrap">
                                                             <div className="flex items-center gap-3">
-                                                                <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
-                                                                    <Wrench className="w-5 h-5 text-amber-600" />
-                                                                </div>
+                                                                {tech.photoUrl ? (
+                                                                    <img
+                                                                        src={tech.photoUrl}
+                                                                        alt={tech.name}
+                                                                        className="w-10 h-10 rounded-full object-cover border-2 border-amber-300"
+                                                                    />
+                                                                ) : (
+                                                                    <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                                                                        <Wrench className="w-5 h-5 text-amber-600" />
+                                                                    </div>
+                                                                )}
                                                                 <div>
                                                                     <p className="font-medium text-gray-900 dark:text-white">{tech.name}</p>
                                                                     <p className="text-xs text-gray-500">{tech.email}</p>
@@ -1631,7 +2022,9 @@ const SantiagoTechRDApp = () => {
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                             <motion.div
                                                 whileHover={{ scale: 1.02 }}
-                                                className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 text-white shadow-lg"
+                                                whileTap={{ scale: 0.98 }}
+                                                onClick={() => setReportDetailModal({ type: 'users', title: 'Total Usuarios' })}
+                                                className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 text-white shadow-lg cursor-pointer"
                                             >
                                                 <div className="flex items-center justify-between">
                                                     <div>
@@ -1640,11 +2033,14 @@ const SantiagoTechRDApp = () => {
                                                     </div>
                                                     <Users className="w-12 h-12 text-blue-200" />
                                                 </div>
+                                                <p className="text-blue-200 text-xs mt-2">Click para ver detalles →</p>
                                             </motion.div>
 
                                             <motion.div
                                                 whileHover={{ scale: 1.02 }}
-                                                className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl p-5 text-white shadow-lg"
+                                                whileTap={{ scale: 0.98 }}
+                                                onClick={() => setReportDetailModal({ type: 'technicians', title: 'Técnicos Registrados' })}
+                                                className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl p-5 text-white shadow-lg cursor-pointer"
                                             >
                                                 <div className="flex items-center justify-between">
                                                     <div>
@@ -1653,11 +2049,14 @@ const SantiagoTechRDApp = () => {
                                                     </div>
                                                     <Wrench className="w-12 h-12 text-amber-200" />
                                                 </div>
+                                                <p className="text-amber-200 text-xs mt-2">Click para ver detalles →</p>
                                             </motion.div>
 
                                             <motion.div
                                                 whileHover={{ scale: 1.02 }}
-                                                className="bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl p-5 text-white shadow-lg"
+                                                whileTap={{ scale: 0.98 }}
+                                                onClick={() => setReportDetailModal({ type: 'bookings', title: 'Todas las Reservas' })}
+                                                className="bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl p-5 text-white shadow-lg cursor-pointer"
                                             >
                                                 <div className="flex items-center justify-between">
                                                     <div>
@@ -1666,6 +2065,7 @@ const SantiagoTechRDApp = () => {
                                                     </div>
                                                     <Calendar className="w-12 h-12 text-emerald-200" />
                                                 </div>
+                                                <p className="text-emerald-200 text-xs mt-2">Click para ver detalles →</p>
                                             </motion.div>
 
                                             <motion.div
@@ -1859,19 +2259,19 @@ const SantiagoTechRDApp = () => {
                                                     value={newSpecialization}
                                                     onChange={(e) => setNewSpecialization(e.target.value)}
                                                     className="flex-1"
-                                                    onKeyDown={(e) => {
+                                                    onKeyDown={async (e) => {
                                                         if (e.key === 'Enter' && newSpecialization.trim()) {
                                                             if (!specializations.includes(newSpecialization.trim())) {
-                                                                setSpecializations([...specializations, newSpecialization.trim()]);
+                                                                await addSpecializationToAPI(newSpecialization.trim());
                                                             }
                                                             setNewSpecialization('');
                                                         }
                                                     }}
                                                 />
                                                 <Button
-                                                    onClick={() => {
+                                                    onClick={async () => {
                                                         if (newSpecialization.trim() && !specializations.includes(newSpecialization.trim())) {
-                                                            setSpecializations([...specializations, newSpecialization.trim()]);
+                                                            await addSpecializationToAPI(newSpecialization.trim());
                                                             setNewSpecialization('');
                                                         }
                                                     }}
@@ -1894,13 +2294,13 @@ const SantiagoTechRDApp = () => {
                                                         <Button
                                                             size="sm"
                                                             variant="ghost"
-                                                            onClick={() => {
+                                                            onClick={async () => {
                                                                 // Check if any technician uses this specialization
-                                                                const inUse = technicians.some(t => t.specialization === spec);
+                                                                const inUse = technicians.some(t => t.specialization === spec || t.specializations?.includes(spec));
                                                                 if (inUse) {
                                                                     alert(`No se puede eliminar "${spec}" porque hay técnicos registrados con esta especialización.`);
                                                                 } else {
-                                                                    setSpecializations(specializations.filter(s => s !== spec));
+                                                                    await removeSpecializationFromAPI(spec);
                                                                 }
                                                             }}
                                                             className="text-red-500 hover:text-red-700 hover:bg-red-50"
@@ -1929,19 +2329,19 @@ const SantiagoTechRDApp = () => {
                                                     value={newLocation}
                                                     onChange={(e) => setNewLocation(e.target.value)}
                                                     className="flex-1"
-                                                    onKeyDown={(e) => {
+                                                    onKeyDown={async (e) => {
                                                         if (e.key === 'Enter' && newLocation.trim()) {
                                                             if (!locations.includes(newLocation.trim())) {
-                                                                setLocations([...locations, newLocation.trim()]);
+                                                                await addLocationToAPI(newLocation.trim());
                                                             }
                                                             setNewLocation('');
                                                         }
                                                     }}
                                                 />
                                                 <Button
-                                                    onClick={() => {
+                                                    onClick={async () => {
                                                         if (newLocation.trim() && !locations.includes(newLocation.trim())) {
-                                                            setLocations([...locations, newLocation.trim()]);
+                                                            await addLocationToAPI(newLocation.trim());
                                                             setNewLocation('');
                                                         }
                                                     }}
@@ -1964,13 +2364,13 @@ const SantiagoTechRDApp = () => {
                                                         <Button
                                                             size="sm"
                                                             variant="ghost"
-                                                            onClick={() => {
+                                                            onClick={async () => {
                                                                 // Check if any technician uses this location
                                                                 const inUse = technicians.some(t => t.location === loc);
                                                                 if (inUse) {
                                                                     alert(`No se puede eliminar "${loc}" porque hay técnicos registrados en esta ubicación.`);
                                                                 } else {
-                                                                    setLocations(locations.filter(l => l !== loc));
+                                                                    await removeLocationFromAPI(loc);
                                                                 }
                                                             }}
                                                             className="text-red-500 hover:text-red-700 hover:bg-red-50"
@@ -2058,91 +2458,89 @@ const SantiagoTechRDApp = () => {
                         </div>
                     </section >
 
-                    {/* Professionals in Action Section - Dominican Style */}
-                    <section className="py-16 bg-gradient-to-b from-sky-50 to-white dark:from-gray-800 dark:to-gray-900">
-                        <div className="container mx-auto px-4">
-                            <h2 className="text-3xl font-bold text-center mb-4 text-gray-800 dark:text-white flex items-center justify-center gap-3">
-                                <span>🛠️</span> Nuestros Tígueres en Acción <span>💪</span>
-                            </h2>
-                            <p className="text-center text-emerald-600 dark:text-emerald-400 mb-12 text-lg">
-                                ¡Los mejores del Cibao, pa' servirte!
-                            </p>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                <motion.div
-                                    whileHover={{ y: -10, scale: 1.02 }}
-                                    className="rounded-2xl overflow-hidden shadow-xl bg-gradient-to-br from-amber-400 to-orange-500"
-                                >
-                                    <img
-                                        src="/images/electricista.png"
-                                        alt="Electricista dominicano profesional"
-                                        className="w-full h-56 object-cover"
-                                    />
-                                    <div className="p-5 bg-white dark:bg-gray-800">
-                                        <h3 className="text-lg font-bold mb-2 text-gray-800 dark:text-white flex items-center gap-2">
-                                            ⚡ Electricidad al Día
-                                        </h3>
-                                        <p className="text-sm text-gray-600 dark:text-gray-300">
-                                            Instalaciones y reparaciones pa' que no te quede' a oscura', ¡garantizado!
-                                        </p>
-                                    </div>
-                                </motion.div>
-                                <motion.div
-                                    whileHover={{ y: -10, scale: 1.02 }}
-                                    className="rounded-2xl overflow-hidden shadow-xl bg-gradient-to-br from-sky-400 to-blue-500"
-                                >
-                                    <img
-                                        src="/images/plomero.png"
-                                        alt="Plomero dominicano arreglando tubería"
-                                        className="w-full h-56 object-cover"
-                                    />
-                                    <div className="p-5 bg-white dark:bg-gray-800">
-                                        <h3 className="text-lg font-bold mb-2 text-gray-800 dark:text-white flex items-center gap-2">
-                                            🔧 Plomería Sin Problema
-                                        </h3>
-                                        <p className="text-sm text-gray-600 dark:text-gray-300">
-                                            ¿Goteo? ¿Tubo roto? ¡Nosotros lo resolvemo' rapidito!
-                                        </p>
-                                    </div>
-                                </motion.div>
-                                <motion.div
-                                    whileHover={{ y: -10, scale: 1.02 }}
-                                    className="rounded-2xl overflow-hidden shadow-xl bg-gradient-to-br from-pink-400 to-rose-500"
-                                >
-                                    <img
-                                        src="/images/cleaner.png"
-                                        alt="Limpiadora dominicana profesional"
-                                        className="w-full h-56 object-cover"
-                                    />
-                                    <div className="p-5 bg-white dark:bg-gray-800">
-                                        <h3 className="text-lg font-bold mb-2 text-gray-800 dark:text-white flex items-center gap-2">
-                                            🧹 Limpieza Impecable
-                                        </h3>
-                                        <p className="text-sm text-gray-600 dark:text-gray-300">
-                                            Tu hogar brillando como nuevo, ¡con el toque dominicano!
-                                        </p>
-                                    </div>
-                                </motion.div>
-                                <motion.div
-                                    whileHover={{ y: -10, scale: 1.02 }}
-                                    className="rounded-2xl overflow-hidden shadow-xl bg-gradient-to-br from-emerald-400 to-teal-500"
-                                >
-                                    <img
-                                        src="/images/tecnico.png"
-                                        alt="Técnico dominicano con multímetro"
-                                        className="w-full h-56 object-cover"
-                                    />
-                                    <div className="p-5 bg-white dark:bg-gray-800">
-                                        <h3 className="text-lg font-bold mb-2 text-gray-800 dark:text-white flex items-center gap-2">
-                                            🔌 Técnico Profesional
-                                        </h3>
-                                        <p className="text-sm text-gray-600 dark:text-gray-300">
-                                            Reparaciones y diagnósticos con equipo de primera, ¡tamo' activo!
-                                        </p>
-                                    </div>
-                                </motion.div>
+                    {/* Featured Technicians Section - Real Data with Big Photos */}
+                    {technicians.length > 0 && (
+                        <section className="py-16 bg-gradient-to-b from-sky-50 to-white dark:from-gray-800 dark:to-gray-900">
+                            <div className="container mx-auto px-4">
+                                <h2 className="text-3xl font-bold text-center mb-4 text-gray-800 dark:text-white flex items-center justify-center gap-3">
+                                    <span>🛠️</span> Nuestros Tígueres en Acción <span>💪</span>
+                                </h2>
+                                <p className="text-center text-emerald-600 dark:text-emerald-400 mb-12 text-lg">
+                                    ¡Los mejores del Cibao, pa' servirte!
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                    {technicians.slice(0, 4).map((technician, index) => {
+                                        const gradients = [
+                                            'from-amber-400 to-orange-500',
+                                            'from-sky-400 to-blue-500',
+                                            'from-pink-400 to-rose-500',
+                                            'from-emerald-400 to-teal-500'
+                                        ];
+                                        return (
+                                            <motion.div
+                                                key={technician.id}
+                                                whileHover={{ y: -10, scale: 1.02 }}
+                                                className={`rounded-2xl overflow-hidden shadow-xl bg-gradient-to-br ${gradients[index % 4]} cursor-pointer`}
+                                                onClick={() => {
+                                                    if (!currentUser) {
+                                                        setShowLoginForm(true);
+                                                        return;
+                                                    }
+                                                    setShowBookingForm({
+                                                        technician: {
+                                                            id: technician.id,
+                                                            name: technician.name,
+                                                            specialization: technician.specialization,
+                                                        },
+                                                        show: true,
+                                                    });
+                                                }}
+                                            >
+                                                {/* Large Photo Section */}
+                                                <div className="relative h-56 bg-gray-200 dark:bg-gray-700">
+                                                    {technician.photoUrl ? (
+                                                        <img
+                                                            src={technician.photoUrl}
+                                                            alt={technician.name}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center">
+                                                            <User className="w-24 h-24 text-white/70" />
+                                                        </div>
+                                                    )}
+                                                    {/* Verified badge */}
+                                                    {technician.verified && (
+                                                        <div className="absolute top-3 right-3 bg-emerald-500 text-white px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 shadow-lg">
+                                                            <CheckCircle className="w-3 h-3" /> Verificado
+                                                        </div>
+                                                    )}
+                                                    {/* Rating badge */}
+                                                    {technician.rating > 0 && (
+                                                        <div className="absolute top-3 left-3 bg-white/90 dark:bg-gray-800/90 px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 shadow-lg">
+                                                            <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                                                            <span className="text-gray-800 dark:text-white">{technician.rating.toFixed(1)}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="p-5 bg-white dark:bg-gray-800">
+                                                    <h3 className="text-lg font-bold mb-1 text-gray-800 dark:text-white truncate">
+                                                        {technician.name}
+                                                    </h3>
+                                                    <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium mb-2 flex items-center gap-1">
+                                                        <span>🔧</span> {technician.specialization}
+                                                    </p>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                                        <MapPin className="w-3 h-3" /> {technician.location}
+                                                    </p>
+                                                </div>
+                                            </motion.div>
+                                        );
+                                    })}
+                                </div>
                             </div>
-                        </div>
-                    </section>
+                        </section>
+                    )}
 
                     <main className="container mx-auto px-4 py-8">
                         {/* Search bar with Dominican flair */}
@@ -2223,24 +2621,45 @@ const SantiagoTechRDApp = () => {
                                             whileHover={{ y: -5 }}
                                         >
                                             <Card className="bg-white dark:bg-gray-800 shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-emerald-300 overflow-hidden group h-full flex flex-col rounded-2xl">
-                                                <CardHeader className="pb-4 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-gray-700/50 dark:to-gray-700/30 border-b border-emerald-100 dark:border-gray-700">
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <div className="bg-gradient-to-br from-emerald-400 to-teal-500 p-2 rounded-full shadow-md">
-                                                            <User className="w-6 h-6 text-white" />
-                                                        </div>
+                                                {/* Prominent Photo Section */}
+                                                <div className="relative">
+                                                    {/* Background gradient banner */}
+                                                    <div className="h-24 bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500" />
+
+                                                    {/* Profile photo - overlapping the banner */}
+                                                    <div className="absolute left-1/2 -translate-x-1/2 -bottom-12">
+                                                        {technician.photoUrl ? (
+                                                            <img
+                                                                src={technician.photoUrl}
+                                                                alt={technician.name}
+                                                                className="w-24 h-24 rounded-full object-cover border-4 border-white dark:border-gray-800 shadow-xl ring-2 ring-emerald-400"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center border-4 border-white dark:border-gray-800 shadow-xl">
+                                                                <User className="w-10 h-10 text-white" />
+                                                            </div>
+                                                        )}
                                                         {technician.verified && (
-                                                            <span title="Técnico Verificado" className="bg-emerald-100 text-emerald-700 text-xs px-3 py-1 rounded-full flex items-center gap-1 font-medium">
-                                                                <CheckCircle className="w-3 h-3" /> ¡Verificado!
-                                                            </span>
+                                                            <div className="absolute -bottom-1 -right-1 bg-emerald-500 rounded-full p-1 border-2 border-white shadow-md">
+                                                                <CheckCircle className="w-4 h-4 text-white" />
+                                                            </div>
                                                         )}
                                                     </div>
+                                                </div>
+
+                                                <CardHeader className="pt-14 pb-4 text-center">
                                                     <h3 className="text-xl font-bold text-gray-800 dark:text-white group-hover:text-emerald-600 transition-colors">
                                                         {technician.name}
                                                     </h3>
-                                                    <p className="text-emerald-600 dark:text-emerald-400 font-medium text-sm flex items-center gap-1">
+                                                    <p className="text-emerald-600 dark:text-emerald-400 font-medium text-sm flex items-center justify-center gap-1">
                                                         <span className="text-base">🔧</span>
                                                         {technician.specialization}
                                                     </p>
+                                                    {technician.verified && (
+                                                        <span className="inline-flex items-center gap-1 mt-2 bg-emerald-100 text-emerald-700 text-xs px-3 py-1 rounded-full font-medium">
+                                                            <CheckCircle className="w-3 h-3" /> Técnico Verificado
+                                                        </span>
+                                                    )}
                                                 </CardHeader>
                                                 <CardContent className="pt-6 flex-grow">
                                                     <div className="space-y-3 mb-6">
@@ -2303,15 +2722,17 @@ const SantiagoTechRDApp = () => {
                                                     </div>
                                                 </CardContent>
                                                 <CardFooter className="pt-0 pb-6 px-6">
-                                                    <div className="grid grid-cols-2 gap-3 w-full">
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            className="w-full border-amber-300 text-amber-600 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-400 transition-colors rounded-xl"
-                                                            onClick={() => setShowReviewForm({ technicianId: technician.id, show: true })}
-                                                        >
-                                                            ⭐ Calificar
-                                                        </Button>
+                                                    <div className={`grid gap-3 w-full ${hasCompletedBookingWithTechnician(technician.id) ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                                                        {hasCompletedBookingWithTechnician(technician.id) && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="w-full border-amber-300 text-amber-600 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-400 transition-colors rounded-xl"
+                                                                onClick={() => setShowReviewForm({ technicianId: technician.id, show: true })}
+                                                            >
+                                                                ⭐ Calificar
+                                                            </Button>
+                                                        )}
                                                         <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                                                             <Button
                                                                 size="sm"
@@ -2375,7 +2796,7 @@ const SantiagoTechRDApp = () => {
                                 🎯 Nuestra Misión
                             </h3>
                             <p className="text-lg leading-relaxed">
-                                En Santiago Tech RD, nuestra misión es conectar a los residentes de Santiago de los Caballeros
+                                En Técnicos en RD, nuestra misión es conectar a los residentes de Santiago de los Caballeros
                                 y toda la región del Cibao con técnicos profesionales calificados. Creemos que encontrar
                                 un buen técnico no debería ser difícil - por eso creamos una plataforma que hace el proceso
                                 fácil, seguro y confiable.
@@ -2486,7 +2907,7 @@ const SantiagoTechRDApp = () => {
                     <div>
                         <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                             <span className="text-2xl">🔧🌴</span>
-                            Santiago Tech RD
+                            Técnicos en RD
                         </h3>
                         <p className="text-sm text-gray-400">
                             ¡El mejor equipo de tígueres pa' resolver to' lo de tu casa! 💪
@@ -2515,7 +2936,7 @@ const SantiagoTechRDApp = () => {
                 </div>
                 <div className="border-t border-gray-700/50 mt-8 pt-8 text-center">
                     <p className="text-sm text-gray-500">
-                        &copy; {new Date().getFullYear()} Santiago Tech RD. Todos los derechos reservados.
+                        &copy; {new Date().getFullYear()} Técnicos en RD. Todos los derechos reservados.
                     </p>
                     <p className="text-emerald-500 text-xs mt-2">
                         Hecho con ❤️ en República Dominicana 🇩🇴
@@ -2579,23 +3000,43 @@ const SantiagoTechRDApp = () => {
                                 </div>
                             ) : (
                                 <form onSubmit={handleTechnicianSubmit(handleTechnicianRegistration)} className="space-y-4">
-                                    <div>
-                                        <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                            Nombre Completo
-                                        </label>
-                                        <Input
-                                            type="text"
-                                            id="name"
-                                            {...registerTechnician('name')}
-                                            className={cn(
-                                                'mt-1',
-                                                technicianErrors.name && 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                Nombre
+                                            </label>
+                                            <Input
+                                                type="text"
+                                                id="firstName"
+                                                {...registerTechnician('firstName')}
+                                                className={cn(
+                                                    'mt-1',
+                                                    technicianErrors.firstName && 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                                                )}
+                                                placeholder="Tu nombre"
+                                            />
+                                            {technicianErrors.firstName && (
+                                                <p className="text-red-500 text-sm mt-1">{technicianErrors.firstName.message}</p>
                                             )}
-                                            placeholder="Tu nombre completo"
-                                        />
-                                        {technicianErrors.name && (
-                                            <p className="text-red-500 text-sm mt-1">{technicianErrors.name.message}</p>
-                                        )}
+                                        </div>
+                                        <div>
+                                            <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                Apellido
+                                            </label>
+                                            <Input
+                                                type="text"
+                                                id="lastName"
+                                                {...registerTechnician('lastName')}
+                                                className={cn(
+                                                    'mt-1',
+                                                    technicianErrors.lastName && 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                                                )}
+                                                placeholder="Tu apellido"
+                                            />
+                                            {technicianErrors.lastName && (
+                                                <p className="text-red-500 text-sm mt-1">{technicianErrors.lastName.message}</p>
+                                            )}
+                                        </div>
                                     </div>
                                     <div>
                                         <label htmlFor="specialization" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -2840,23 +3281,88 @@ const SantiagoTechRDApp = () => {
                                         )}
                                     </div>
 
-                                    <div>
-                                        <label htmlFor="userName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                            Nombre Completo
+                                    {/* Profile Photo Upload */}
+                                    <div className="flex flex-col items-center">
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Foto de Perfil <span className="text-gray-400">(opcional)</span>
                                         </label>
-                                        <Input
-                                            type="text"
-                                            id="userName"
-                                            {...registerUser('name')}
-                                            className={cn(
-                                                'mt-1',
-                                                userErrors.name && 'border-red-500 focus:ring-red-500 focus:border-red-500'
-                                            )}
-                                            placeholder="Tu nombre completo"
-                                        />
-                                        {userErrors.name && (
-                                            <p className="text-red-500 text-sm mt-1">{userErrors.name.message}</p>
+                                        <div className="relative group cursor-pointer">
+                                            <div className={cn(
+                                                "w-24 h-24 rounded-full flex items-center justify-center overflow-hidden border-2 transition-all",
+                                                registrationPhoto
+                                                    ? "border-emerald-400"
+                                                    : "border-gray-300 dark:border-gray-600 border-dashed"
+                                            )}>
+                                                {registrationPhoto ? (
+                                                    <img
+                                                        src={registrationPhoto}
+                                                        alt="Preview"
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                ) : (
+                                                    <div className="flex flex-col items-center text-gray-400">
+                                                        <Camera className="w-8 h-8" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <Camera className="w-6 h-6 text-white" />
+                                            </div>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={handleRegistrationPhotoSelect}
+                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                            />
+                                        </div>
+                                        {registrationPhoto && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setRegistrationPhoto(null)}
+                                                className="mt-2 text-xs text-red-500 hover:text-red-700"
+                                            >
+                                                Quitar foto
+                                            </button>
                                         )}
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label htmlFor="userFirstName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                Nombre
+                                            </label>
+                                            <Input
+                                                type="text"
+                                                id="userFirstName"
+                                                {...registerUser('firstName')}
+                                                className={cn(
+                                                    'mt-1',
+                                                    userErrors.firstName && 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                                                )}
+                                                placeholder="Tu nombre"
+                                            />
+                                            {userErrors.firstName && (
+                                                <p className="text-red-500 text-sm mt-1">{userErrors.firstName.message}</p>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <label htmlFor="userLastName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                Apellido
+                                            </label>
+                                            <Input
+                                                type="text"
+                                                id="userLastName"
+                                                {...registerUser('lastName')}
+                                                className={cn(
+                                                    'mt-1',
+                                                    userErrors.lastName && 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                                                )}
+                                                placeholder="Tu apellido"
+                                            />
+                                            {userErrors.lastName && (
+                                                <p className="text-red-500 text-sm mt-1">{userErrors.lastName.message}</p>
+                                            )}
+                                        </div>
                                     </div>
                                     <div>
                                         <label htmlFor="userEmail" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -2929,32 +3435,59 @@ const SantiagoTechRDApp = () => {
                                                     </h3>
                                                     <div className="space-y-4">
                                                         <div>
-                                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                                                Especialización <span className="text-red-500">*</span>
+                                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                                Servicios que ofreces <span className="text-red-500">*</span>
                                                             </label>
+                                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                                                                Selecciona todos los servicios que puedes proveer
+                                                            </p>
                                                             <Controller
-                                                                name="specialization"
+                                                                name="specializations"
                                                                 control={userFormControl}
                                                                 render={({ field }) => (
-                                                                    <Select onValueChange={field.onChange} value={field.value}>
-                                                                        <SelectTrigger className={cn(
-                                                                            "mt-1",
-                                                                            userErrors.specialization && 'border-red-500'
-                                                                        )}>
-                                                                            <SelectValue placeholder="Selecciona tu especialización" />
-                                                                        </SelectTrigger>
-                                                                        <SelectContent>
-                                                                            {specializations.map((spec) => (
-                                                                                <SelectItem key={spec} value={spec}>
-                                                                                    {spec}
-                                                                                </SelectItem>
-                                                                            ))}
-                                                                        </SelectContent>
-                                                                    </Select>
+                                                                    <div className={cn(
+                                                                        "grid grid-cols-2 gap-2 p-3 border rounded-lg max-h-48 overflow-y-auto",
+                                                                        userErrors.specializations ? 'border-red-500' : 'border-gray-200 dark:border-gray-600'
+                                                                    )}>
+                                                                        {specializations.map((spec) => {
+                                                                            const isSelected = field.value?.includes(spec) || false;
+                                                                            return (
+                                                                                <label
+                                                                                    key={spec}
+                                                                                    className={cn(
+                                                                                        "flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all text-sm",
+                                                                                        isSelected
+                                                                                            ? "bg-amber-100 dark:bg-amber-900/30 border border-amber-400"
+                                                                                            : "bg-gray-50 dark:bg-gray-800 border border-transparent hover:bg-gray-100 dark:hover:bg-gray-700"
+                                                                                    )}
+                                                                                >
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        checked={isSelected}
+                                                                                        onChange={(e) => {
+                                                                                            const currentValues = field.value || [];
+                                                                                            if (e.target.checked) {
+                                                                                                field.onChange([...currentValues, spec]);
+                                                                                            } else {
+                                                                                                field.onChange(currentValues.filter((v: string) => v !== spec));
+                                                                                            }
+                                                                                        }}
+                                                                                        className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                                                                                    />
+                                                                                    <span className={cn(
+                                                                                        "text-sm",
+                                                                                        isSelected ? "text-amber-700 dark:text-amber-300 font-medium" : "text-gray-700 dark:text-gray-300"
+                                                                                    )}>
+                                                                                        {spec}
+                                                                                    </span>
+                                                                                </label>
+                                                                            );
+                                                                        })}
+                                                                    </div>
                                                                 )}
                                                             />
-                                                            {userErrors.specialization && (
-                                                                <p className="text-red-500 text-sm mt-1">{userErrors.specialization.message}</p>
+                                                            {userErrors.specializations && (
+                                                                <p className="text-red-500 text-sm mt-1">{userErrors.specializations.message}</p>
                                                             )}
                                                         </div>
                                                         <div>
@@ -2986,6 +3519,21 @@ const SantiagoTechRDApp = () => {
                                                                 <p className="text-red-500 text-sm mt-1">{userErrors.location.message}</p>
                                                             )}
                                                         </div>
+                                                        <div>
+                                                            <label htmlFor="companyName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                                Nombre de Empresa <span className="text-gray-400">(opcional)</span>
+                                                            </label>
+                                                            <Input
+                                                                type="text"
+                                                                id="companyName"
+                                                                {...registerUser('companyName')}
+                                                                className="mt-1"
+                                                                placeholder="Ej: Servicios Técnicos González"
+                                                            />
+                                                            <p className="text-xs text-gray-500 mt-1">
+                                                                Si trabajas con una empresa, ingresa el nombre aquí.
+                                                            </p>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </motion.div>
@@ -2999,6 +3547,7 @@ const SantiagoTechRDApp = () => {
                                                 setShowUserRegisterForm(false);
                                                 setUserRegistrationSuccess(false);
                                                 resetUserForm();
+                                                setRegistrationPhoto(null);
                                             }}
                                             disabled={isUserSubmitting}
                                             className="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300"
@@ -3240,21 +3789,183 @@ const SantiagoTechRDApp = () => {
                                         )}
                                     </Button>
                                 </form>
-                                <div className="mt-4 text-center text-sm text-gray-600 dark:text-gray-400">
-                                    ¿No tienes cuenta?{' '}
+                                <div className="mt-4 text-center space-y-2">
                                     <button
                                         onClick={() => {
                                             setShowLoginForm(false);
-                                            setShowUserRegisterForm(true);
+                                            setShowForgotPasswordForm(true);
+                                            setForgotPasswordMessage('');
+                                            setResetEmail('');
                                         }}
-                                        className="text-blue-600 hover:underline font-medium"
+                                        className="text-sm text-gray-500 hover:text-blue-600 hover:underline"
                                     >
-                                        Regístrate aquí
+                                        ¿Olvidaste tu contraseña?
                                     </button>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                                        ¿No tienes cuenta?{' '}
+                                        <button
+                                            onClick={() => {
+                                                setShowLoginForm(false);
+                                                setShowUserRegisterForm(true);
+                                            }}
+                                            className="text-blue-600 hover:underline font-medium"
+                                        >
+                                            Regístrate aquí
+                                        </button>
+                                    </p>
                                 </div>
                             </motion.div>
                         </motion.div>
                     )}
+            </AnimatePresence>
+
+            {/* Forgot Password Modal */}
+            <AnimatePresence>
+                {showForgotPasswordForm && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+                        onClick={() => setShowForgotPasswordForm(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.9, y: 20 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-white dark:bg-gray-800 rounded-2xl p-8 w-full max-w-md relative shadow-2xl"
+                        >
+                            <button
+                                onClick={() => setShowForgotPasswordForm(false)}
+                                className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                            <h2 className="text-2xl font-semibold text-gray-800 dark:text-white mb-2 text-center">
+                                Recuperar Contraseña
+                            </h2>
+                            <p className="text-gray-600 dark:text-gray-400 text-sm text-center mb-6">
+                                Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña
+                            </p>
+                            <div className="space-y-4">
+                                <div>
+                                    <label htmlFor="resetEmail" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        Correo Electrónico
+                                    </label>
+                                    <Input
+                                        type="email"
+                                        id="resetEmail"
+                                        value={resetEmail}
+                                        onChange={(e) => setResetEmail(e.target.value)}
+                                        className="mt-1"
+                                        placeholder="tu.correo@ejemplo.com"
+                                    />
+                                </div>
+                                {forgotPasswordMessage && (
+                                    <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-sm">
+                                        {forgotPasswordMessage}
+                                    </div>
+                                )}
+                                <Button
+                                    onClick={handleForgotPassword}
+                                    disabled={forgotPasswordLoading}
+                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                                >
+                                    {forgotPasswordLoading ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Enviando...
+                                        </>
+                                    ) : (
+                                        'Enviar enlace de recuperación'
+                                    )}
+                                </Button>
+                                <button
+                                    onClick={() => {
+                                        setShowForgotPasswordForm(false);
+                                        setShowLoginForm(true);
+                                    }}
+                                    className="w-full text-sm text-gray-500 hover:text-blue-600 hover:underline"
+                                >
+                                    Volver a iniciar sesión
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Reset Password Modal */}
+            <AnimatePresence>
+                {showResetPasswordForm && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.9, y: 20 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-white dark:bg-gray-800 rounded-2xl p-8 w-full max-w-md relative shadow-2xl"
+                        >
+                            <h2 className="text-2xl font-semibold text-gray-800 dark:text-white mb-2 text-center">
+                                Nueva Contraseña
+                            </h2>
+                            <p className="text-gray-600 dark:text-gray-400 text-sm text-center mb-6">
+                                Ingresa tu nueva contraseña
+                            </p>
+                            <div className="space-y-4">
+                                <div>
+                                    <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        Nueva Contraseña
+                                    </label>
+                                    <Input
+                                        type="password"
+                                        id="newPassword"
+                                        value={newPassword}
+                                        onChange={(e) => setNewPassword(e.target.value)}
+                                        className="mt-1"
+                                        placeholder="Mínimo 6 caracteres"
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        Confirmar Contraseña
+                                    </label>
+                                    <Input
+                                        type="password"
+                                        id="confirmPassword"
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                        className="mt-1"
+                                        placeholder="Repite la contraseña"
+                                    />
+                                </div>
+                                {newPassword && confirmPassword && newPassword !== confirmPassword && (
+                                    <p className="text-red-500 text-sm">Las contraseñas no coinciden</p>
+                                )}
+                                <Button
+                                    onClick={handleResetPassword}
+                                    disabled={resetPasswordLoading || !newPassword || !confirmPassword || newPassword !== confirmPassword}
+                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+                                >
+                                    {resetPasswordLoading ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Guardando...
+                                        </>
+                                    ) : (
+                                        'Restablecer Contraseña'
+                                    )}
+                                </Button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
             </AnimatePresence>
 
             {/* Profile Modal - Enhanced with Photo and History */}
@@ -3265,7 +3976,7 @@ const SantiagoTechRDApp = () => {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4"
-                        onClick={() => { setShowProfileModal(false); setShowProfileHistory(false); setIsEditingProfile(false); }}
+                        onClick={() => { setShowProfileModal(false); setProfileTab('info'); setIsEditingProfile(false); }}
                     >
                         <motion.div
                             initial={{ scale: 0.8, y: -20 }}
@@ -3277,7 +3988,7 @@ const SantiagoTechRDApp = () => {
                             {/* Header */}
                             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-6 rounded-t-2xl relative">
                                 <button
-                                    onClick={() => { setShowProfileModal(false); setShowProfileHistory(false); setIsEditingProfile(false); }}
+                                    onClick={() => { setShowProfileModal(false); setProfileTab('info'); setIsEditingProfile(false); }}
                                     className="absolute top-4 right-4 text-white/80 hover:text-white"
                                 >
                                     <X className="w-6 h-6" />
@@ -3329,35 +4040,49 @@ const SantiagoTechRDApp = () => {
 
                             {/* Body */}
                             <div className="p-6">
-                                {/* Tabs: Info / History */}
+                                {/* Tabs: Info / History / Availability (for technicians) */}
                                 <div className="flex gap-2 mb-6">
                                     <button
-                                        onClick={() => setShowProfileHistory(false)}
+                                        onClick={() => setProfileTab('info')}
                                         className={cn(
-                                            "flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2",
-                                            !showProfileHistory
+                                            "flex-1 py-2 px-3 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-1.5",
+                                            profileTab === 'info'
                                                 ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
                                                 : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200"
                                         )}
                                     >
                                         <User className="w-4 h-4" />
-                                        Mi Información
+                                        <span className="hidden sm:inline">Mi Info</span>
                                     </button>
+                                    {currentUser.role === 'technician' && (
+                                        <button
+                                            onClick={() => { setProfileTab('availability'); fetchAvailability(); }}
+                                            className={cn(
+                                                "flex-1 py-2 px-3 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-1.5",
+                                                profileTab === 'availability'
+                                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                                                    : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200"
+                                            )}
+                                        >
+                                            <Clock className="w-4 h-4" />
+                                            <span className="hidden sm:inline">Horario</span>
+                                        </button>
+                                    )}
                                     <button
-                                        onClick={() => { setShowProfileHistory(true); fetchProfileHistory(); }}
+                                        onClick={() => { setProfileTab('history'); fetchProfileHistory(); }}
                                         className={cn(
-                                            "flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2",
-                                            showProfileHistory
+                                            "flex-1 py-2 px-3 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-1.5",
+                                            profileTab === 'history'
                                                 ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
                                                 : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200"
                                         )}
                                     >
                                         <History className="w-4 h-4" />
-                                        Historial
+                                        <span className="hidden sm:inline">Historial</span>
                                     </button>
                                 </div>
 
-                                {!showProfileHistory ? (
+                                {profileTab === 'info' ? (
                                     /* Profile Info */
                                     <>
                                         {isEditingProfile ? (
@@ -3394,6 +4119,47 @@ const SantiagoTechRDApp = () => {
                                                         className="w-full"
                                                     />
                                                 </div>
+                                                {/* Specializations editor for technicians */}
+                                                {currentUser.role === 'technician' && (
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                            Servicios que Ofreces
+                                                        </label>
+                                                        <div className="grid grid-cols-2 gap-2 p-3 border rounded-lg max-h-48 overflow-y-auto border-gray-200 dark:border-gray-600">
+                                                            {specializations.map((spec) => {
+                                                                const isSelected = editingSpecializations.includes(spec);
+                                                                return (
+                                                                    <label
+                                                                        key={spec}
+                                                                        className={cn(
+                                                                            "flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all text-sm",
+                                                                            isSelected
+                                                                                ? "bg-amber-100 dark:bg-amber-900/30 border border-amber-400"
+                                                                                : "bg-gray-50 dark:bg-gray-800 border border-transparent hover:bg-gray-100 dark:hover:bg-gray-700"
+                                                                        )}
+                                                                    >
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={isSelected}
+                                                                            onChange={(e) => {
+                                                                                if (e.target.checked) {
+                                                                                    setEditingSpecializations([...editingSpecializations, spec]);
+                                                                                } else {
+                                                                                    setEditingSpecializations(editingSpecializations.filter(s => s !== spec));
+                                                                                }
+                                                                            }}
+                                                                            className="w-4 h-4 text-amber-500 rounded focus:ring-amber-500"
+                                                                        />
+                                                                        <span className="text-gray-700 dark:text-gray-300">{spec}</span>
+                                                                    </label>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                        {editingSpecializations.length === 0 && (
+                                                            <p className="text-xs text-red-500 mt-1">Debes seleccionar al menos un servicio</p>
+                                                        )}
+                                                    </div>
+                                                )}
                                                 <div className="flex gap-2 pt-4">
                                                     <Button
                                                         type="button"
@@ -3442,8 +4208,33 @@ const SantiagoTechRDApp = () => {
                                                         </p>
                                                     </div>
                                                 </div>
+                                                {/* Show specializations for technicians */}
+                                                {currentUser.role === 'technician' && currentUser.specializations && currentUser.specializations.length > 0 && (
+                                                    <div className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                                                        <Wrench className="w-5 h-5 text-gray-400 mt-0.5" />
+                                                        <div>
+                                                            <p className="text-xs text-gray-500 dark:text-gray-400">Servicios</p>
+                                                            <div className="flex flex-wrap gap-1 mt-1">
+                                                                {currentUser.specializations.map((spec) => (
+                                                                    <span
+                                                                        key={spec}
+                                                                        className="inline-block px-2 py-0.5 text-xs bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 rounded-full"
+                                                                    >
+                                                                        {spec}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
                                                 <Button
-                                                    onClick={() => setIsEditingProfile(true)}
+                                                    onClick={() => {
+                                                        // Initialize specializations when entering edit mode
+                                                        if (currentUser.role === 'technician' && currentUser.specializations) {
+                                                            setEditingSpecializations(currentUser.specializations);
+                                                        }
+                                                        setIsEditingProfile(true);
+                                                    }}
                                                     className="w-full bg-blue-600 hover:bg-blue-700 text-white mt-4"
                                                 >
                                                     <Edit className="w-4 h-4 mr-2" />
@@ -3474,6 +4265,105 @@ const SantiagoTechRDApp = () => {
                                             </div>
                                         )}
                                     </>
+                                ) : profileTab === 'availability' ? (
+                                    /* Availability Settings (Technicians Only) */
+                                    <div className="space-y-4">
+                                        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                                            <p className="text-sm text-amber-800 dark:text-amber-200">
+                                                <Clock className="w-4 h-4 inline mr-2" />
+                                                Configura tus días y horarios de trabajo. Los clientes solo podrán reservarte en estos horarios.
+                                            </p>
+                                        </div>
+
+                                        {loadingAvailability ? (
+                                            <div className="flex items-center justify-center py-8">
+                                                <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className="space-y-3">
+                                                    {[1, 2, 3, 4, 5, 6, 0].map((dayNum) => {
+                                                        const daySlot = availability.find(s => s.dayOfWeek === dayNum) || {
+                                                            dayOfWeek: dayNum,
+                                                            startTime: '08:00',
+                                                            endTime: '18:00',
+                                                            isAvailable: dayNum !== 0
+                                                        };
+                                                        return (
+                                                            <div
+                                                                key={dayNum}
+                                                                className={cn(
+                                                                    "p-3 rounded-lg border transition-colors",
+                                                                    daySlot.isAvailable
+                                                                        ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+                                                                        : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                                                                )}
+                                                            >
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <label className="flex items-center cursor-pointer">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={daySlot.isAvailable}
+                                                                                onChange={(e) => updateDayAvailability(dayNum, 'isAvailable', e.target.checked)}
+                                                                                className="w-5 h-5 text-green-600 rounded focus:ring-green-500"
+                                                                            />
+                                                                            <span className={cn(
+                                                                                "ml-3 font-medium",
+                                                                                daySlot.isAvailable ? "text-gray-800 dark:text-white" : "text-gray-400"
+                                                                            )}>
+                                                                                {dayNames[dayNum]}
+                                                                            </span>
+                                                                        </label>
+                                                                    </div>
+                                                                    {daySlot.isAvailable && (
+                                                                        <div className="flex items-center gap-2">
+                                                                            <select
+                                                                                value={daySlot.startTime}
+                                                                                onChange={(e) => updateDayAvailability(dayNum, 'startTime', e.target.value)}
+                                                                                className="px-2 py-1 text-sm border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600"
+                                                                            >
+                                                                                {Array.from({ length: 14 }, (_, i) => i + 6).map(hour => (
+                                                                                    <option key={hour} value={`${hour.toString().padStart(2, '0')}:00`}>
+                                                                                        {hour.toString().padStart(2, '0')}:00
+                                                                                    </option>
+                                                                                ))}
+                                                                            </select>
+                                                                            <span className="text-gray-500">a</span>
+                                                                            <select
+                                                                                value={daySlot.endTime}
+                                                                                onChange={(e) => updateDayAvailability(dayNum, 'endTime', e.target.value)}
+                                                                                className="px-2 py-1 text-sm border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600"
+                                                                            >
+                                                                                {Array.from({ length: 14 }, (_, i) => i + 7).map(hour => (
+                                                                                    <option key={hour} value={`${hour.toString().padStart(2, '0')}:00`}>
+                                                                                        {hour.toString().padStart(2, '0')}:00
+                                                                                    </option>
+                                                                                ))}
+                                                                            </select>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+
+                                                <Button
+                                                    onClick={saveAvailability}
+                                                    disabled={savingAvailability}
+                                                    className="w-full bg-amber-600 hover:bg-amber-700 text-white mt-4"
+                                                >
+                                                    {savingAvailability ? (
+                                                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                                    ) : (
+                                                        <Save className="w-4 h-4 mr-2" />
+                                                    )}
+                                                    Guardar Disponibilidad
+                                                </Button>
+                                            </>
+                                        )}
+                                    </div>
                                 ) : (
                                     /* Profile History */
                                     <div className="space-y-3">
@@ -3534,6 +4424,231 @@ const SantiagoTechRDApp = () => {
                         onSubmit={handleCreateBooking}
                         onClose={() => setShowBookingForm(null)}
                     />
+                )}
+            </AnimatePresence>
+
+            {/* Report Detail Modal */}
+            <AnimatePresence>
+                {reportDetailModal.type && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                        onClick={() => setReportDetailModal({ type: null, title: '' })}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[80vh] overflow-hidden"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {/* Header */}
+                            <div className={cn(
+                                "p-4 flex items-center justify-between",
+                                reportDetailModal.type === 'users' && "bg-gradient-to-r from-blue-500 to-blue-600",
+                                reportDetailModal.type === 'technicians' && "bg-gradient-to-r from-amber-500 to-orange-500",
+                                reportDetailModal.type === 'bookings' && "bg-gradient-to-r from-emerald-500 to-teal-500"
+                            )}>
+                                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                    {reportDetailModal.type === 'users' && <Users className="w-6 h-6" />}
+                                    {reportDetailModal.type === 'technicians' && <Wrench className="w-6 h-6" />}
+                                    {reportDetailModal.type === 'bookings' && <Calendar className="w-6 h-6" />}
+                                    {reportDetailModal.title}
+                                </h2>
+                                <button
+                                    onClick={() => setReportDetailModal({ type: null, title: '' })}
+                                    className="text-white/80 hover:text-white p-1 rounded-full hover:bg-white/20 transition-colors"
+                                >
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+
+                            {/* Content */}
+                            <div className="overflow-y-auto max-h-[calc(80vh-70px)] p-4">
+                                {/* Users Detail */}
+                                {reportDetailModal.type === 'users' && (
+                                    <div className="space-y-4">
+                                        <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
+                                            Total: {users.length} usuarios registrados
+                                        </p>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left">
+                                                <thead className="bg-gray-50 dark:bg-gray-700">
+                                                    <tr>
+                                                        <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Usuario</th>
+                                                        <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Email</th>
+                                                        <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Teléfono</th>
+                                                        <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Rol</th>
+                                                        <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Verificado</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+                                                    {users.map((user) => (
+                                                        <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                                            <td className="px-4 py-3">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold overflow-hidden">
+                                                                        {user.photoUrl ? (
+                                                                            <img src={user.photoUrl} alt={user.name} className="w-full h-full object-cover" />
+                                                                        ) : (
+                                                                            user.name.charAt(0).toUpperCase()
+                                                                        )}
+                                                                    </div>
+                                                                    <span className="font-medium text-gray-800 dark:text-white">{user.name}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{user.email}</td>
+                                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{user.phone || '-'}</td>
+                                                            <td className="px-4 py-3">
+                                                                <span className={cn(
+                                                                    "px-2 py-1 rounded-full text-xs font-medium",
+                                                                    user.role === 'admin' && "bg-purple-100 text-purple-700",
+                                                                    user.role === 'technician' && "bg-amber-100 text-amber-700",
+                                                                    user.role === 'user' && "bg-blue-100 text-blue-700"
+                                                                )}>
+                                                                    {user.role === 'admin' ? 'Admin' : user.role === 'technician' ? 'Técnico' : 'Usuario'}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-4 py-3">
+                                                                {user.emailVerified ? (
+                                                                    <CheckCircle className="w-5 h-5 text-green-500" />
+                                                                ) : (
+                                                                    <X className="w-5 h-5 text-red-400" />
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Technicians Detail */}
+                                {reportDetailModal.type === 'technicians' && (
+                                    <div className="space-y-4">
+                                        <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
+                                            Total: {technicians.length} técnicos registrados
+                                        </p>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {technicians.map((tech) => (
+                                                <div key={tech.id} className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4">
+                                                    <div className="flex items-start gap-4">
+                                                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center text-white font-bold text-xl overflow-hidden flex-shrink-0">
+                                                            {tech.photoUrl ? (
+                                                                <img src={tech.photoUrl} alt={tech.name} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                tech.name.charAt(0).toUpperCase()
+                                                            )}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <h4 className="font-bold text-gray-800 dark:text-white truncate">{tech.name}</h4>
+                                                                {tech.verified && (
+                                                                    <CheckCircle className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                                                                )}
+                                                            </div>
+                                                            {tech.companyName && (
+                                                                <p className="text-sm text-gray-500 dark:text-gray-400">{tech.companyName}</p>
+                                                            )}
+                                                            <div className="flex items-center gap-1 mt-1">
+                                                                <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                                                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                                    {tech.rating.toFixed(1)}
+                                                                </span>
+                                                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                                    ({tech.reviews?.length || 0} reseñas)
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex flex-wrap gap-1 mt-2">
+                                                                {(tech.specializations || [tech.specialization]).map((spec, idx) => (
+                                                                    <span key={idx} className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">
+                                                                        {spec}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                            <div className="mt-2 text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                                                                <p className="flex items-center gap-1">
+                                                                    <MapPin className="w-3 h-3" /> {tech.location}
+                                                                </p>
+                                                                <p className="flex items-center gap-1">
+                                                                    <Mail className="w-3 h-3" /> {tech.email}
+                                                                </p>
+                                                                <p className="flex items-center gap-1">
+                                                                    <Phone className="w-3 h-3" /> {tech.phone}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Bookings Detail */}
+                                {reportDetailModal.type === 'bookings' && (
+                                    <div className="space-y-4">
+                                        <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
+                                            Total: {allBookings.length} reservas
+                                        </p>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left">
+                                                <thead className="bg-gray-50 dark:bg-gray-700">
+                                                    <tr>
+                                                        <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Fecha</th>
+                                                        <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Servicio</th>
+                                                        <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Cliente</th>
+                                                        <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Técnico</th>
+                                                        <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Estado</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+                                                    {allBookings.map((booking: any) => (
+                                                        <tr key={booking.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                                                                <div>
+                                                                    <p className="font-medium">
+                                                                        {new Date(booking.scheduledDate).toLocaleDateString('es-DO')}
+                                                                    </p>
+                                                                    <p className="text-xs text-gray-500">{booking.scheduledTime}</p>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{booking.serviceType}</td>
+                                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                                                                {booking.customer?.name || '-'}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                                                                {booking.technician?.user?.name || '-'}
+                                                            </td>
+                                                            <td className="px-4 py-3">
+                                                                <span className={cn(
+                                                                    "px-2 py-1 rounded-full text-xs font-medium",
+                                                                    booking.status === 'PENDING' && "bg-yellow-100 text-yellow-700",
+                                                                    booking.status === 'CONFIRMED' && "bg-blue-100 text-blue-700",
+                                                                    booking.status === 'IN_PROGRESS' && "bg-purple-100 text-purple-700",
+                                                                    booking.status === 'COMPLETED' && "bg-green-100 text-green-700",
+                                                                    booking.status === 'CANCELLED' && "bg-red-100 text-red-700"
+                                                                )}>
+                                                                    {booking.status === 'PENDING' && 'Pendiente'}
+                                                                    {booking.status === 'CONFIRMED' && 'Confirmada'}
+                                                                    {booking.status === 'IN_PROGRESS' && 'En Progreso'}
+                                                                    {booking.status === 'COMPLETED' && 'Completada'}
+                                                                    {booking.status === 'CANCELLED' && 'Cancelada'}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
+                    </motion.div>
                 )}
             </AnimatePresence>
 

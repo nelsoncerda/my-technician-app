@@ -1,6 +1,6 @@
 {
-  "short_name": "Santiago Tech",
-  "name": "Santiago Tech RD - Encuentra Tu Tecnico",
+  "short_name": "Técnicos RD",
+  "name": "Técnicos en RD - Encuentra Tu Técnico",
   "icons": [
     {
       "src": "favicon.ico",
@@ -20,7 +20,7 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#10B981",
+  "theme_color": "#2563eb",
   "background_color": "#ffffff",
-  "description": "Los mejores tecnicos de Santiago de los Caballeros, Republica Dominicana"
+  "description": "Encuentra técnicos profesionales en Santiago de los Caballeros, República Dominicana"
 }

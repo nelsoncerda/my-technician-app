@@ -22,6 +22,10 @@ export interface BookingFilters {
   endDate?: Date;
 }
 
+// Default business hours (8 AM - 6 PM) when no availability is configured
+const DEFAULT_START_TIME = '08:00';
+const DEFAULT_END_TIME = '18:00';
+
 // Check if a time slot is available
 export async function checkAvailability(
   technicianId: string,
@@ -31,19 +35,36 @@ export async function checkAvailability(
 ): Promise<boolean> {
   const dayOfWeek = date.getDay();
 
-  // Check if technician has availability for this day
-  const availabilitySlot = await prisma.availabilitySlot.findFirst({
-    where: {
-      technicianId,
-      dayOfWeek,
-      isAvailable: true,
-      startTime: { lte: time },
-      endTime: { gte: time },
-    },
+  // Check if technician has any availability configured
+  const hasAnyAvailability = await prisma.availabilitySlot.count({
+    where: { technicianId },
   });
 
-  if (!availabilitySlot) {
-    return false;
+  if (hasAnyAvailability > 0) {
+    // Check if technician has availability for this specific day
+    const availabilitySlot = await prisma.availabilitySlot.findFirst({
+      where: {
+        technicianId,
+        dayOfWeek,
+        isAvailable: true,
+        startTime: { lte: time },
+        endTime: { gte: time },
+      },
+    });
+
+    if (!availabilitySlot) {
+      return false;
+    }
+  } else {
+    // No availability configured - use default business hours (Mon-Sat, 8 AM - 6 PM)
+    // Sunday (0) is not available by default
+    if (dayOfWeek === 0) {
+      return false;
+    }
+    // Check if time is within default business hours
+    if (time < DEFAULT_START_TIME || time >= DEFAULT_END_TIME) {
+      return false;
+    }
   }
 
   // Check for time off
@@ -76,21 +97,7 @@ export async function checkAvailability(
 export async function getAvailableSlots(technicianId: string, date: Date) {
   const dayOfWeek = date.getDay();
 
-  // Get availability slots for this day
-  const availabilitySlots = await prisma.availabilitySlot.findMany({
-    where: {
-      technicianId,
-      dayOfWeek,
-      isAvailable: true,
-    },
-    orderBy: { startTime: 'asc' },
-  });
-
-  if (availabilitySlots.length === 0) {
-    return [];
-  }
-
-  // Check for time off
+  // Check for time off first
   const timeOff = await prisma.timeOff.findFirst({
     where: {
       technicianId,
@@ -102,6 +109,21 @@ export async function getAvailableSlots(technicianId: string, date: Date) {
   if (timeOff) {
     return [];
   }
+
+  // Get availability slots for this day
+  const availabilitySlots = await prisma.availabilitySlot.findMany({
+    where: {
+      technicianId,
+      dayOfWeek,
+      isAvailable: true,
+    },
+    orderBy: { startTime: 'asc' },
+  });
+
+  // Check if technician has any availability configured at all
+  const hasAnyAvailability = await prisma.availabilitySlot.count({
+    where: { technicianId },
+  });
 
   // Get existing bookings for this date
   const existingBookings = await prisma.booking.findMany({
@@ -118,14 +140,34 @@ export async function getAvailableSlots(technicianId: string, date: Date) {
   // Generate available time slots
   const slots: string[] = [];
 
-  for (const availability of availabilitySlots) {
-    const startHour = parseInt(availability.startTime.split(':')[0]);
-    const endHour = parseInt(availability.endTime.split(':')[0]);
-
+  if (hasAnyAvailability === 0) {
+    // No availability configured - use default business hours (Mon-Sat, 8 AM - 6 PM)
+    // Sunday (0) is not available by default
+    if (dayOfWeek === 0) {
+      return [];
+    }
+    const startHour = parseInt(DEFAULT_START_TIME.split(':')[0]);
+    const endHour = parseInt(DEFAULT_END_TIME.split(':')[0]);
     for (let hour = startHour; hour < endHour; hour++) {
       const timeSlot = `${hour.toString().padStart(2, '0')}:00`;
       if (!bookedTimes.has(timeSlot)) {
         slots.push(timeSlot);
+      }
+    }
+  } else if (availabilitySlots.length === 0) {
+    // Has availability configured but not for this day
+    return [];
+  } else {
+    // Use configured availability slots
+    for (const availability of availabilitySlots) {
+      const startHour = parseInt(availability.startTime.split(':')[0]);
+      const endHour = parseInt(availability.endTime.split(':')[0]);
+
+      for (let hour = startHour; hour < endHour; hour++) {
+        const timeSlot = `${hour.toString().padStart(2, '0')}:00`;
+        if (!bookedTimes.has(timeSlot)) {
+          slots.push(timeSlot);
+        }
       }
     }
   }
@@ -237,7 +279,7 @@ export async function getCustomerBookings(customerId: string, filters?: BookingF
     include: {
       technician: {
         include: {
-          user: { select: { id: true, name: true, email: true, phone: true } },
+          user: { select: { id: true, name: true, email: true, phone: true, photoUrl: true } },
         },
       },
     },
@@ -265,7 +307,7 @@ export async function getTechnicianBookings(technicianId: string, filters?: Book
     where,
     include: {
       customer: {
-        select: { id: true, name: true, email: true, phone: true },
+        select: { id: true, name: true, email: true, phone: true, photoUrl: true },
       },
     },
     orderBy: { scheduledDate: 'desc' },

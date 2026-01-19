@@ -42,5 +42,8 @@ export const LEVELS = [
   { level: 6, name: 'Elite', minPoints: 15000, maxPoints: 999999 },
 ];
 
-// API Base URL
-export const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+// API Base URL - use environment variable, localhost for dev, or production API
+export const API_BASE_URL = process.env.REACT_APP_API_URL ||
+  (window.location.hostname === 'localhost'
+    ? 'http://localhost:3001'
+    : 'https://api.tecnicosenrd.com');

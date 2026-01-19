@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Clock, MapPin, User, Wrench, CheckCircle, XCircle, PlayCircle, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, MapPin, User, Wrench, CheckCircle, XCircle, PlayCircle, AlertCircle, Mail, Phone } from 'lucide-react';
 
 interface BookingCardProps {
   booking: {
@@ -14,12 +14,16 @@ interface BookingCardProps {
     description?: string;
     customer?: {
       name: string;
+      email?: string;
       phone?: string;
+      photoUrl?: string;
     };
     technician?: {
       user: {
         name: string;
+        email?: string;
         phone?: string;
+        photoUrl?: string;
       };
     };
   };
@@ -130,15 +134,56 @@ const BookingCard: React.FC<BookingCardProps> = ({
           <span>{booking.address}, {booking.city}</span>
         </div>
 
-        {/* Contact */}
+        {/* Contact Person Section */}
         {contactPerson && (
-          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-            <User className="w-4 h-4" />
-            <span>
-              {userRole === 'customer' ? 'Técnico: ' : 'Cliente: '}
-              <span className="font-medium text-gray-900 dark:text-white">{contactPerson.name}</span>
-              {contactPerson.phone && <span className="ml-2 text-sm">({contactPerson.phone})</span>}
-            </span>
+          <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+            <div className="flex items-start gap-3">
+              {/* Avatar */}
+              <div className="flex-shrink-0">
+                {contactPerson.photoUrl ? (
+                  <img
+                    src={contactPerson.photoUrl}
+                    alt={contactPerson.name}
+                    className="w-12 h-12 rounded-full object-cover border-2 border-white dark:border-gray-700 shadow-sm"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                    <User className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                )}
+              </div>
+              {/* Contact Info */}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
+                  {userRole === 'customer' ? 'Técnico' : 'Cliente'}
+                </p>
+                <p className="font-semibold text-gray-900 dark:text-white truncate">
+                  {contactPerson.name}
+                </p>
+                {contactPerson.email && (
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    <Mail className="w-3.5 h-3.5 text-gray-400" />
+                    <a
+                      href={`mailto:${contactPerson.email}`}
+                      className="text-sm text-blue-600 dark:text-blue-400 hover:underline truncate"
+                    >
+                      {contactPerson.email}
+                    </a>
+                  </div>
+                )}
+                {contactPerson.phone && (
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <Phone className="w-3.5 h-3.5 text-gray-400" />
+                    <a
+                      href={`tel:${contactPerson.phone}`}
+                      className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      {contactPerson.phone}
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
 

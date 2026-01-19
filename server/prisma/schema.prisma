@@ -18,18 +18,20 @@ generator client {
 // ============================================
 
 model User {
-  id                String      @id @default(uuid())
-  email             String      @unique
-  password          String
-  name              String
-  phone             String?
-  photoUrl          String?     // Profile photo URL
-  role              String      @default("user") // "user", "technician", "admin"
-  emailVerified     Boolean     @default(false)
-  verificationToken String?
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  technician        Technician?
+  id                   String      @id @default(uuid())
+  email                String      @unique
+  password             String
+  name                 String
+  phone                String?
+  photoUrl             String?     // Profile photo URL
+  role                 String      @default("user") // "user", "technician", "admin"
+  emailVerified        Boolean     @default(false)
+  verificationToken    String?
+  resetPasswordToken   String?     // Token for password reset
+  resetPasswordExpires DateTime?   // Expiration time for reset token
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+  technician           Technician?
 
   // Gamification relations
   points             UserPoints?
@@ -66,14 +68,15 @@ model ProfileChangeHistory {
 }
 
 model Technician {
-  id             String   @id @default(uuid())
-  userId         String   @unique
-  user           User     @relation(fields: [userId], references: [id])
-  specialization String
-  location       String
-  rating         Float    @default(0)
-  verified       Boolean  @default(false)
-  reviews        Review[]
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+  specializations String[] // Array of specializations/services the technician provides
+  location        String
+  companyName     String?  // Optional company name for the technician
+  rating          Float    @default(0)
+  verified        Boolean  @default(false)
+  reviews         Review[]
 
   // Booking relations
   bookings          Booking[]
@@ -151,9 +154,6 @@ model Booking {
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
-  // Gamification relation
-  pointsAwarded PointTransaction[]
-
   @@index([customerId])
   @@index([technicianId])
   @@index([status])
@@ -202,8 +202,7 @@ model PointTransaction {
   points      Int      // Can be negative for redemptions
   type        String   // "EARNED" | "REDEEMED" | "BONUS" | "PENALTY"
   source      String   // "BOOKING_COMPLETED" | "REVIEW_GIVEN" | "FIRST_BOOKING" | "REFERRAL" etc.
-  sourceId    String?  // Reference to booking, review, etc.
-  booking     Booking? @relation(fields: [sourceId], references: [id])
+  sourceId    String?  // Reference to booking, review, etc. (not a foreign key to allow flexibility)
   description String
   createdAt   DateTime @default(now())
 
@@ -306,4 +305,16 @@ model LeaderboardEntry {
 
   @@unique([userId, period, periodStart])
   @@index([period, periodStart, rank])
+}
+
+// ============================================
+// APP SETTINGS MODEL
+// ============================================
+
+model AppSettings {
+  id              String   @id @default("app_settings")
+  specializations String[] // List of available specializations
+  locations       String[] // List of available locations
+  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now())
 }

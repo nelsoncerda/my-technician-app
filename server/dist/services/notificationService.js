@@ -1,62 +1,46 @@
-import { sendEmail } from './emailService';
-
-interface BookingNotificationData {
-  id: string;
-  scheduledDate: Date;
-  scheduledTime: string;
-  serviceType: string;
-  address: string;
-  city: string;
-  customer: {
-    name: string;
-    email: string;
-    phone?: string | null;
-  };
-  technician: {
-    user: {
-      name: string;
-      email: string;
-      phone?: string | null;
-    };
-  };
-}
-
-interface AchievementNotificationData {
-  name: string;
-  nameEs: string;
-  description: string;
-  pointsReward: number;
-}
-
-interface LevelUpNotificationData {
-  levelNumber: number;
-  name: string;
-  nameEs: string;
-}
-
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.sendBookingCreatedToCustomer = sendBookingCreatedToCustomer;
+exports.sendBookingCreatedToTechnician = sendBookingCreatedToTechnician;
+exports.sendBookingConfirmed = sendBookingConfirmed;
+exports.sendBookingCompleted = sendBookingCompleted;
+exports.sendBookingCancelled = sendBookingCancelled;
+exports.sendBookingReminder = sendBookingReminder;
+exports.sendAchievementUnlocked = sendAchievementUnlocked;
+exports.sendLevelUp = sendLevelUp;
+exports.sendPointsEarned = sendPointsEarned;
+const emailService_1 = require("./emailService");
 // Format date for display
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat('es-DO', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  }).format(new Date(date));
+function formatDate(date) {
+    return new Intl.DateTimeFormat('es-DO', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+    }).format(new Date(date));
 }
-
 // Format time for display
-function formatTime(time: string): string {
-  const [hours, minutes] = time.split(':');
-  const hour = parseInt(hours);
-  const ampm = hour >= 12 ? 'PM' : 'AM';
-  const hour12 = hour % 12 || 12;
-  return `${hour12}:${minutes} ${ampm}`;
+function formatTime(time) {
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:${minutes} ${ampm}`;
 }
-
 // Send booking created notification to customer
-export async function sendBookingCreatedToCustomer(booking: BookingNotificationData) {
-  const subject = `Reserva Confirmada - Técnicos en RD`;
-  const html = `
+function sendBookingCreatedToCustomer(booking) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const subject = `Reserva Confirmada - Técnicos en RD`;
+        const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%); padding: 20px; text-align: center;">
         <h1 style="color: white; margin: 0;">Técnicos en RD</h1>
@@ -87,18 +71,18 @@ export async function sendBookingCreatedToCustomer(booking: BookingNotificationD
       </div>
     </div>
   `;
-
-  await sendEmail({
-    to: booking.customer.email,
-    subject,
-    html,
-  });
+        yield (0, emailService_1.sendEmail)({
+            to: booking.customer.email,
+            subject,
+            html,
+        });
+    });
 }
-
 // Send booking notification to technician
-export async function sendBookingCreatedToTechnician(booking: BookingNotificationData) {
-  const subject = `Nueva Reserva - Técnicos en RD`;
-  const html = `
+function sendBookingCreatedToTechnician(booking) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const subject = `Nueva Reserva - Técnicos en RD`;
+        const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%); padding: 20px; text-align: center;">
         <h1 style="color: white; margin: 0;">Técnicos en RD</h1>
@@ -130,18 +114,18 @@ export async function sendBookingCreatedToTechnician(booking: BookingNotificatio
       </div>
     </div>
   `;
-
-  await sendEmail({
-    to: booking.technician.user.email,
-    subject,
-    html,
-  });
+        yield (0, emailService_1.sendEmail)({
+            to: booking.technician.user.email,
+            subject,
+            html,
+        });
+    });
 }
-
 // Send booking confirmed notification
-export async function sendBookingConfirmed(booking: BookingNotificationData) {
-  const subject = `Reserva Confirmada - Técnicos en RD`;
-  const html = `
+function sendBookingConfirmed(booking) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const subject = `Reserva Confirmada - Técnicos en RD`;
+        const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); padding: 20px; text-align: center;">
         <h1 style="color: white; margin: 0;">✓ Reserva Confirmada</h1>
@@ -170,18 +154,18 @@ export async function sendBookingConfirmed(booking: BookingNotificationData) {
       </div>
     </div>
   `;
-
-  await sendEmail({
-    to: booking.customer.email,
-    subject,
-    html,
-  });
+        yield (0, emailService_1.sendEmail)({
+            to: booking.customer.email,
+            subject,
+            html,
+        });
+    });
 }
-
 // Send booking completed notification
-export async function sendBookingCompleted(booking: BookingNotificationData) {
-  const subject = `Servicio Completado - Técnicos en RD`;
-  const html = `
+function sendBookingCompleted(booking) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const subject = `Servicio Completado - Técnicos en RD`;
+        const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); padding: 20px; text-align: center;">
         <h1 style="color: white; margin: 0;">🎉 Servicio Completado</h1>
@@ -207,25 +191,20 @@ export async function sendBookingCompleted(booking: BookingNotificationData) {
       </div>
     </div>
   `;
-
-  await sendEmail({
-    to: booking.customer.email,
-    subject,
-    html,
-  });
+        yield (0, emailService_1.sendEmail)({
+            to: booking.customer.email,
+            subject,
+            html,
+        });
+    });
 }
-
 // Send booking cancelled notification
-export async function sendBookingCancelled(
-  booking: BookingNotificationData,
-  cancelledBy: string,
-  reason?: string
-) {
-  const recipientEmail = cancelledBy === 'technician' ? booking.customer.email : booking.technician.user.email;
-  const recipientName = cancelledBy === 'technician' ? booking.customer.name : booking.technician.user.name;
-
-  const subject = `Reserva Cancelada - Técnicos en RD`;
-  const html = `
+function sendBookingCancelled(booking, cancelledBy, reason) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const recipientEmail = cancelledBy === 'technician' ? booking.customer.email : booking.technician.user.email;
+        const recipientName = cancelledBy === 'technician' ? booking.customer.name : booking.technician.user.name;
+        const subject = `Reserva Cancelada - Técnicos en RD`;
+        const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%); padding: 20px; text-align: center;">
         <h1 style="color: white; margin: 0;">Reserva Cancelada</h1>
@@ -246,18 +225,18 @@ export async function sendBookingCancelled(
       </div>
     </div>
   `;
-
-  await sendEmail({
-    to: recipientEmail,
-    subject,
-    html,
-  });
+        yield (0, emailService_1.sendEmail)({
+            to: recipientEmail,
+            subject,
+            html,
+        });
+    });
 }
-
 // Send booking reminder
-export async function sendBookingReminder(booking: BookingNotificationData, hoursUntil: number) {
-  const subject = `Recordatorio: Reserva en ${hoursUntil} horas - Técnicos en RD`;
-  const html = `
+function sendBookingReminder(booking, hoursUntil) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const subject = `Recordatorio: Reserva en ${hoursUntil} horas - Técnicos en RD`;
+        const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); padding: 20px; text-align: center;">
         <h1 style="color: white; margin: 0;">⏰ Recordatorio de Reserva</h1>
@@ -284,22 +263,18 @@ export async function sendBookingReminder(booking: BookingNotificationData, hour
       </div>
     </div>
   `;
-
-  await sendEmail({
-    to: booking.customer.email,
-    subject,
-    html,
-  });
+        yield (0, emailService_1.sendEmail)({
+            to: booking.customer.email,
+            subject,
+            html,
+        });
+    });
 }
-
 // Send achievement unlocked notification
-export async function sendAchievementUnlocked(
-  userEmail: string,
-  userName: string,
-  achievement: AchievementNotificationData
-) {
-  const subject = `🏆 ¡Logro Desbloqueado! - Técnicos en RD`;
-  const html = `
+function sendAchievementUnlocked(userEmail, userName, achievement) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const subject = `🏆 ¡Logro Desbloqueado! - Técnicos en RD`;
+        const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); padding: 20px; text-align: center;">
         <h1 style="color: white; margin: 0;">🏆 ¡Logro Desbloqueado!</h1>
@@ -322,18 +297,18 @@ export async function sendAchievementUnlocked(
       </div>
     </div>
   `;
-
-  await sendEmail({
-    to: userEmail,
-    subject,
-    html,
-  });
+        yield (0, emailService_1.sendEmail)({
+            to: userEmail,
+            subject,
+            html,
+        });
+    });
 }
-
 // Send level up notification
-export async function sendLevelUp(userEmail: string, userName: string, newLevel: LevelUpNotificationData) {
-  const subject = `🎉 ¡Subiste de Nivel! - Técnicos en RD`;
-  const html = `
+function sendLevelUp(userEmail, userName, newLevel) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const subject = `🎉 ¡Subiste de Nivel! - Técnicos en RD`;
+        const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); padding: 20px; text-align: center;">
         <h1 style="color: white; margin: 0;">🎉 ¡Nuevo Nivel!</h1>
@@ -356,23 +331,18 @@ export async function sendLevelUp(userEmail: string, userName: string, newLevel:
       </div>
     </div>
   `;
-
-  await sendEmail({
-    to: userEmail,
-    subject,
-    html,
-  });
+        yield (0, emailService_1.sendEmail)({
+            to: userEmail,
+            subject,
+            html,
+        });
+    });
 }
-
 // Send points earned notification
-export async function sendPointsEarned(
-  userEmail: string,
-  userName: string,
-  points: number,
-  reason: string
-) {
-  const subject = `+${points} Puntos - Técnicos en RD`;
-  const html = `
+function sendPointsEarned(userEmail, userName, points, reason) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const subject = `+${points} Puntos - Técnicos en RD`;
+        const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); padding: 20px; text-align: center;">
         <h1 style="color: white; margin: 0;">+${points} Puntos</h1>
@@ -391,10 +361,10 @@ export async function sendPointsEarned(
       </div>
     </div>
   `;
-
-  await sendEmail({
-    to: userEmail,
-    subject,
-    html,
-  });
+        yield (0, emailService_1.sendEmail)({
+            to: userEmail,
+            subject,
+            html,
+        });
+    });
 }

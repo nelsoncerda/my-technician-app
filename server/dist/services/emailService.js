@@ -1,25 +1,36 @@
-import nodemailer from 'nodemailer';
-
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.sendPasswordResetEmail = exports.sendWelcomeEmail = exports.sendVerificationEmail = exports.sendEmail = void 0;
+const nodemailer_1 = __importDefault(require("nodemailer"));
 // Configuration - use environment variables in production
 const APP_URL = process.env.APP_URL || 'https://tecnicosenrd.com';
 const API_URL = process.env.API_URL || 'https://api.tecnicosenrd.com';
-
 // SMTP Configuration from environment variables
 const SMTP_HOST = process.env.SMTP_HOST;
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587');
 const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
 const SMTP_FROM = process.env.SMTP_FROM || '"Técnicos en RD" <no-reply@santiagotech.rd>';
-
 // Flag to check if real SMTP is configured
 const useRealSMTP = SMTP_HOST && SMTP_USER && SMTP_PASS;
-
 // Create a transporter - uses real SMTP if configured, otherwise Ethereal for testing
-const createTransporter = async () => {
+const createTransporter = () => __awaiter(void 0, void 0, void 0, function* () {
     if (useRealSMTP) {
         // Production: Use real SMTP server
         console.log(`Using real SMTP: ${SMTP_HOST}:${SMTP_PORT}`);
-        const transporter = nodemailer.createTransport({
+        const transporter = nodemailer_1.default.createTransport({
             host: SMTP_HOST,
             port: SMTP_PORT,
             secure: SMTP_PORT === 465, // true for 465, false for other ports
@@ -28,14 +39,13 @@ const createTransporter = async () => {
                 pass: SMTP_PASS,
             },
         });
-
         return { transporter, testAccount: null };
-    } else {
+    }
+    else {
         // Development: Use Ethereal Email (emails won't actually be sent)
         console.log('Using Ethereal Email (test mode - emails not actually sent)');
-        const testAccount = await nodemailer.createTestAccount();
-
-        const transporter = nodemailer.createTransport({
+        const testAccount = yield nodemailer_1.default.createTestAccount();
+        const transporter = nodemailer_1.default.createTransport({
             host: 'smtp.ethereal.email',
             port: 587,
             secure: false,
@@ -44,13 +54,11 @@ const createTransporter = async () => {
                 pass: testAccount.pass,
             },
         });
-
         return { transporter, testAccount };
     }
-};
-
+});
 // Email template wrapper
-const getEmailTemplate = (content: string, preheader: string = '') => `
+const getEmailTemplate = (content, preheader = '') => `
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -113,50 +121,36 @@ const getEmailTemplate = (content: string, preheader: string = '') => `
 </body>
 </html>
 `;
-
-// Generic send email function
-interface SendEmailOptions {
-    to: string;
-    subject: string;
-    html: string;
-    text?: string;
-}
-
-export const sendEmail = async (options: SendEmailOptions) => {
+const sendEmail = (options) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { transporter, testAccount } = await createTransporter();
-
-        const info = await transporter.sendMail({
+        const { transporter, testAccount } = yield createTransporter();
+        const info = yield transporter.sendMail({
             from: SMTP_FROM,
             to: options.to,
             subject: options.subject,
             text: options.text || '',
             html: options.html,
         });
-
         console.log('Email sent: %s', info.messageId);
-
         // Only show preview URL for Ethereal (test) emails
         if (testAccount) {
-            const previewUrl = nodemailer.getTestMessageUrl(info);
+            const previewUrl = nodemailer_1.default.getTestMessageUrl(info);
             console.log('Preview URL: %s', previewUrl);
             return previewUrl;
         }
-
         return info.messageId;
-    } catch (error) {
+    }
+    catch (error) {
         console.error('Error sending email:', error);
         throw error;
     }
-};
-
-export const sendVerificationEmail = async (email: string, token: string, userName?: string) => {
+});
+exports.sendEmail = sendEmail;
+const sendVerificationEmail = (email, token, userName) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { transporter, testAccount } = await createTransporter();
-
+        const { transporter, testAccount } = yield createTransporter();
         const verificationLink = `${API_URL}/api/auth/verify?token=${token}`;
         const greeting = userName ? `Hola ${userName},` : 'Hola,';
-
         const content = `
             <h2 style="margin: 0 0 20px; color: #333; font-size: 24px;">Verifica tu cuenta</h2>
             <p style="margin: 0 0 20px; color: #555; font-size: 16px; line-height: 1.6;">
@@ -186,35 +180,31 @@ export const sendVerificationEmail = async (email: string, token: string, userNa
                 </p>
             </div>
         `;
-
-        const info = await transporter.sendMail({
+        const info = yield transporter.sendMail({
             from: SMTP_FROM,
             to: email,
             subject: 'Verifica tu cuenta - Técnicos en RD',
             text: `${greeting} Gracias por registrarte en Técnicos en RD. Por favor verifica tu cuenta haciendo clic en el siguiente enlace: ${verificationLink}`,
             html: getEmailTemplate(content, 'Verifica tu cuenta para acceder a Técnicos en RD'),
         });
-
         console.log('Verification email sent to %s: %s', email, info.messageId);
-
         // Only show preview URL for Ethereal (test) emails
         if (testAccount) {
-            const previewUrl = nodemailer.getTestMessageUrl(info);
+            const previewUrl = nodemailer_1.default.getTestMessageUrl(info);
             console.log('Preview URL: %s', previewUrl);
             return previewUrl;
         }
-
         return info.messageId;
-    } catch (error) {
+    }
+    catch (error) {
         console.error('Error sending verification email:', error);
         return null;
     }
-};
-
-export const sendWelcomeEmail = async (email: string, userName: string) => {
+});
+exports.sendVerificationEmail = sendVerificationEmail;
+const sendWelcomeEmail = (email, userName) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { transporter, testAccount } = await createTransporter();
-
+        const { transporter, testAccount } = yield createTransporter();
         const content = `
             <h2 style="margin: 0 0 20px; color: #333; font-size: 24px;">Bienvenido a Técnicos en RD!</h2>
             <p style="margin: 0 0 20px; color: #555; font-size: 16px; line-height: 1.6;">
@@ -242,37 +232,32 @@ export const sendWelcomeEmail = async (email: string, userName: string) => {
                 Si tienes alguna pregunta, no dudes en contactarnos.
             </p>
         `;
-
-        const info = await transporter.sendMail({
+        const info = yield transporter.sendMail({
             from: SMTP_FROM,
             to: email,
             subject: 'Bienvenido a Técnicos en RD!',
             text: `Hola ${userName}, bienvenido a Técnicos en RD! Tu cuenta ha sido verificada. Visita ${APP_URL} para comenzar.`,
             html: getEmailTemplate(content, 'Tu cuenta ha sido verificada - Bienvenido a Técnicos en RD'),
         });
-
         console.log('Welcome email sent to %s: %s', email, info.messageId);
-
         // Only show preview URL for Ethereal (test) emails
         if (testAccount) {
-            const previewUrl = nodemailer.getTestMessageUrl(info);
+            const previewUrl = nodemailer_1.default.getTestMessageUrl(info);
             console.log('Preview URL: %s', previewUrl);
             return previewUrl;
         }
-
         return info.messageId;
-    } catch (error) {
+    }
+    catch (error) {
         console.error('Error sending welcome email:', error);
         return null;
     }
-};
-
-export const sendPasswordResetEmail = async (email: string, token: string, userName: string) => {
+});
+exports.sendWelcomeEmail = sendWelcomeEmail;
+const sendPasswordResetEmail = (email, token, userName) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { transporter, testAccount } = await createTransporter();
-
+        const { transporter, testAccount } = yield createTransporter();
         const resetLink = `${APP_URL}?reset=${token}`;
-
         const content = `
             <h2 style="margin: 0 0 20px; color: #333; font-size: 24px;">Restablecer contraseña</h2>
             <p style="margin: 0 0 20px; color: #555; font-size: 16px; line-height: 1.6;">
@@ -302,26 +287,24 @@ export const sendPasswordResetEmail = async (email: string, token: string, userN
                 </p>
             </div>
         `;
-
-        const info = await transporter.sendMail({
+        const info = yield transporter.sendMail({
             from: SMTP_FROM,
             to: email,
             subject: 'Restablecer contraseña - Técnicos en RD',
             text: `Hola ${userName}, recibimos una solicitud para restablecer tu contraseña. Haz clic en el siguiente enlace: ${resetLink}. Este enlace expirará en 1 hora.`,
             html: getEmailTemplate(content, 'Restablece tu contraseña en Técnicos en RD'),
         });
-
         console.log('Password reset email sent to %s: %s', email, info.messageId);
-
         if (testAccount) {
-            const previewUrl = nodemailer.getTestMessageUrl(info);
+            const previewUrl = nodemailer_1.default.getTestMessageUrl(info);
             console.log('Preview URL: %s', previewUrl);
             return previewUrl;
         }
-
         return info.messageId;
-    } catch (error) {
+    }
+    catch (error) {
         console.error('Error sending password reset email:', error);
         return null;
     }
-};
+});
+exports.sendPasswordResetEmail = sendPasswordResetEmail;

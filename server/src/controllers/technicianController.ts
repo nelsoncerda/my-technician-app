@@ -18,8 +18,11 @@ export const getTechnicians = async (req: Request, res: Response) => {
                 name: user?.name || 'Unknown',
                 email: user?.email || '',
                 phone: user?.phone || '',
-                specialization: tech.specialization,
+                photoUrl: user?.photoUrl || null,
+                specialization: tech.specializations.join(', '), // For backwards compatibility
+                specializations: tech.specializations, // New array format
                 location: tech.location,
+                companyName: tech.companyName || null,
                 rating: tech.rating,
                 verified: tech.verified,
                 reviews: tech.reviews,
@@ -34,7 +37,7 @@ export const getTechnicians = async (req: Request, res: Response) => {
 
 export const registerTechnician = async (req: Request, res: Response) => {
     try {
-        const { userId, specialization, location, phone } = req.body;
+        const { userId, specializations, location, phone, companyName } = req.body;
 
         // Update user phone if provided
         if (phone) {
@@ -48,8 +51,9 @@ export const registerTechnician = async (req: Request, res: Response) => {
         const technician = await prisma.technician.create({
             data: {
                 userId,
-                specialization,
+                specializations: Array.isArray(specializations) ? specializations : [specializations],
                 location,
+                companyName: companyName || null,
             },
         });
 
