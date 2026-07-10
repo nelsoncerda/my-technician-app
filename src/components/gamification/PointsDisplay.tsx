@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Zap, TrendingUp, Star } from 'lucide-react';
+import { Zap, TrendingUp } from 'lucide-react';
 
 interface PointsDisplayProps {
   totalPoints: number;

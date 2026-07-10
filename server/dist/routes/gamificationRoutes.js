@@ -35,24 +35,25 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const gamificationController = __importStar(require("../controllers/gamificationController"));
+const auth_1 = require("../middleware/auth");
 const router = (0, express_1.Router)();
 // Points
-router.get('/points/:userId', gamificationController.getUserPoints);
-router.get('/points/:userId/history', gamificationController.getPointsHistory);
-router.post('/points/award', gamificationController.awardPoints); // Admin/System
+router.get('/points/:userId', auth_1.requireAuth, (0, auth_1.requireSelfOrAdmin)('userId'), gamificationController.getUserPoints);
+router.get('/points/:userId/history', auth_1.requireAuth, (0, auth_1.requireSelfOrAdmin)('userId'), gamificationController.getPointsHistory);
+router.post('/points/award', auth_1.requireAuth, auth_1.requireAdmin, gamificationController.awardPoints); // Admin/System
 // Achievements
 router.get('/achievements', gamificationController.getAllAchievements);
-router.get('/achievements/:userId', gamificationController.getUserAchievements);
-router.post('/achievements/check', gamificationController.checkAchievements);
+router.get('/achievements/:userId', auth_1.requireAuth, (0, auth_1.requireSelfOrAdmin)('userId'), gamificationController.getUserAchievements);
+router.post('/achievements/check', auth_1.requireAuth, gamificationController.checkAchievements);
 // Levels
 router.get('/levels', gamificationController.getAllLevels);
 // Leaderboard
 router.get('/leaderboard', gamificationController.getLeaderboard);
 // Rewards
 router.get('/rewards', gamificationController.getRewards);
-router.get('/rewards/:userId/available', gamificationController.getAffordableRewards);
-router.post('/rewards/redeem', gamificationController.redeemReward);
-router.get('/rewards/:userId/history', gamificationController.getRedemptionHistory);
+router.get('/rewards/:userId/available', auth_1.requireAuth, (0, auth_1.requireSelfOrAdmin)('userId'), gamificationController.getAffordableRewards);
+router.post('/rewards/redeem', auth_1.requireAuth, gamificationController.redeemReward);
+router.get('/rewards/:userId/history', auth_1.requireAuth, (0, auth_1.requireSelfOrAdmin)('userId'), gamificationController.getRedemptionHistory);
 // Admin utilities
-router.post('/initialize', gamificationController.initializeUserGamification);
+router.post('/initialize', auth_1.requireAuth, auth_1.requireAdmin, gamificationController.initializeUserGamification);
 exports.default = router;

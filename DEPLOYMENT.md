@@ -1,222 +1,251 @@
-# Deployment Guide for AWS Lightsail
+# Production deployment: AWS Lightsail
 
-This guide outlines the steps to deploy your application to an AWS Lightsail instance.
+This runbook deploys **Técnicos en RD** to the existing Lightsail instance at
+`tecnicosenrd.com`. Deployments use immutable release directories and an atomic
+symlink cutover:
+
+```text
+/home/bitnami/apps/
+├── my-technician-app/        # legacy live checkout; preserve for first rollback
+├── release-source/           # clean Git checkout used to build releases
+├── releases/                 # versioned releases
+├── shared/server.env         # production environment; never committed
+├── backups/                  # database and configuration backups
+└── technician-current -> releases/<timestamp>-<commit>
+```
+
+Nginx serves `technician-current/build`, proxies same-origin `/api/` requests
+to the API on port `3001`, and exposes `/health`. PM2 runs the API as
+`technician-api` from the same stable symlink.
 
 ## Prerequisites
 
-1.  **AWS Lightsail Instance**:
-    -   Create an instance using the **OS Only (Ubuntu 22.04)** or **Apps + OS (Node.js)** blueprint.
-    -   Attach a static IP to your instance.
-2.  **Domain Name**:
-    -   Point your domain (`nelsoncerda.com`) to the static IP of your Lightsail instance.
+- The Lightsail static IP is assigned and DNS for `tecnicosenrd.com`,
+  `www.tecnicosenrd.com`, and the legacy `api.tecnicosenrd.com` points to it.
+- Ports 80 and 443 are open in the Lightsail firewall.
+- PostgreSQL, Nginx, Git, NVM, and PM2 are installed.
+- `sudo certbot certificates` confirms the existing certificate covers the
+  configured hostnames. Do not request a replacement certificate during a
+  normal deployment.
+- The release commit is pushed to `origin/master` and `npm run check` passes
+  locally.
 
-## 1. Local Preparation
+## One-time server setup
 
-Ensure your project is ready for deployment.
-
-### Server
-The server is configured to build TypeScript to JavaScript.
-- **Build**: `npm run build` (in `server` directory)
-- **Start**: `npm start` (runs `node dist/index.js`)
-
-### Frontend
-The frontend needs to be built for production.
-- **Build**: `npm run build` (in root directory)
-- **Output**: The build artifacts will be in the `build` folder.
-
-## 2. Server Setup (Remote)
-
-SSH into your Lightsail instance.
-
-### Install Dependencies
-Update packages and install Node.js, Nginx, and PostgreSQL.
+SSH in as `bitnami`, select Node 20 through NVM, and create the shared paths:
 
 ```bash
-sudo apt update
-sudo apt install -y nginx postgresql postgresql-contrib
-# Install Node.js (if not using Node.js blueprint)
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
-# Install PM2
-sudo npm install -g pm2
+ssh bitnami@tecnicosenrd.com
+source "$HOME/.nvm/nvm.sh"
+nvm install 20
+nvm alias default 20
+nvm use 20
+npm install --global pm2
+
+APP_ROOT=/home/bitnami/apps
+LEGACY="$APP_ROOT/my-technician-app"
+SOURCE="$APP_ROOT/release-source"
+mkdir -p "$APP_ROOT/releases" "$APP_ROOT/shared" "$APP_ROOT/backups"
+
+if [ ! -f "$APP_ROOT/shared/server.env" ]; then
+  if [ -f "$LEGACY/server/.env" ]; then
+    install -m 600 "$LEGACY/server/.env" "$APP_ROOT/shared/server.env"
+  else
+    install -m 600 /dev/null "$APP_ROOT/shared/server.env"
+  fi
+fi
+
+if [ ! -d "$SOURCE/.git" ]; then
+  git clone https://github.com/nelsoncerda/my-technician-app.git "$SOURCE"
+fi
 ```
 
-### Configure PostgreSQL
-Create a database and user.
+Edit `/home/bitnami/apps/shared/server.env` and verify these keys. Keep actual
+credentials out of Git, terminal history, screenshots, and deployment logs.
+
+```dotenv
+DATABASE_URL=
+AUTH_SECRET=
+NODE_ENV=production
+APP_URL=https://tecnicosenrd.com
+API_URL=https://tecnicosenrd.com
+CORS_ORIGIN=https://tecnicosenrd.com,https://www.tecnicosenrd.com
+PORT=3001
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASS=
+SMTP_FROM=
+```
+
+`AUTH_SECRET` must be a securely generated value of at least 32 characters.
+Run `chmod 600 /home/bitnami/apps/shared/server.env` after editing it. Configure
+PM2 startup once with `pm2 startup`, follow the command it prints, and run
+`pm2 save` after the first successful release.
+
+## Version-controlled production configuration
+
+The repository is the source of truth for both service definitions:
+
+- `deploy/nginx/tecnicosenrd.com.conf` serves the frontend, keeps the legacy API
+  hostname working, proxies `/api/` without stripping the prefix, forwards the
+  standard proxy headers, limits request bodies to 10 MB, and uses the existing
+  Certbot certificate.
+- `deploy/ecosystem.config.cjs` runs `server/dist/index.js` as
+  `technician-api`, with its working directory under `technician-current`.
+
+If Certbot reports a suffixed certificate directory, update the versioned Nginx
+file to those exact paths and review the change before deployment. Do not
+maintain a divergent hand-edited production copy.
+
+## Deploy a release
+
+Run this as `bitnami`. It verifies the tracked source is clean, builds the root
+frontend and server before cutover, and backs up PostgreSQL and Nginx before
+applying migrations.
 
 ```bash
-sudo -u postgres psql
-```
+set -euo pipefail
+source "$HOME/.nvm/nvm.sh"
+nvm use 20
 
-Inside the SQL prompt:
-```sql
-CREATE DATABASE my_technician_app;
-CREATE USER myuser WITH ENCRYPTED PASSWORD 'mypassword';
-GRANT ALL PRIVILEGES ON DATABASE my_technician_app TO myuser;
-\q
-```
+APP_ROOT=/home/bitnami/apps
+LEGACY="$APP_ROOT/my-technician-app"
+SOURCE="$APP_ROOT/release-source"
+RELEASES="$APP_ROOT/releases"
+SHARED="$APP_ROOT/shared"
 
-## 3. Deploy Application
+cd "$SOURCE"
+git diff --quiet
+git diff --cached --quiet
+PREVIOUS_SOURCE_REVISION=$(git rev-parse HEAD)
+git fetch origin
+git checkout master
+git pull --ff-only origin master
 
-### Transfer Files
-You can use `git` to clone your repository or `scp` to copy files.
-Recommended: Clone via Git.
+REVISION=$(git rev-parse HEAD)
+STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+RELEASE="$RELEASES/${STAMP}-${REVISION:0:7}"
+BACKUP="$APP_ROOT/backups/$STAMP"
+mkdir "$RELEASE" "$BACKUP"
 
-```bash
-git clone <your-repo-url> app
-cd app
-```
+git archive "$REVISION" | tar -x -C "$RELEASE"
+printf '%s\n' "$REVISION" > "$RELEASE/REVISION"
+printf '%s\n' "$PREVIOUS_SOURCE_REVISION" > "$BACKUP/previous-source-revision"
+ln -s "$SHARED/server.env" "$RELEASE/server/.env"
 
-### Setup Backend
-1.  Navigate to server: `cd server`
-2.  Install dependencies: `npm install`
-3.  Create `.env` file:
-    ```bash
-    nano .env
-    ```
-    Add:
-    ```env
-    DATABASE_URL="postgresql://myuser:mypassword@localhost:5432/my_technician_app?schema=public"
-    PORT=3001
-    # Add other secrets
-    ```
-4.  Run migrations: `npx prisma migrate deploy`
-5.  Build server: `npm run build`
-6.  Start with PM2:
-    ```bash
-    pm2 start dist/index.js --name "api"
-    ```
+cd "$RELEASE"
+npm ci
+npm run build
 
-### Setup Frontend
-1.  Navigate to root: `cd ..`
-2.  Install dependencies: `npm install`
-3.  Build frontend: `npm run build`
-4.  Move build files to Nginx web root:
-    ```bash
-    sudo mkdir -p /var/www/nelsoncerda.com
-    sudo cp -r build/* /var/www/nelsoncerda.com/
-    ```
+cd "$RELEASE/server"
+npm ci
+npx prisma generate
+npm run build
+test -f "$RELEASE/build/index.html"
+test -f "$RELEASE/server/dist/index.js"
 
-## 4. Configure Nginx
+sudo cp /etc/nginx/sites-available/tecnicosenrd.com \
+  "$BACKUP/nginx-tecnicosenrd.com"
+if [ -L "$APP_ROOT/technician-current" ]; then
+  readlink -f "$APP_ROOT/technician-current" > "$BACKUP/previous-release"
+elif [ -d "$LEGACY/frontend" ]; then
+  cp -a "$LEGACY/frontend" "$BACKUP/legacy-frontend"
+fi
 
-Create an Nginx config file.
+cd "$RELEASE"
+node --env-file="$SHARED/server.env" deploy/backup-database.cjs \
+  "$BACKUP/database.dump"
+pg_restore --list "$BACKUP/database.dump" >/dev/null
 
-```bash
-sudo nano /etc/nginx/sites-available/nelsoncerda.com
-```
+cd "$RELEASE/server"
+npx prisma migrate deploy
 
-Add the following configuration:
+ln -sfn "$RELEASE" "$APP_ROOT/technician-current.next"
+mv -Tf "$APP_ROOT/technician-current.next" "$APP_ROOT/technician-current"
 
-```nginx
-server {
-    listen 80;
-    server_name nelsoncerda.com www.nelsoncerda.com;
+cd "$APP_ROOT/technician-current"
+pm2 startOrReload deploy/ecosystem.config.cjs --env production --update-env
+pm2 save
+curl --retry 10 --retry-connrefused --retry-delay 1 \
+  --fail --silent --show-error http://127.0.0.1:3001/health
 
-    root /var/www/nelsoncerda.com;
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /api {
-        proxy_pass http://localhost:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
-
-Enable the site and restart Nginx:
-
-```bash
-sudo ln -s /etc/nginx/sites-available/nelsoncerda.com /etc/nginx/sites-enabled/
+sudo install -m 644 deploy/nginx/tecnicosenrd.com.conf \
+  /etc/nginx/sites-available/tecnicosenrd.com
+test -e /etc/nginx/sites-enabled/tecnicosenrd.com || \
+  sudo ln -s /etc/nginx/sites-available/tecnicosenrd.com \
+  /etc/nginx/sites-enabled/tecnicosenrd.com
 sudo nginx -t
-sudo systemctl restart nginx
+sudo systemctl reload nginx
 ```
 
-## 5. SSL Configuration (HTTPS)
+Seeding is not part of every production deployment. Run
+`npm run db:seed` from `/home/bitnami/apps/technician-current/server` only when
+the release explicitly requires reference-data changes and the seed is known
+to be idempotent.
 
-Secure your site with Let's Encrypt.
+## Verify the deployment
+
+All checks must pass before declaring the release complete:
 
 ```bash
-sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d nelsoncerda.com -d www.nelsoncerda.com
+cat /home/bitnami/apps/technician-current/REVISION
+pm2 status technician-api
+pm2 logs technician-api --lines 50 --nostream
+curl -fsS http://127.0.0.1:3001/health
+curl -fsS https://tecnicosenrd.com/health
+curl -fsSI https://tecnicosenrd.com/
+sudo nginx -t
 ```
 
-## 6. Final Steps
+The health responses should be `{"status":"ok"}`, the homepage should return
+HTTP 200, PM2 should remain `online`, and the logs should contain no restart
+loop or database errors. Also test sign-in and one read-only API flow in the
+browser.
 
--   **Firewall**: Ensure ports 80 (HTTP) and 443 (HTTPS) are open in the Lightsail networking tab.
--   **PM2 Startup**: Run `pm2 startup` and follow instructions to ensure the API starts on reboot. `pm2 save`.
+## Roll back application code
 
-## 7. Troubleshooting
+Choose the previous known-good directory from `/home/bitnami/apps/releases`.
+Validate its build before changing the stable symlink:
 
-### Apt Update Errors (404 Not Found)
-If you encounter 404 errors when running `sudo apt update` (e.g., `security.debian.org/debian-security bullseye/updates Release`), it means your `sources.list` file or files in `sources.list.d` have outdated repository paths.
+```bash
+set -euo pipefail
+APP_ROOT=/home/bitnami/apps
+ls -1dt "$APP_ROOT"/releases/*
+PREVIOUS=/home/bitnami/apps/releases/<known-good-release>
+test -f "$PREVIOUS/build/index.html"
+test -f "$PREVIOUS/server/dist/index.js"
+test -f "$PREVIOUS/deploy/nginx/tecnicosenrd.com.conf"
 
-To fix this:
+ln -sfn "$PREVIOUS" "$APP_ROOT/technician-current.next"
+mv -Tf "$APP_ROOT/technician-current.next" "$APP_ROOT/technician-current"
 
-1.  Create a fix script on the server:
-    ```bash
-    nano fix_sources.sh
-    ```
-2.  Paste the following content:
-    ```bash
-    #!/bin/bash
-    
-    # Backup existing sources.list
-    sudo cp /etc/apt/sources.list /etc/apt/sources.list.bak
-    
-    # Create new sources.list content (Minimal stable repositories)
-    cat <<EOF | sudo tee /etc/apt/sources.list
-    deb http://deb.debian.org/debian bullseye main contrib non-free
-    deb-src http://deb.debian.org/debian bullseye main contrib non-free
-    
-    deb http://deb.debian.org/debian-security/ bullseye-security main contrib non-free
-    deb-src http://deb.debian.org/debian-security/ bullseye-security main contrib non-free
-    
-    deb http://deb.debian.org/debian bullseye-updates main contrib non-free
-    deb-src http://deb.debian.org/debian bullseye-updates main contrib non-free
-    EOF
-    
-    # Disable conflicting files in sources.list.d
-    if [ -d "/etc/apt/sources.list.d" ]; then
-        echo "Checking for conflicting files in /etc/apt/sources.list.d..."
-        for file in /etc/apt/sources.list.d/*.list; do
-            if [ -f "$file" ]; then
-                echo "Disabling $file"
-                sudo mv "$file" "${file}.bak"
-            fi
-        done
-    fi
-    
-    # Update package lists
-    echo "Updating package lists..."
-    sudo apt update
-    ```
-3.  Make it executable and run it:
-    ```bash
-    chmod +x fix_sources.sh
-    ./fix_sources.sh
-    ```
+cd "$APP_ROOT/technician-current"
+pm2 startOrReload deploy/ecosystem.config.cjs --env production --update-env
+pm2 save
+sudo install -m 644 deploy/nginx/tecnicosenrd.com.conf \
+  /etc/nginx/sites-available/tecnicosenrd.com
+sudo nginx -t
+sudo systemctl reload nginx
 
-### PostgreSQL Password Prompt
-If `sudo -u postgres psql` still asks for a password:
+curl -fsS http://127.0.0.1:3001/health
+curl -fsS https://tecnicosenrd.com/health
+```
 
-1.  **Restart the Service**: Changes to `pg_hba.conf` require a restart.
-    ```bash
-    sudo systemctl restart postgresql
-    ```
-2.  **Check the Line**: Ensure you edited the `local` connection line for `postgres`.
-    ```text
-    # TYPE  DATABASE        USER            ADDRESS                 METHOD
-    local   all             postgres                                trust
-    ```
-3.  **Check the Prompt**:
-    -   `Password:` = PostgreSQL password (edit `pg_hba.conf` to `trust`).
-    -   `[sudo] password for ubuntu:` = System user password (check sudo permissions).
+The first migration to versioned releases has no earlier release directory, so
+its rollback assets are the `legacy-frontend`, previous source revision, Nginx
+copy, and database dump saved under that deployment's backup directory. Do not
+remove the legacy application until the first release has been verified.
 
-Your application should now be live at https://nelsoncerda.com!
+A code rollback does **not** reverse Prisma migrations. Prefer a forward fix
+when the migrated schema remains compatible. Restoring
+`backups/<timestamp>/database.dump` overwrites production data and must only be
+done during an approved maintenance window after application writes are
+stopped. Keep at least the current release, the previous known-good release,
+and their matching backups.
+
+The first hardened release transparently upgrades legacy plaintext passwords
+to scrypt hashes when users sign in. Once that happens, the legacy API cannot
+authenticate those users. Roll back that release with a forward-compatible API
+fix whenever possible; restoring its predeployment database dump would also
+discard every production write made after the backup.

@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import { ACHIEVEMENTS, LEVELS, REWARDS } from '../src/config/gamification';
 

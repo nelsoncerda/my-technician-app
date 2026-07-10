@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, Clock, MapPin, Phone, FileText, ChevronRight, ChevronLeft, Check, Loader2, X } from 'lucide-react';
-import { SERVICE_TYPES } from '../../config/constants';
+import { API_BASE_URL, SERVICE_TYPES } from '../../config/constants';
+import { apiFetch } from '../../lib/api';
 
 interface BookingFormProps {
   technician: {
@@ -9,14 +10,12 @@ interface BookingFormProps {
     name: string;
     specialization: string;
   };
-  customerId: string;
   onSubmit: (data: BookingData) => Promise<void>;
   onClose: () => void;
 }
 
 interface BookingData {
   technicianId: string;
-  customerId: string;
   scheduledDate: string;
   scheduledTime: string;
   serviceType: string;
@@ -32,15 +31,15 @@ const CITIES = [
   'Villa González', 'Puñal'
 ];
 
-const BookingForm: React.FC<BookingFormProps> = ({ technician, customerId, onSubmit, onClose }) => {
+const BookingForm: React.FC<BookingFormProps> = ({ technician, onSubmit, onClose }) => {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [slotsError, setSlotsError] = useState('');
 
   const [formData, setFormData] = useState<BookingData>({
     technicianId: technician.id,
-    customerId,
     scheduledDate: '',
     scheduledTime: '',
     serviceType: '',
@@ -50,37 +49,71 @@ const BookingForm: React.FC<BookingFormProps> = ({ technician, customerId, onSub
     phone: '',
   });
 
-  // Get minimum date (tomorrow)
+  const formatDateInputValue = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Get minimum date (tomorrow) in the user's local timezone.
   const getMinDate = () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split('T')[0];
+    return formatDateInputValue(tomorrow);
   };
 
   // Get maximum date (30 days from now)
   const getMaxDate = () => {
     const maxDate = new Date();
     maxDate.setDate(maxDate.getDate() + 30);
-    return maxDate.toISOString().split('T')[0];
+    return formatDateInputValue(maxDate);
   };
 
   // Fetch available slots when date changes
   useEffect(() => {
+    let cancelled = false;
+
     if (formData.scheduledDate) {
       setLoadingSlots(true);
-      fetch(`http://localhost:3001/api/bookings/availability/${technician.id}/slots?date=${formData.scheduledDate}`)
-        .then((res) => res.json())
+      setSlotsError('');
+      setAvailableSlots([]);
+      apiFetch(`${API_BASE_URL}/api/bookings/availability/${technician.id}/slots?date=${formData.scheduledDate}`)
+        .then((res) => {
+          if (!res.ok) throw new Error('No se pudo consultar la disponibilidad');
+          return res.json();
+        })
         .then((slots) => {
-          setAvailableSlots(slots.length > 0 ? slots : ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00']);
+          if (cancelled) return;
+          setAvailableSlots(Array.isArray(slots) ? slots : []);
           setLoadingSlots(false);
         })
         .catch(() => {
-          // Use default slots if API fails
-          setAvailableSlots(['09:00', '10:00', '11:00', '14:00', '15:00', '16:00']);
+          if (cancelled) return;
+          setSlotsError('No pudimos consultar los horarios. Intenta elegir la fecha nuevamente.');
           setLoadingSlots(false);
         });
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [formData.scheduledDate, technician.id]);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !isSubmitting) onClose();
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isSubmitting, onClose]);
 
   const handleNext = () => {
     if (step < 5) setStep(step + 1);
@@ -108,7 +141,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ technician, customerId, onSub
       case 3:
         return !!formData.scheduledTime;
       case 4:
-        return !!formData.address && !!formData.city && !!formData.phone;
+        return Boolean(
+          formData.address.trim() &&
+          formData.city &&
+          /^\+?[\d\s()-]{10,20}$/.test(formData.phone.trim())
+        );
       case 5:
         return true;
       default:
@@ -129,11 +166,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ technician, customerId, onSub
 
   const formatTime = (time: string) => {
     if (!time) return '';
-    const [hours] = time.split(':');
+    const [hours, minutes = '00'] = time.split(':');
     const hour = parseInt(hours);
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const hour12 = hour % 12 || 12;
-    return `${hour12}:00 ${ampm}`;
+    return `${hour12}:${minutes} ${ampm}`;
   };
 
   const renderStep = () => {
@@ -202,6 +239,14 @@ const BookingForm: React.FC<BookingFormProps> = ({ technician, customerId, onSub
             {loadingSlots ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+              </div>
+            ) : slotsError ? (
+              <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                {slotsError}
+              </div>
+            ) : availableSlots.length === 0 ? (
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+                No hay horarios disponibles para esta fecha. Prueba con otro día.
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-3">
@@ -360,21 +405,26 @@ const BookingForm: React.FC<BookingFormProps> = ({ technician, customerId, onSub
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="booking-dialog-title"
+        className="max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-gray-900"
       >
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
           <div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Reservar servicio</h2>
+            <h2 id="booking-dialog-title" className="text-xl font-bold text-gray-900 dark:text-white">Reservar servicio</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">Paso {step} de 5</p>
           </div>
           <button
             onClick={onClose}
+            type="button"
+            aria-label="Cerrar reserva"
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
           >
             <X className="w-5 h-5 text-gray-500" />

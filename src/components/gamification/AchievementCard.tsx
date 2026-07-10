@@ -24,32 +24,6 @@ const categoryLabels: Record<string, string> = {
   SPECIAL: '🌴 Especial',
 };
 
-const getCategoryEmoji = (category: string): string => {
-  const emojis: Record<string, string> = {
-    MILESTONE: '🏆',
-    QUALITY: '⭐',
-    ENGAGEMENT: '🔥',
-    SPECIAL: '🌴',
-  };
-  return emojis[category] || '🎯';
-};
-
-const getMotivationalText = (isUnlocked: boolean): string => {
-  const unlockedPhrases = [
-    '¡Tá\' duro!',
-    '¡Dímelo!',
-    '¡Qué lo qué!',
-    '¡Tamo\' activo!',
-  ];
-  const lockedPhrases = [
-    '¡Dale que tú puede\'!',
-    '¡Ya casi lo logra\'!',
-    '¡Sigue así, tíguere!',
-  ];
-  const phrases = isUnlocked ? unlockedPhrases : lockedPhrases;
-  return phrases[Math.floor(Math.random() * phrases.length)];
-};
-
 const AchievementCard: React.FC<AchievementCardProps> = ({
   name,
   nameEs,

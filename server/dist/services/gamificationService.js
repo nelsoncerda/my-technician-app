@@ -8,6 +8,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.initializeUserPoints = initializeUserPoints;
 exports.getUserPointsSummary = getUserPointsSummary;
@@ -21,32 +24,30 @@ exports.redeemReward = redeemReward;
 exports.getAvailableRewards = getAvailableRewards;
 exports.getUserRedemptions = getUserRedemptions;
 const client_1 = require("@prisma/client");
+const crypto_1 = require("crypto");
+const prisma_1 = __importDefault(require("../prisma"));
 const gamification_1 = require("../config/gamification");
-const prisma = new client_1.PrismaClient();
 // Initialize user points record if not exists
 function initializeUserPoints(userId) {
     return __awaiter(this, void 0, void 0, function* () {
-        const existing = yield prisma.userPoints.findUnique({
+        yield prisma_1.default.userPoints.upsert({
             where: { userId },
+            update: {},
+            create: {
+                userId,
+                totalPoints: 0,
+                currentLevel: 1,
+                levelProgress: 0,
+                lifetimePoints: 0,
+            },
         });
-        if (!existing) {
-            yield prisma.userPoints.create({
-                data: {
-                    userId,
-                    totalPoints: 0,
-                    currentLevel: 1,
-                    levelProgress: 0,
-                    lifetimePoints: 0,
-                },
-            });
-        }
     });
 }
 // Get user points summary
 function getUserPointsSummary(userId) {
     return __awaiter(this, void 0, void 0, function* () {
         yield initializeUserPoints(userId);
-        const userPoints = yield prisma.userPoints.findUnique({
+        const userPoints = yield prisma_1.default.userPoints.findUnique({
             where: { userId },
         });
         if (!userPoints)
@@ -71,55 +72,35 @@ function getUserPointsSummary(userId) {
 function awardPoints(userId, points, type, source, description, sourceId) {
     return __awaiter(this, void 0, void 0, function* () {
         yield initializeUserPoints(userId);
-        // Create transaction record
-        yield prisma.pointTransaction.create({
-            data: {
-                userId,
-                points,
-                type,
-                source,
-                sourceId,
-                description,
-            },
-        });
-        // Update user points
-        const updatedPoints = yield prisma.userPoints.update({
-            where: { userId },
-            data: {
-                totalPoints: { increment: points },
-                lifetimePoints: { increment: points > 0 ? points : 0 },
-            },
-        });
-        // Check for level up
-        const newLevel = (0, gamification_1.calculateLevel)(updatedPoints.totalPoints);
-        if (newLevel.levelNumber > updatedPoints.currentLevel) {
-            yield prisma.userPoints.update({
-                where: { userId },
+        return prisma_1.default.$transaction((tx) => __awaiter(this, void 0, void 0, function* () {
+            yield tx.pointTransaction.create({
                 data: {
-                    currentLevel: newLevel.levelNumber,
-                    levelProgress: (0, gamification_1.getLevelProgress)(updatedPoints.totalPoints),
+                    userId,
+                    points,
+                    type,
+                    source,
+                    sourceId,
+                    description,
                 },
             });
-            return {
-                pointsAwarded: points,
-                newTotal: updatedPoints.totalPoints,
-                levelUp: true,
+            const updatedPoints = yield tx.userPoints.update({
+                where: { userId },
+                data: {
+                    totalPoints: { increment: points },
+                    lifetimePoints: { increment: points > 0 ? points : 0 },
+                },
+            });
+            const newLevel = (0, gamification_1.calculateLevel)(updatedPoints.totalPoints);
+            const levelUp = newLevel.levelNumber > updatedPoints.currentLevel;
+            yield tx.userPoints.update({
+                where: { userId },
+                data: Object.assign(Object.assign({}, (levelUp && { currentLevel: newLevel.levelNumber })), { levelProgress: (0, gamification_1.getLevelProgress)(updatedPoints.totalPoints) }),
+            });
+            return Object.assign({ pointsAwarded: points, newTotal: updatedPoints.totalPoints, levelUp }, (levelUp && {
                 newLevel: newLevel.levelNumber,
                 newLevelName: newLevel.nameEs,
-            };
-        }
-        // Update level progress
-        yield prisma.userPoints.update({
-            where: { userId },
-            data: {
-                levelProgress: (0, gamification_1.getLevelProgress)(updatedPoints.totalPoints),
-            },
-        });
-        return {
-            pointsAwarded: points,
-            newTotal: updatedPoints.totalPoints,
-            levelUp: false,
-        };
+            }));
+        }));
     });
 }
 // Award points for specific events
@@ -181,13 +162,13 @@ function awardPointsForEvent(event) {
 // Get user's points history
 function getPointsHistory(userId_1) {
     return __awaiter(this, arguments, void 0, function* (userId, limit = 20, offset = 0) {
-        const transactions = yield prisma.pointTransaction.findMany({
+        const transactions = yield prisma_1.default.pointTransaction.findMany({
             where: { userId },
             orderBy: { createdAt: 'desc' },
             take: limit,
             skip: offset,
         });
-        const total = yield prisma.pointTransaction.count({
+        const total = yield prisma_1.default.pointTransaction.count({
             where: { userId },
         });
         return {
@@ -200,7 +181,7 @@ function getPointsHistory(userId_1) {
 // Check and unlock achievements for user
 function checkAndUnlockAchievements(userId, triggerEvent) {
     return __awaiter(this, void 0, void 0, function* () {
-        const user = yield prisma.user.findUnique({
+        const user = yield prisma_1.default.user.findUnique({
             where: { id: userId },
             include: {
                 technician: true,
@@ -218,7 +199,7 @@ function checkAndUnlockAchievements(userId, triggerEvent) {
         const newlyUnlocked = [];
         // Get user stats
         const bookingsCompleted = user.bookingsAsCustomer.length;
-        const reviewsWritten = yield prisma.review.count({
+        const reviewsWritten = yield prisma_1.default.review.count({
             where: { authorId: userId },
         });
         let jobsCompleted = 0;
@@ -229,7 +210,7 @@ function checkAndUnlockAchievements(userId, triggerEvent) {
             jobsCompleted = user.technician.totalJobsCompleted;
             totalReviews = user.technician.totalReviews;
             averageRating = user.technician.rating;
-            fiveStarReviews = yield prisma.review.count({
+            fiveStarReviews = yield prisma_1.default.review.count({
                 where: {
                     technicianId: user.technician.id,
                     rating: 5,
@@ -275,11 +256,11 @@ function checkAndUnlockAchievements(userId, triggerEvent) {
             }
             if (unlocked) {
                 // Unlock the achievement
-                const dbAchievement = yield prisma.achievement.findUnique({
+                const dbAchievement = yield prisma_1.default.achievement.findUnique({
                     where: { code: achievement.code },
                 });
                 if (dbAchievement) {
-                    yield prisma.userAchievement.create({
+                    yield prisma_1.default.userAchievement.create({
                         data: {
                             userId,
                             achievementId: dbAchievement.id,
@@ -306,11 +287,11 @@ function checkAndUnlockAchievements(userId, triggerEvent) {
 // Get all achievements with user progress
 function getUserAchievements(userId) {
     return __awaiter(this, void 0, void 0, function* () {
-        const userAchievements = yield prisma.userAchievement.findMany({
+        const userAchievements = yield prisma_1.default.userAchievement.findMany({
             where: { userId },
             include: { achievement: true },
         });
-        const allAchievements = yield prisma.achievement.findMany({
+        const allAchievements = yield prisma_1.default.achievement.findMany({
             where: { isActive: true },
             orderBy: { sortOrder: 'asc' },
         });
@@ -340,7 +321,7 @@ function getLeaderboard(period_1) {
         }
         // For ALL_TIME, use UserPoints directly
         if (period === 'ALL_TIME') {
-            const topUsers = yield prisma.userPoints.findMany({
+            const topUsers = yield prisma_1.default.userPoints.findMany({
                 orderBy: { lifetimePoints: 'desc' },
                 take: limit,
                 include: {
@@ -374,7 +355,7 @@ function getLeaderboard(period_1) {
             });
         }
         // For WEEKLY/MONTHLY, aggregate from transactions
-        const transactions = yield prisma.pointTransaction.groupBy({
+        const transactions = yield prisma_1.default.pointTransaction.groupBy({
             by: ['userId'],
             where: {
                 createdAt: { gte: startDate },
@@ -385,7 +366,7 @@ function getLeaderboard(period_1) {
             take: limit,
         });
         const userIds = transactions.map((t) => t.userId);
-        const users = yield prisma.user.findMany({
+        const users = yield prisma_1.default.user.findMany({
             where: { id: { in: userIds } },
             include: {
                 points: true,
@@ -417,53 +398,60 @@ function getLeaderboard(period_1) {
 // Redeem a reward
 function redeemReward(userId, rewardCode) {
     return __awaiter(this, void 0, void 0, function* () {
-        const reward = yield prisma.reward.findUnique({
-            where: { code: rewardCode },
-        });
-        if (!reward || !reward.isActive) {
-            throw new Error('Recompensa no disponible');
-        }
-        if (reward.stock !== null && reward.stock <= 0) {
-            throw new Error('Recompensa agotada');
-        }
-        const userPoints = yield prisma.userPoints.findUnique({
-            where: { userId },
-        });
-        if (!userPoints || userPoints.totalPoints < reward.pointsCost) {
-            throw new Error('Puntos insuficientes');
-        }
-        // Generate unique redemption code
-        const redemptionCode = `${rewardCode}-${Date.now().toString(36).toUpperCase()}`;
-        // Create redemption record
-        const redemption = yield prisma.rewardRedemption.create({
-            data: {
-                userId,
-                rewardId: reward.id,
-                pointsUsed: reward.pointsCost,
-                code: redemptionCode,
-                expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-            },
-        });
-        // Deduct points
-        yield awardPoints(userId, -reward.pointsCost, 'REDEEMED', 'REWARD_REDEEMED', `Canjeaste: ${reward.nameEs}`, redemption.id);
-        // Update stock if applicable
-        if (reward.stock !== null) {
-            yield prisma.reward.update({
-                where: { id: reward.id },
-                data: { stock: { decrement: 1 } },
+        return prisma_1.default.$transaction((tx) => __awaiter(this, void 0, void 0, function* () {
+            const reward = yield tx.reward.findUnique({ where: { code: rewardCode } });
+            if (!reward || !reward.isActive) {
+                throw new Error('Recompensa no disponible');
+            }
+            if (reward.stock !== null) {
+                const stockClaim = yield tx.reward.updateMany({
+                    where: { id: reward.id, stock: { gt: 0 } },
+                    data: { stock: { decrement: 1 } },
+                });
+                if (stockClaim.count !== 1)
+                    throw new Error('Recompensa agotada');
+            }
+            const pointsClaim = yield tx.userPoints.updateMany({
+                where: { userId, totalPoints: { gte: reward.pointsCost } },
+                data: { totalPoints: { decrement: reward.pointsCost } },
             });
-        }
-        return {
-            redemption,
-            reward,
-            redemptionCode,
-        };
+            if (pointsClaim.count !== 1)
+                throw new Error('Puntos insuficientes');
+            const redemptionCode = `${rewardCode}-${(0, crypto_1.randomBytes)(6).toString('hex').toUpperCase()}`;
+            const redemption = yield tx.rewardRedemption.create({
+                data: {
+                    userId,
+                    rewardId: reward.id,
+                    pointsUsed: reward.pointsCost,
+                    code: redemptionCode,
+                    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                },
+            });
+            const updatedPoints = yield tx.userPoints.findUniqueOrThrow({ where: { userId } });
+            yield tx.pointTransaction.create({
+                data: {
+                    userId,
+                    points: -reward.pointsCost,
+                    type: 'REDEEMED',
+                    source: 'REWARD_REDEEMED',
+                    sourceId: redemption.id,
+                    description: `Canjeaste: ${reward.nameEs}`,
+                },
+            });
+            yield tx.userPoints.update({
+                where: { userId },
+                data: { levelProgress: (0, gamification_1.getLevelProgress)(updatedPoints.totalPoints) },
+            });
+            return { redemption, reward, redemptionCode };
+        }), {
+            isolationLevel: client_1.Prisma.TransactionIsolationLevel.Serializable,
+        });
     });
 }
 // Get available rewards
 function getAvailableRewards() {
     return __awaiter(this, void 0, void 0, function* () {
-        return prisma.reward.findMany({
+        return prisma_1.default.reward.findMany({
             where: {
                 isActive: true,
                 OR: [{ stock: null }, { stock: { gt: 0 } }],
@@ -475,7 +463,7 @@ function getAvailableRewards() {
 // Get user's reward redemptions
 function getUserRedemptions(userId) {
     return __awaiter(this, void 0, void 0, function* () {
-        return prisma.rewardRedemption.findMany({
+        return prisma_1.default.rewardRedemption.findMany({
             where: { userId },
             include: { reward: true },
             orderBy: { redeemedAt: 'desc' },

@@ -147,10 +147,11 @@ function getUserAchievements(req, res) {
 function checkAchievements(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const { userId, triggerEvent } = req.body;
-            if (!userId) {
-                return res.status(400).json({ error: 'ID de usuario requerido' });
-            }
+            const { triggerEvent } = req.body;
+            const requestedUserId = req.body.userId;
+            const userId = req.auth.role === 'admin' && typeof requestedUserId === 'string'
+                ? requestedUserId
+                : req.auth.userId;
             const newAchievements = yield gamificationService.checkAndUnlockAchievements(userId, triggerEvent);
             res.json({ newAchievements });
         }
@@ -227,7 +228,8 @@ function getAffordableRewards(req, res) {
 function redeemReward(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const { userId, rewardCode } = req.body;
+            const { rewardCode } = req.body;
+            const userId = req.auth.userId;
             if (!userId || !rewardCode) {
                 return res.status(400).json({ error: 'Usuario y código de recompensa requeridos' });
             }

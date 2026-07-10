@@ -1,70 +1,76 @@
-# Getting Started with Create React App
+# Técnicos en RD
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Marketplace local para encontrar, comparar y reservar técnicos en Santiago y el Cibao. El proyecto incluye una aplicación React, una API Express y PostgreSQL mediante Prisma.
 
-## Available Scripts
+## Funciones principales
 
-In the project directory, you can run:
+- Directorio de técnicos con búsqueda por servicio y ubicación.
+- Perfiles verificados, valoraciones y reservas con disponibilidad real.
+- Agendas separadas para servicios contratados y trabajos recibidos.
+- Registro, verificación de correo y recuperación de contraseña.
+- Panel de administración, gamificación, logros y recompensas.
+- Autenticación con tokens firmados, contraseñas con `scrypt` y autorización por rol/propietario.
 
-### `npm start`
+## Requisitos
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- Node.js 20 o posterior
+- npm
+- PostgreSQL
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Desarrollo local
 
-### `npm test`
+Instala las dependencias del frontend y la API:
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+```bash
+npm install
+cd server && npm install
+```
 
-### `npm run build`
+Crea `server/.env`:
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```env
+DATABASE_URL="postgresql://usuario:clave@localhost:5432/my_technician_app?schema=public"
+AUTH_SECRET="cambia-esto-por-un-secreto-aleatorio-de-al-menos-32-caracteres"
+APP_URL="http://localhost:3000"
+API_URL="http://localhost:3001"
+CORS_ORIGIN="http://localhost:3000"
+PORT=3001
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+Las variables SMTP son opcionales en desarrollo: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` y `SMTP_FROM`.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Prepara la base de datos y arranca ambos procesos en terminales separadas:
 
-### `npm run eject`
+```bash
+cd server
+npx prisma migrate dev
+npm run db:seed
+npm run dev
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+```bash
+npm start
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+La web queda en [http://localhost:3000](http://localhost:3000), la API en [http://localhost:3001](http://localhost:3001) y el estado del proceso en [http://localhost:3001/health](http://localhost:3001/health).
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## Verificación
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+```bash
+# Frontend
+CI=true npm test -- --runInBand
+CI=true npm run build
 
-## Learn More
+# API
+cd server
+npm test
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## Configuración de producción
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+- `AUTH_SECRET` es obligatorio en producción y debe tener al menos 32 caracteres.
+- Define `REACT_APP_API_URL` al compilar el frontend solo si la API vive en otro origen. Sin esa variable, producción usa `/api` en el mismo dominio.
+- Ejecuta `npx prisma migrate deploy` y `npm run db:seed` durante el despliegue.
+- Sirve `build/` desde el proxy web y dirige `/api` al proceso Express.
 
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+Consulta [DEPLOYMENT.md](./DEPLOYMENT.md) para la guía de Nginx y Lightsail.

@@ -1,16 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    MapPin, Phone, Mail, Star, Search, Filter, Wrench, User,
+    MapPin, Phone, Mail, Star, Wrench, User as UserIcon,
     CheckCircle, PlusCircle, Loader2, X, LogIn, LogOut, Shield, Edit,
-    Calendar, Trophy, Gift, Home, Users, BarChart3, TrendingUp, Clock,
-    DollarSign, Activity, AlertCircle, UserCheck, UserX, Trash2, Eye, Settings, Plus,
+    Calendar, Trophy, Gift, Users, BarChart3, Clock,
+    DollarSign, AlertCircle, UserCheck, Trash2, Settings, Plus,
     Camera, History, Save, MailWarning, RefreshCw, CheckCircle2
 } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { Textarea } from './components/ui/textarea';
-import { Card, CardHeader, CardContent, CardFooter } from './components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select';
 import { cn } from './lib/utils';
 import { useForm, Controller } from 'react-hook-form';
@@ -25,7 +24,10 @@ import AchievementCard from './components/gamification/AchievementCard';
 import Leaderboard from './components/gamification/Leaderboard';
 import RewardCard from './components/gamification/RewardCard';
 import AchievementUnlocked from './components/gamification/AchievementUnlocked';
+import HomeView from './components/home/HomeView';
+import AboutView from './components/home/AboutView';
 import { API_BASE_URL } from './config/constants';
+import { apiFetch, clearAuthSession, getStoredUser, setAuthSession, updateStoredUser } from './lib/api';
 
 // Default data (will be managed via state)
 const DEFAULT_SPECIALIZATIONS = [
@@ -47,8 +49,8 @@ interface Technician {
     specialization: string;
     specializations?: string[]; // Array of specializations
     location: string;
-    phone: string;
-    email: string;
+    phone?: string;
+    email?: string;
     photoUrl?: string; // Profile photo URL
     rating: number;
     reviews: Review[];
@@ -64,7 +66,6 @@ interface User {
     phone?: string;
     photoUrl?: string;
     emailVerified?: boolean;
-    password?: string; // In a real app, this would be hashed
     // Technician-specific fields (only present if role is 'technician')
     technicianId?: string;
     specializations?: string[];
@@ -114,7 +115,6 @@ const technicianFormSchema = z.object({
 });
 
 const reviewFormSchema = z.object({
-    author: z.string().min(3, { message: 'El nombre debe tener al menos 3 caracteres.' }),
     comment: z.string().min(10, { message: 'El comentario debe tener al menos 10 caracteres.' }),
     rating: z.number().min(1).max(5),
 });
@@ -124,7 +124,7 @@ const userFormSchema = z.object({
     lastName: z.string().min(2, { message: 'El apellido debe tener al menos 2 caracteres.' }),
     email: z.string().email({ message: 'Formato de correo electrónico inválido.' }),
     phone: z.string().regex(/^\d{3}-\d{3}-\d{4}$/, { message: 'Formato de teléfono inválido (XXX-XXX-XXXX).' }),
-    password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
+    password: z.string().min(8, { message: 'La contraseña debe tener al menos 8 caracteres.' }),
     accountType: z.enum(['user', 'technician'], { required_error: 'Debes seleccionar un tipo de cuenta.' }),
     // Campos condicionales para técnicos
     specializations: z.array(z.string()).optional(), // Array of specializations
@@ -146,22 +146,11 @@ const loginFormSchema = z.object({
     password: z.string().min(1, { message: 'La contraseña es requerida.' }),
 });
 
-// Animation Variants
-const cardVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
-    exit: { opacity: 0, y: -20, transition: { duration: 0.2 } },
-};
-
-const reviewVariants = {
-    hidden: { opacity: 0, x: -20 },
-    visible: { opacity: 1, x: 0, transition: { duration: 0.3 } },
-    exit: { opacity: 0, x: 20, transition: { duration: 0.2 } },
-};
-
 const SantiagoTechRDApp = () => {
     const [technicians, setTechnicians] = useState<Technician[]>([]);
     const [loading, setLoading] = useState(true);
+    const [directoryError, setDirectoryError] = useState('');
+    const [directoryReloadKey, setDirectoryReloadKey] = useState(0);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedSpecialization, setSelectedSpecialization] = useState('');
     const [selectedLocation, setSelectedLocation] = useState('');
@@ -169,10 +158,12 @@ const SantiagoTechRDApp = () => {
     const [showUserRegisterForm, setShowUserRegisterForm] = useState(false);
     const [showLoginForm, setShowLoginForm] = useState(false);
     const [showProfileModal, setShowProfileModal] = useState(false);
-    const [currentUser, setCurrentUser] = useState<User | null>(null);
+    const [currentUser, setCurrentUser] = useState<User | null>(() => getStoredUser<User>());
     const [users, setUsers] = useState<User[]>([]); // Store registered users
     const [currentView, setCurrentView] = useState<'home' | 'admin' | 'bookings' | 'gamification' | 'about'>('home');
     const [showReviewForm, setShowReviewForm] = useState<{ technicianId: string; show: boolean } | null>(null);
+    const [reviewSubmitError, setReviewSubmitError] = useState('');
+    const [reviewedTechnicianIds, setReviewedTechnicianIds] = useState<Set<string>>(() => new Set());
     const [registrationSuccess, setRegistrationSuccess] = useState(false);
     const [userRegistrationSuccess, setUserRegistrationSuccess] = useState(false);
 
@@ -200,7 +191,6 @@ const SantiagoTechRDApp = () => {
     // Profile editing state
     const [isEditingProfile, setIsEditingProfile] = useState(false);
     const [profileHistory, setProfileHistory] = useState<ProfileChangeHistory[]>([]);
-    const [showProfileHistory, setShowProfileHistory] = useState(false);
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
     const [savingProfile, setSavingProfile] = useState(false);
     const [editingSpecializations, setEditingSpecializations] = useState<string[]>([]);
@@ -253,6 +243,17 @@ const SantiagoTechRDApp = () => {
         title: string;
     }>({ type: null, title: '' });
 
+    useEffect(() => {
+        const handleExpiredSession = () => {
+            setCurrentUser(null);
+            setCurrentView('home');
+            setShowProfileModal(false);
+        };
+
+        window.addEventListener('tecnicos-rd:session-expired', handleExpiredSession);
+        return () => window.removeEventListener('tecnicos-rd:session-expired', handleExpiredSession);
+    }, []);
+
     // Form for Technician Registration
     const {
         register: registerTechnician,
@@ -297,7 +298,6 @@ const SantiagoTechRDApp = () => {
     } = useForm<z.infer<typeof reviewFormSchema>>({
         resolver: zodResolver(reviewFormSchema),
         defaultValues: {
-            author: '',
             comment: '',
             rating: 5,
         },
@@ -343,40 +343,68 @@ const SantiagoTechRDApp = () => {
         },
     });
 
-    // Fetch Technicians and Users from API
+    // Fetch public directory data, and load private user data only for admins.
     useEffect(() => {
+        let cancelled = false;
+
         const fetchData = async () => {
+            setLoading(true);
+            setDirectoryError('');
+
             try {
-                // Fetch technicians
-                const techResponse = await fetch(`${API_BASE_URL}/api/technicians`);
+                const [techResult, settingsResult] = await Promise.allSettled([
+                    apiFetch(`${API_BASE_URL}/api/technicians`),
+                    apiFetch(`${API_BASE_URL}/api/settings`),
+                ]);
+
+                if (techResult.status === 'rejected' || !techResult.value.ok) {
+                    throw new Error('No se pudo cargar el directorio');
+                }
+
+                const techResponse = techResult.value;
                 const techData = await techResponse.json();
-                setTechnicians(techData);
+                if (!Array.isArray(techData)) {
+                    throw new Error('El directorio devolvió una respuesta inválida');
+                }
 
-                // Fetch users (for admin view)
-                const userResponse = await fetch(`${API_BASE_URL}/api/users`);
-                const userData = await userResponse.json();
-                setUsers(userData);
+                if (!cancelled) setTechnicians(techData);
 
-                // Fetch app settings (specializations and locations)
-                const settingsResponse = await fetch(`${API_BASE_URL}/api/settings`);
-                if (settingsResponse.ok) {
+                if (settingsResult.status === 'fulfilled' && settingsResult.value.ok) {
+                    const settingsResponse = settingsResult.value;
                     const settingsData = await settingsResponse.json();
-                    if (settingsData.specializations?.length > 0) {
+                    if (!cancelled && settingsData.specializations?.length > 0) {
                         setSpecializations(settingsData.specializations);
                     }
-                    if (settingsData.locations?.length > 0) {
+                    if (!cancelled && settingsData.locations?.length > 0) {
                         setLocations(settingsData.locations);
                     }
                 }
+
+                if (currentUser?.role === 'admin') {
+                    const userResponse = await apiFetch(`${API_BASE_URL}/api/users`);
+                    if (userResponse.ok) {
+                        const userData = await userResponse.json();
+                        if (!cancelled) setUsers(Array.isArray(userData) ? userData : []);
+                    }
+                } else if (!cancelled) {
+                    setUsers([]);
+                }
             } catch (error) {
                 console.error("Error fetching data:", error);
+                if (!cancelled) {
+                    setTechnicians([]);
+                    setDirectoryError('No pudimos conectar con el directorio. Revisa tu conexión e inténtalo de nuevo.');
+                }
             } finally {
-                setLoading(false);
+                if (!cancelled) setLoading(false);
             }
         };
 
         fetchData();
-    }, [currentUser]); // Refetch when user changes (e.g. after login/register)
+        return () => {
+            cancelled = true;
+        };
+    }, [currentUser?.role, directoryReloadKey]);
 
     // Fetch user bookings
     const fetchUserBookings = useCallback(async () => {
@@ -387,8 +415,8 @@ const SantiagoTechRDApp = () => {
             // (technicians can also book services from other technicians)
             if (currentUser.role === 'technician' && currentUser.technicianId) {
                 const [technicianRes, customerRes] = await Promise.all([
-                    fetch(`${API_BASE_URL}/api/bookings/technician/${currentUser.technicianId}`),
-                    fetch(`${API_BASE_URL}/api/bookings/customer/${currentUser.id}`)
+                    apiFetch(`${API_BASE_URL}/api/bookings/technician/${currentUser.technicianId}`),
+                    apiFetch(`${API_BASE_URL}/api/bookings/customer/${currentUser.id}`)
                 ]);
                 const technicianBookings = technicianRes.ok ? await technicianRes.json() : [];
                 const customerBookings = customerRes.ok ? await customerRes.json() : [];
@@ -404,7 +432,7 @@ const SantiagoTechRDApp = () => {
                 setUserBookings(allBookings);
             } else {
                 // For regular customers, only fetch their bookings
-                const response = await fetch(`${API_BASE_URL}/api/bookings/customer/${currentUser.id}`);
+                const response = await apiFetch(`${API_BASE_URL}/api/bookings/customer/${currentUser.id}`);
                 const data = await response.json();
                 setUserBookings(Array.isArray(data) ? data : []);
             }
@@ -430,10 +458,10 @@ const SantiagoTechRDApp = () => {
         setLoadingGamification(true);
         try {
             const [pointsRes, achievementsRes, leaderboardRes, rewardsRes] = await Promise.all([
-                fetch(`${API_BASE_URL}/api/gamification/points/${currentUser.id}`),
-                fetch(`${API_BASE_URL}/api/gamification/achievements/${currentUser.id}`),
-                fetch(`${API_BASE_URL}/api/gamification/leaderboard?period=${leaderboardPeriod}`),
-                fetch(`${API_BASE_URL}/api/gamification/rewards`),
+                apiFetch(`${API_BASE_URL}/api/gamification/points/${currentUser.id}`),
+                apiFetch(`${API_BASE_URL}/api/gamification/achievements/${currentUser.id}`),
+                apiFetch(`${API_BASE_URL}/api/gamification/leaderboard?period=${leaderboardPeriod}`),
+                apiFetch(`${API_BASE_URL}/api/gamification/rewards`),
             ]);
 
             if (pointsRes.ok) {
@@ -481,8 +509,8 @@ const SantiagoTechRDApp = () => {
         try {
             // Fetch stats from backend and bookings
             const [statsRes, bookingsRes] = await Promise.all([
-                fetch(`${API_BASE_URL}/api/users/admin/stats`),
-                fetch(`${API_BASE_URL}/api/bookings/all`)
+                apiFetch(`${API_BASE_URL}/api/users/admin/stats`),
+                apiFetch(`${API_BASE_URL}/api/bookings/all`)
             ]);
 
             const bookingsJson = bookingsRes.ok ? await bookingsRes.json() : { bookings: [] };
@@ -590,7 +618,7 @@ const SantiagoTechRDApp = () => {
         if (!window.confirm('¿Estás seguro de eliminar este usuario?')) return;
 
         try {
-            const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+            const response = await apiFetch(`${API_BASE_URL}/api/users/${userId}`, {
                 method: 'DELETE',
             });
             if (response.ok) {
@@ -604,7 +632,7 @@ const SantiagoTechRDApp = () => {
     // Handle user role change
     const handleChangeUserRole = async (userId: string, newRole: string) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/users/${userId}/role`, {
+            const response = await apiFetch(`${API_BASE_URL}/api/users/${userId}/role`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ role: newRole }),
@@ -620,7 +648,7 @@ const SantiagoTechRDApp = () => {
     // Handle booking creation
     const handleCreateBooking = async (bookingData: any) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/bookings`, {
+            const response = await apiFetch(`${API_BASE_URL}/api/bookings`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(bookingData),
@@ -630,10 +658,10 @@ const SantiagoTechRDApp = () => {
                 setShowBookingForm(null);
                 fetchUserBookings();
                 // Check for new achievements
-                const achievementsRes = await fetch(`${API_BASE_URL}/api/gamification/achievements/check`, {
+                const achievementsRes = await apiFetch(`${API_BASE_URL}/api/gamification/achievements/check`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: currentUser?.id, triggerEvent: 'BOOKING_CREATED' }),
+                    body: JSON.stringify({ triggerEvent: 'BOOKING_CREATED' }),
                 });
                 if (achievementsRes.ok) {
                     const { newAchievements } = await achievementsRes.json();
@@ -655,10 +683,8 @@ const SantiagoTechRDApp = () => {
     // Handle booking actions
     const handleConfirmBooking = async (bookingId: string) => {
         try {
-            await fetch(`${API_BASE_URL}/api/bookings/${bookingId}/confirm`, {
+            await apiFetch(`${API_BASE_URL}/api/bookings/${bookingId}/confirm`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ technicianUserId: currentUser?.id }),
             });
             fetchUserBookings();
         } catch (error) {
@@ -668,10 +694,8 @@ const SantiagoTechRDApp = () => {
 
     const handleStartBooking = async (bookingId: string) => {
         try {
-            await fetch(`${API_BASE_URL}/api/bookings/${bookingId}/start`, {
+            await apiFetch(`${API_BASE_URL}/api/bookings/${bookingId}/start`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ technicianUserId: currentUser?.id }),
             });
             fetchUserBookings();
         } catch (error) {
@@ -681,19 +705,17 @@ const SantiagoTechRDApp = () => {
 
     const handleCompleteBooking = async (bookingId: string) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/bookings/${bookingId}/complete`, {
+            const response = await apiFetch(`${API_BASE_URL}/api/bookings/${bookingId}/complete`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ technicianUserId: currentUser?.id }),
             });
             if (response.ok) {
                 fetchUserBookings();
                 fetchGamificationData();
                 // Check for new achievements
-                const achievementsRes = await fetch(`${API_BASE_URL}/api/gamification/achievements/check`, {
+                const achievementsRes = await apiFetch(`${API_BASE_URL}/api/gamification/achievements/check`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: currentUser?.id, triggerEvent: 'JOB_COMPLETED' }),
+                    body: JSON.stringify({ triggerEvent: 'JOB_COMPLETED' }),
                 });
                 if (achievementsRes.ok) {
                     const { newAchievements } = await achievementsRes.json();
@@ -710,13 +732,8 @@ const SantiagoTechRDApp = () => {
     const handleCancelBooking = async (bookingId: string) => {
         if (!window.confirm('¿Estás seguro de cancelar esta reserva?')) return;
         try {
-            await fetch(`${API_BASE_URL}/api/bookings/${bookingId}/cancel`, {
+            await apiFetch(`${API_BASE_URL}/api/bookings/${bookingId}/cancel`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    cancelledBy: currentUser?.role === 'technician' ? 'technician' : 'customer',
-                    cancellerUserId: currentUser?.id,
-                }),
             });
             fetchUserBookings();
         } catch (error) {
@@ -727,10 +744,10 @@ const SantiagoTechRDApp = () => {
     // Handle reward redemption
     const handleRedeemReward = async (rewardCode: string) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/gamification/rewards/redeem`, {
+            const response = await apiFetch(`${API_BASE_URL}/api/gamification/rewards/redeem`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: currentUser?.id, rewardCode }),
+                body: JSON.stringify({ rewardCode }),
             });
             if (response.ok) {
                 const result = await response.json();
@@ -758,7 +775,7 @@ const SantiagoTechRDApp = () => {
     // API functions for managing specializations and locations
     const addSpecializationToAPI = async (spec: string) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/settings/specializations`, {
+            const response = await apiFetch(`${API_BASE_URL}/api/settings/specializations`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ specialization: spec }),
@@ -777,7 +794,7 @@ const SantiagoTechRDApp = () => {
 
     const removeSpecializationFromAPI = async (spec: string) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/settings/specializations`, {
+            const response = await apiFetch(`${API_BASE_URL}/api/settings/specializations`, {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ specialization: spec }),
@@ -796,7 +813,7 @@ const SantiagoTechRDApp = () => {
 
     const addLocationToAPI = async (loc: string) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/settings/locations`, {
+            const response = await apiFetch(`${API_BASE_URL}/api/settings/locations`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ location: loc }),
@@ -815,7 +832,7 @@ const SantiagoTechRDApp = () => {
 
     const removeLocationFromAPI = async (loc: string) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/settings/locations`, {
+            const response = await apiFetch(`${API_BASE_URL}/api/settings/locations`, {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ location: loc }),
@@ -834,11 +851,17 @@ const SantiagoTechRDApp = () => {
 
     // Filtered Technicians based on search and filters
     const filteredTechnicians = technicians.filter((technician) => {
+        const normalizedSearch = searchTerm.trim().toLocaleLowerCase('es');
+        const technicianSpecializations = technician.specializations?.length
+            ? technician.specializations
+            : technician.specialization.split(',').map((item) => item.trim()).filter(Boolean);
         const searchMatch =
-            technician.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            technician.specialization.toLowerCase().includes(searchTerm.toLowerCase());
+            !normalizedSearch ||
+            [technician.name, technician.companyName, technician.location, ...technicianSpecializations]
+                .filter(Boolean)
+                .some((value) => value!.toLocaleLowerCase('es').includes(normalizedSearch));
         const specializationMatch =
-            !selectedSpecialization || technician.specialization === selectedSpecialization;
+            !selectedSpecialization || technicianSpecializations.includes(selectedSpecialization);
         const locationMatch = !selectedLocation || technician.location === selectedLocation;
         return searchMatch && specializationMatch && locationMatch;
     });
@@ -849,12 +872,11 @@ const SantiagoTechRDApp = () => {
         try {
             if (!currentUser) return;
 
-            const response = await fetch(`${API_BASE_URL}/api/technicians`, {
+            const response = await apiFetch(`${API_BASE_URL}/api/technicians`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    userId: currentUser.id,
-                    specialization: data.specialization,
+                    specializations: [data.specialization],
                     location: data.location,
                     phone: data.phone,
                 }),
@@ -864,7 +886,16 @@ const SantiagoTechRDApp = () => {
                 const newTechnician = await response.json();
                 // Update local state to reflect changes immediately
                 setTechnicians([...technicians, { ...newTechnician, name: currentUser.name, email: currentUser.email, reviews: [] }]);
-                setCurrentUser({ ...currentUser, role: 'technician', phone: data.phone });
+                const updatedUser: User = {
+                    ...currentUser,
+                    role: 'technician',
+                    phone: data.phone,
+                    technicianId: newTechnician.id,
+                    specializations: [data.specialization],
+                    location: data.location,
+                };
+                setCurrentUser(updatedUser);
+                updateStoredUser(updatedUser);
                 setRegistrationSuccess(true);
                 resetTechnicianForm();
             } else {
@@ -883,7 +914,7 @@ const SantiagoTechRDApp = () => {
         try {
             // Combine firstName and lastName into name for backend
             const { firstName, lastName, ...restData } = data;
-            const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+            const response = await apiFetch(`${API_BASE_URL}/api/auth/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -914,14 +945,18 @@ const SantiagoTechRDApp = () => {
     const handleLogin = async (data: z.infer<typeof loginFormSchema>) => {
         setLoading(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+            const response = await apiFetch(`${API_BASE_URL}/api/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             });
 
             if (response.ok) {
-                const user = await response.json();
+                const loginResult = await response.json();
+                const { token, ...user } = loginResult;
+                if (!token) throw new Error('La sesión no incluyó un token válido');
+
+                setAuthSession(token, user);
                 setCurrentUser(user);
                 setCurrentView(user.role === 'admin' ? 'admin' : 'home');
                 setShowLoginForm(false);
@@ -940,6 +975,7 @@ const SantiagoTechRDApp = () => {
     };
 
     const handleLogout = () => {
+        clearAuthSession();
         setCurrentUser(null);
         setCurrentView('home');
         setVerificationEmailSent(false);
@@ -955,7 +991,7 @@ const SantiagoTechRDApp = () => {
         setForgotPasswordLoading(true);
         setForgotPasswordMessage('');
         try {
-            const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+            const response = await apiFetch(`${API_BASE_URL}/api/auth/forgot-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: resetEmail }),
@@ -983,14 +1019,14 @@ const SantiagoTechRDApp = () => {
             return;
         }
 
-        if (newPassword.length < 6) {
-            alert('La contraseña debe tener al menos 6 caracteres');
+        if (newPassword.length < 8) {
+            alert('La contraseña debe tener al menos 8 caracteres');
             return;
         }
 
         setResetPasswordLoading(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+            const response = await apiFetch(`${API_BASE_URL}/api/auth/reset-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ token: resetToken, newPassword }),
@@ -1024,7 +1060,7 @@ const SantiagoTechRDApp = () => {
         const token = urlParams.get('reset');
         if (token) {
             // Verify token is valid
-            fetch(`${API_BASE_URL}/api/auth/verify-reset-token?token=${token}`)
+            apiFetch(`${API_BASE_URL}/api/auth/verify-reset-token?token=${token}`)
                 .then(res => res.json())
                 .then(data => {
                     if (data.valid) {
@@ -1048,7 +1084,7 @@ const SantiagoTechRDApp = () => {
 
         setResendingVerification(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/api/auth/resend-verification`, {
+            const response = await apiFetch(`${API_BASE_URL}/api/auth/resend-verification`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: currentUser.email }),
@@ -1072,7 +1108,7 @@ const SantiagoTechRDApp = () => {
     // Handle Verify Technician
     const handleVerifyTechnician = async (id: string) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/technicians/${id}/verify`, {
+            const response = await apiFetch(`${API_BASE_URL}/api/technicians/${id}/verify`, {
                 method: 'PUT',
             });
             if (response.ok) {
@@ -1086,7 +1122,7 @@ const SantiagoTechRDApp = () => {
     // Handle Delete Technician
     const handleDeleteTechnician = async (id: string) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/technicians/${id}`, {
+            const response = await apiFetch(`${API_BASE_URL}/api/technicians/${id}`, {
                 method: 'DELETE',
             });
             if (response.ok) {
@@ -1117,15 +1153,16 @@ const SantiagoTechRDApp = () => {
                 requestBody.specializations = editingSpecializations;
             }
 
-            const response = await fetch(`${API_BASE_URL}/api/users/${currentUser.id}/profile`, {
+            const response = await apiFetch(`${API_BASE_URL}/api/users/${currentUser.id}/profile`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestBody),
             });
 
             if (response.ok) {
-                const updatedUser = await response.json();
-                setCurrentUser({ ...currentUser, ...updatedUser });
+                const updatedUser = { ...currentUser, ...await response.json() };
+                setCurrentUser(updatedUser);
+                updateStoredUser(updatedUser);
                 setIsEditingProfile(false);
                 // Refresh history
                 fetchProfileHistory();
@@ -1144,7 +1181,7 @@ const SantiagoTechRDApp = () => {
     const fetchProfileHistory = useCallback(async () => {
         if (!currentUser) return;
         try {
-            const response = await fetch(`${API_BASE_URL}/api/users/${currentUser.id}/profile-history`);
+            const response = await apiFetch(`${API_BASE_URL}/api/users/${currentUser.id}/profile-history`);
             if (response.ok) {
                 const history = await response.json();
                 setProfileHistory(history);
@@ -1159,7 +1196,7 @@ const SantiagoTechRDApp = () => {
         if (!currentUser || currentUser.role !== 'technician' || !currentUser.technicianId) return;
         setLoadingAvailability(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/api/bookings/technician/${currentUser.technicianId}/availability`);
+            const response = await apiFetch(`${API_BASE_URL}/api/bookings/availability/${currentUser.technicianId}`);
             if (response.ok) {
                 const data = await response.json();
                 if (data.length > 0) {
@@ -1202,10 +1239,10 @@ const SantiagoTechRDApp = () => {
         if (!currentUser || currentUser.role !== 'technician' || !currentUser.technicianId) return;
         setSavingAvailability(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/api/bookings/technician/${currentUser.technicianId}/availability`, {
+            const response = await apiFetch(`${API_BASE_URL}/api/bookings/availability`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ slots: availability }),
+                body: JSON.stringify({ technicianId: currentUser.technicianId, slots: availability }),
             });
             if (response.ok) {
                 alert('¡Disponibilidad guardada exitosamente!');
@@ -1256,7 +1293,7 @@ const SantiagoTechRDApp = () => {
             reader.onload = async () => {
                 const photoBase64 = reader.result as string;
 
-                const response = await fetch(`${API_BASE_URL}/api/users/${currentUser.id}/photo`, {
+                const response = await apiFetch(`${API_BASE_URL}/api/users/${currentUser.id}/photo`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ photoBase64 }),
@@ -1264,7 +1301,9 @@ const SantiagoTechRDApp = () => {
 
                 if (response.ok) {
                     const result = await response.json();
-                    setCurrentUser({ ...currentUser, photoUrl: result.photoUrl });
+                    const updatedUser = { ...currentUser, photoUrl: result.photoUrl };
+                    setCurrentUser(updatedUser);
+                    updateStoredUser(updatedUser);
                     fetchProfileHistory();
                 } else {
                     alert('Error al subir la foto');
@@ -1325,16 +1364,23 @@ const SantiagoTechRDApp = () => {
 
     // Handle Review Form Submission
     const handleAddReview = useCallback(
-        (technicianId: string, reviewData: z.infer<typeof reviewFormSchema>) => {
-            // Simulate API call
-            setTimeout(() => {
-                const newReview: Review = {
-                    id: crypto.randomUUID(),
-                    ...reviewData,
-                    date: new Date().toISOString().split('T')[0],
-                };
+        async (technicianId: string, reviewData: z.infer<typeof reviewFormSchema>) => {
+            setReviewSubmitError('');
 
-                const updatedTechnicians = technicians.map((tech) =>
+            try {
+                const response = await apiFetch(`${API_BASE_URL}/api/technicians/${technicianId}/reviews`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(reviewData),
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.message || 'No pudimos publicar tu reseña');
+                }
+
+                const newReview: Review = await response.json();
+                setTechnicians((currentTechnicians) => currentTechnicians.map((tech) =>
                     tech.id === technicianId
                         ? {
                             ...tech,
@@ -1342,16 +1388,15 @@ const SantiagoTechRDApp = () => {
                             rating: calculateAverageRating([...tech.reviews, newReview]),
                         }
                         : tech
-                );
-
-                setTechnicians(updatedTechnicians);
-                setShowReviewForm(null); // Close form
+                ));
+                setReviewedTechnicianIds((current) => new Set(current).add(technicianId));
+                setShowReviewForm(null);
                 resetReviewForm();
-                setLoading(false);
-            }, 1000);
-            setLoading(true);
+            } catch (error) {
+                setReviewSubmitError(error instanceof Error ? error.message : 'No pudimos publicar tu reseña');
+            }
         },
-        [technicians, resetReviewForm]
+        [resetReviewForm]
     );
 
     // Calculate Average Rating
@@ -1361,106 +1406,84 @@ const SantiagoTechRDApp = () => {
         return parseFloat((totalRating / reviews.length).toFixed(1));
     };
 
-    // Frases dominicanas para diferentes contextos
-    const frasesExito = [
-        "¡Dímelo manito! 🎉",
-        "¡Tamo' activo! 🔥",
-        "¡Eso e' lo que hay! 💪",
-        "¡Klk, qué lo qué! 🌴",
-    ];
-
-    const getFraseExito = () => frasesExito[Math.floor(Math.random() * frasesExito.length)];
-
     return (
-        <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-amber-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-            {/* Decorative tropical elements */}
-            <div className="fixed top-0 right-0 w-64 h-64 bg-gradient-to-bl from-emerald-200/30 to-transparent rounded-full blur-3xl pointer-events-none" />
-            <div className="fixed bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-amber-200/20 to-transparent rounded-full blur-3xl pointer-events-none" />
-
-            <header className="bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-600 shadow-lg sticky top-0 z-50">
-                {/* Decorative wave pattern */}
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 via-orange-500 to-red-500" />
-
-                <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-                    <h1
-                        className="text-2xl font-bold text-white flex items-center gap-2 drop-shadow-md cursor-pointer hover:opacity-90 transition-opacity"
+        <div className="min-h-screen bg-stone-50 text-slate-900 dark:bg-gray-950 dark:text-white">
+            <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 backdrop-blur dark:border-gray-800 dark:bg-gray-950/95">
+                <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+                    <button
+                        type="button"
                         onClick={() => setCurrentView('home')}
+                        className="flex items-center gap-3 rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+                        aria-label="Ir al inicio"
                     >
-                        <span className="text-3xl">🔧</span>
-                        <span className="hidden sm:inline">Técnicos en RD</span>
-                        <span className="sm:hidden">TecRD</span>
-                        <span className="text-2xl">🌴</span>
-                    </h1>
-                    <div className="flex gap-2 items-center">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
+                            <Wrench className="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <span className="hidden min-[360px]:block">
+                            <span className="block text-base font-bold leading-tight text-slate-950 dark:text-white">Técnicos en RD</span>
+                            <span className="hidden text-xs text-slate-500 sm:block">Servicios confiables en Santiago</span>
+                        </span>
+                    </button>
+
+                    {!currentUser && (
+                        <nav className="hidden items-center gap-1 md:flex" aria-label="Navegación principal">
+                            <Button variant="ghost" size="sm" onClick={() => setCurrentView('home')}>Inicio</Button>
+                            <Button variant="ghost" size="sm" onClick={() => setCurrentView('about')}>Cómo funciona</Button>
+                        </nav>
+                    )}
+
+                    <div className="flex items-center gap-1.5 sm:gap-2">
                         {currentUser ? (
-                            <div className="flex items-center gap-2 md:gap-4">
-                                {/* Points display (compact) */}
-                                {userPoints && (
-                                    <motion.div
-                                        whileHover={{ scale: 1.05 }}
-                                        whileTap={{ scale: 0.95 }}
-                                        onClick={() => setCurrentView('gamification')}
-                                        className="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 text-white shadow-md hover:shadow-lg transition-all border-2 border-white/30 cursor-pointer"
-                                    >
-                                        <span className="text-sm">⚡</span>
-                                        <span className="font-bold text-sm">{userPoints.totalPoints?.toLocaleString() || 0}</span>
-                                    </motion.div>
-                                )}
-                                <span className="text-sm font-medium text-white/90 hidden md:block">
-                                    ¡Klk, {currentUser.name}!
+                            <>
+                                <span className="mr-1 hidden max-w-36 truncate text-sm font-medium text-slate-600 lg:block">
+                                    {currentUser.name}
                                 </span>
-                                {/* Navigation buttons */}
                                 <Button
-                                    onClick={() => setCurrentView(currentView === 'bookings' ? 'home' : 'bookings')}
-                                    variant="ghost"
-                                    size="sm"
-                                    className={cn("text-white/80 hover:text-white hover:bg-white/20", currentView === 'bookings' && "text-white bg-white/20")}
-                                    title="Mis Citas"
+                                    onClick={() => setCurrentView('bookings')}
+                                    variant={currentView === 'bookings' ? 'secondary' : 'ghost'}
+                                    size="icon"
+                                    aria-label="Mis reservas"
+                                    title="Mis reservas"
                                 >
-                                    <Calendar className="w-5 h-5" />
+                                    <Calendar className="h-5 w-5" />
                                 </Button>
                                 <Button
-                                    onClick={() => setCurrentView(currentView === 'gamification' ? 'home' : 'gamification')}
-                                    variant="ghost"
-                                    size="sm"
-                                    className={cn("text-white/80 hover:text-white hover:bg-white/20", currentView === 'gamification' && "text-white bg-white/20")}
-                                    title="Puntos y Trofeos"
+                                    onClick={() => setCurrentView('gamification')}
+                                    variant={currentView === 'gamification' ? 'secondary' : 'ghost'}
+                                    size="icon"
+                                    aria-label="Puntos y recompensas"
+                                    title="Puntos y recompensas"
                                 >
-                                    <Trophy className="w-5 h-5" />
+                                    <Trophy className="h-5 w-5" />
                                 </Button>
                                 {currentUser.role === 'admin' && (
                                     <Button
-                                        onClick={() => setCurrentView(currentView === 'admin' ? 'home' : 'admin')}
-                                        variant="ghost"
-                                        size="sm"
-                                        className={cn("text-white/80 hover:text-white hover:bg-white/20", currentView === 'admin' && "text-white bg-white/20")}
+                                        onClick={() => setCurrentView('admin')}
+                                        variant={currentView === 'admin' ? 'secondary' : 'ghost'}
+                                        size="icon"
+                                        aria-label="Panel administrativo"
+                                        title="Panel administrativo"
                                     >
-                                        <Shield className="w-5 h-5" />
+                                        <Shield className="h-5 w-5" />
                                     </Button>
                                 )}
-                                <Button onClick={() => setShowProfileModal(true)} variant="ghost" size="sm" className="text-white/80 hover:text-white hover:bg-white/20">
-                                    <User className="w-5 h-5" />
+                                <Button onClick={() => setShowProfileModal(true)} variant="ghost" size="icon" aria-label="Mi perfil" title="Mi perfil">
+                                    <UserIcon className="h-5 w-5" />
                                 </Button>
-                                <Button onClick={handleLogout} variant="ghost" size="sm" className="text-white/80 hover:text-red-200 hover:bg-red-500/20">
-                                    <LogOut className="w-5 h-5" />
+                                <Button onClick={handleLogout} variant="ghost" size="icon" aria-label="Cerrar sesión" title="Cerrar sesión" className="text-slate-500 hover:text-red-600">
+                                    <LogOut className="h-5 w-5" />
                                 </Button>
-                            </div>
+                            </>
                         ) : (
                             <>
-                                <Button onClick={() => setShowLoginForm(true)} variant="ghost" className="text-white/90 hover:text-white hover:bg-white/20">
-                                    <LogIn className="w-5 h-5 sm:mr-2" />
-                                    <span className="hidden sm:inline">Entrar</span>
+                                <Button onClick={() => setShowLoginForm(true)} variant="ghost" size="sm">
+                                    <LogIn className="mr-2 hidden h-4 w-4 sm:block" />
+                                    Entrar
                                 </Button>
-                                <Button onClick={() => setShowUserRegisterForm(true)} variant="outline" className="hidden md:flex border-white/50 text-white hover:bg-white/20">
-                                    ¡Únete!
+                                <Button onClick={() => setShowUserRegisterForm(true)} size="sm">
+                                    <PlusCircle className="mr-2 hidden h-4 w-4 sm:block" />
+                                    Crear cuenta
                                 </Button>
-                                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                                    <Button onClick={() => setShowUserRegisterForm(true)} className="bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white shadow-lg border-2 border-white/30">
-                                        <PlusCircle className="mr-2 w-4 h-4" />
-                                        <span className="hidden sm:inline">¡Soy Técnico!</span>
-                                        <span className="sm:hidden">Técnico</span>
-                                    </Button>
-                                </motion.div>
                             </>
                         )}
                     </div>
@@ -1516,34 +1539,56 @@ const SantiagoTechRDApp = () => {
 
             {/* Bookings View */}
             {currentView === 'bookings' && currentUser && (
-                <main className="container mx-auto px-4 py-8 relative">
-                    <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-3xl font-bold text-gray-800 dark:text-white flex items-center gap-3">
-                            <span className="text-4xl">📅</span>
-                            Mis Citas
-                            <span className="text-sm font-normal text-emerald-600 bg-emerald-100 px-3 py-1 rounded-full">
-                                ¡Tamo' activo!
-                            </span>
-                        </h2>
-                        <motion.div whileHover={{ scale: 1.05 }}>
-                            <Button
-                                onClick={() => setCurrentView('home')}
-                                variant="outline"
-                                className="border-emerald-500 text-emerald-600 hover:bg-emerald-50"
-                            >
-                                🏠 Pa'l inicio
-                            </Button>
-                        </motion.div>
+                <main className="mx-auto min-h-[70vh] max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
+                    <div className="mb-8">
+                        <p className="mb-2 text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700">Tu agenda</p>
+                        <h2 className="text-3xl font-bold tracking-tight text-slate-950 dark:text-white">Reservas y trabajos</h2>
+                        <p className="mt-2 text-slate-600 dark:text-gray-300">Consulta el estado de tus servicios y administra las próximas visitas.</p>
                     </div>
-                    <BookingList
-                        bookings={userBookings}
-                        userRole={currentUser.role === 'technician' ? 'technician' : 'customer'}
-                        loading={loadingBookings}
-                        onConfirm={currentUser.role === 'technician' ? handleConfirmBooking : undefined}
-                        onStart={currentUser.role === 'technician' ? handleStartBooking : undefined}
-                        onComplete={currentUser.role === 'technician' ? handleCompleteBooking : undefined}
-                        onCancel={handleCancelBooking}
-                    />
+
+                    {currentUser.role === 'technician' && currentUser.technicianId ? (
+                        <div className="space-y-10">
+                            <section aria-labelledby="received-jobs-heading">
+                                <div className="mb-4 flex items-center justify-between gap-3">
+                                    <h3 id="received-jobs-heading" className="text-xl font-bold text-slate-900 dark:text-white">Trabajos recibidos</h3>
+                                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">
+                                        {userBookings.filter((booking: any) => booking.technicianId === currentUser.technicianId).length}
+                                    </span>
+                                </div>
+                                <BookingList
+                                    bookings={userBookings.filter((booking: any) => booking.technicianId === currentUser.technicianId)}
+                                    userRole="technician"
+                                    loading={loadingBookings}
+                                    onConfirm={handleConfirmBooking}
+                                    onStart={handleStartBooking}
+                                    onComplete={handleCompleteBooking}
+                                    onCancel={handleCancelBooking}
+                                />
+                            </section>
+
+                            <section aria-labelledby="hired-services-heading" className="border-t border-slate-200 pt-8 dark:border-gray-800">
+                                <div className="mb-4 flex items-center justify-between gap-3">
+                                    <h3 id="hired-services-heading" className="text-xl font-bold text-slate-900 dark:text-white">Servicios contratados</h3>
+                                    <span className="rounded-full bg-sky-50 px-3 py-1 text-sm font-semibold text-sky-700">
+                                        {userBookings.filter((booking: any) => booking.customerId === currentUser.id).length}
+                                    </span>
+                                </div>
+                                <BookingList
+                                    bookings={userBookings.filter((booking: any) => booking.customerId === currentUser.id)}
+                                    userRole="customer"
+                                    loading={loadingBookings}
+                                    onCancel={handleCancelBooking}
+                                />
+                            </section>
+                        </div>
+                    ) : (
+                        <BookingList
+                            bookings={userBookings}
+                            userRole="customer"
+                            loading={loadingBookings}
+                            onCancel={handleCancelBooking}
+                        />
+                    )}
                 </main>
             )}
 
@@ -1888,7 +1933,7 @@ const SantiagoTechRDApp = () => {
                                                                 )}>
                                                                     {user.role === 'admin' ? <Shield className="w-5 h-5 text-purple-600" /> :
                                                                         user.role === 'technician' ? <Wrench className="w-5 h-5 text-amber-600" /> :
-                                                                            <User className="w-5 h-5 text-blue-600" />}
+                                                                            <UserIcon className="w-5 h-5 text-blue-600" />}
                                                                 </div>
                                                                 <p className="font-medium text-gray-900 dark:text-white">{user.name}</p>
                                                             </div>
@@ -2399,569 +2444,92 @@ const SantiagoTechRDApp = () => {
                         )}
                     </AnimatePresence>
                 </main>
-            ) : (
-                <>
-                    {/* Hero Section - Dominican Style */}
-                    <section className="relative bg-gradient-to-br from-emerald-600 via-teal-500 to-sky-600 text-white py-20 px-4 overflow-hidden">
-                        {/* Tropical decorations */}
-                        <div className="absolute top-5 left-5 text-6xl opacity-20 animate-pulse">🌴</div>
-                        <div className="absolute top-10 right-10 text-5xl opacity-20 animate-bounce">🔧</div>
-                        <div className="absolute bottom-10 left-20 text-4xl opacity-20">🏝️</div>
-                        <div className="absolute bottom-5 right-20 text-5xl opacity-20 animate-pulse">⚡</div>
+            ) : null}
 
-                        <div className="container mx-auto text-center relative z-10">
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ duration: 0.5 }}
-                                className="mb-4"
-                            >
-                                <span className="text-6xl">🔧🌴</span>
-                            </motion.div>
-                            <motion.h2
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.5 }}
-                                className="text-4xl md:text-5xl font-extrabold mb-4 tracking-tight drop-shadow-lg"
-                            >
-                                ¡Dímelo! Encuentra Tu Técnico
-                            </motion.h2>
-                            <motion.p
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.5, delay: 0.2 }}
-                                className="text-xl md:text-2xl mb-4 text-white/90 max-w-2xl mx-auto"
-                            >
-                                Los mejores técnicos de Santiago, ¡a un clic de tu casa!
-                            </motion.p>
-                            <motion.p
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.5, delay: 0.3 }}
-                                className="text-lg text-amber-200 font-medium"
-                            >
-                                🇩🇴 Rápido, seguro y con el mejor servicio caribeño
-                            </motion.p>
-                        </div>
-                        {/* Decorative wave at bottom */}
-                        <div className="absolute bottom-0 left-0 right-0">
-                            <svg viewBox="0 0 1200 120" preserveAspectRatio="none" className="w-full h-12 fill-sky-50 dark:fill-gray-900">
-                                <path d="M0,0V46.29c47.79,22.2,103.59,32.17,158,28,70.36-5.37,136.33-33.31,206.8-37.5C438.64,32.43,512.34,53.67,583,72.05c69.27,18,138.3,24.88,209.4,13.08,36.15-6,69.85-17.84,104.45-29.34C989.49,25,1113-14.29,1200,52.47V0Z" opacity=".25"></path>
-                                <path d="M0,0V15.81C13,36.92,27.64,56.86,47.69,72.05,99.41,111.27,165,111,224.58,91.58c31.15-10.15,60.09-26.07,89.67-39.8,40.92-19,84.73-46,130.83-49.67,36.26-2.85,70.9,9.42,98.6,31.56,31.77,25.39,62.32,62,103.63,73,40.44,10.79,81.35-6.69,119.13-24.28s75.16-39,116.92-43.05c59.73-5.85,113.28,22.88,168.9,38.84,30.2,8.66,59,6.17,87.09-7.5,22.43-10.89,48-26.93,60.65-49.24V0Z" opacity=".5"></path>
-                                <path d="M0,0V5.63C149.93,59,314.09,71.32,475.83,42.57c43-7.64,84.23-20.12,127.61-26.46,59-8.63,112.48,12.24,165.56,35.4C827.93,77.22,886,95.24,951.2,90c86.53-7,172.46-45.71,248.8-84.81V0Z"></path>
-                            </svg>
-                        </div>
-                        {/* Decorative background elements */}
-                        <div className="absolute top-0 left-0 w-full h-full overflow-hidden opacity-10 pointer-events-none">
-                            <Wrench className="absolute top-10 left-10 w-32 h-32 text-white transform -rotate-12" />
-                            <User className="absolute bottom-10 right-10 w-40 h-40 text-white transform rotate-12" />
-                        </div>
-                    </section >
-
-                    {/* Featured Technicians Section - Real Data with Big Photos */}
-                    {technicians.length > 0 && (
-                        <section className="py-16 bg-gradient-to-b from-sky-50 to-white dark:from-gray-800 dark:to-gray-900">
-                            <div className="container mx-auto px-4">
-                                <h2 className="text-3xl font-bold text-center mb-4 text-gray-800 dark:text-white flex items-center justify-center gap-3">
-                                    <span>🛠️</span> Nuestros Tígueres en Acción <span>💪</span>
-                                </h2>
-                                <p className="text-center text-emerald-600 dark:text-emerald-400 mb-12 text-lg">
-                                    ¡Los mejores del Cibao, pa' servirte!
-                                </p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                    {technicians.slice(0, 4).map((technician, index) => {
-                                        const gradients = [
-                                            'from-amber-400 to-orange-500',
-                                            'from-sky-400 to-blue-500',
-                                            'from-pink-400 to-rose-500',
-                                            'from-emerald-400 to-teal-500'
-                                        ];
-                                        return (
-                                            <motion.div
-                                                key={technician.id}
-                                                whileHover={{ y: -10, scale: 1.02 }}
-                                                className={`rounded-2xl overflow-hidden shadow-xl bg-gradient-to-br ${gradients[index % 4]} cursor-pointer`}
-                                                onClick={() => {
-                                                    if (!currentUser) {
-                                                        setShowLoginForm(true);
-                                                        return;
-                                                    }
-                                                    setShowBookingForm({
-                                                        technician: {
-                                                            id: technician.id,
-                                                            name: technician.name,
-                                                            specialization: technician.specialization,
-                                                        },
-                                                        show: true,
-                                                    });
-                                                }}
-                                            >
-                                                {/* Large Photo Section */}
-                                                <div className="relative h-56 bg-gray-200 dark:bg-gray-700">
-                                                    {technician.photoUrl ? (
-                                                        <img
-                                                            src={technician.photoUrl}
-                                                            alt={technician.name}
-                                                            className="w-full h-full object-cover"
-                                                        />
-                                                    ) : (
-                                                        <div className="w-full h-full flex items-center justify-center">
-                                                            <User className="w-24 h-24 text-white/70" />
-                                                        </div>
-                                                    )}
-                                                    {/* Verified badge */}
-                                                    {technician.verified && (
-                                                        <div className="absolute top-3 right-3 bg-emerald-500 text-white px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 shadow-lg">
-                                                            <CheckCircle className="w-3 h-3" /> Verificado
-                                                        </div>
-                                                    )}
-                                                    {/* Rating badge */}
-                                                    {technician.rating > 0 && (
-                                                        <div className="absolute top-3 left-3 bg-white/90 dark:bg-gray-800/90 px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 shadow-lg">
-                                                            <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                                                            <span className="text-gray-800 dark:text-white">{technician.rating.toFixed(1)}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className="p-5 bg-white dark:bg-gray-800">
-                                                    <h3 className="text-lg font-bold mb-1 text-gray-800 dark:text-white truncate">
-                                                        {technician.name}
-                                                    </h3>
-                                                    <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium mb-2 flex items-center gap-1">
-                                                        <span>🔧</span> {technician.specialization}
-                                                    </p>
-                                                    <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                                                        <MapPin className="w-3 h-3" /> {technician.location}
-                                                    </p>
-                                                </div>
-                                            </motion.div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        </section>
-                    )}
-
-                    <main className="container mx-auto px-4 py-8">
-                        {/* Search bar with Dominican flair */}
-                        <div className="mb-12 flex flex-col md:flex-row gap-4 items-center justify-center max-w-4xl mx-auto bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-xl -mt-10 relative z-20 border-2 border-emerald-100">
-                            <div className="absolute -top-3 left-6 bg-emerald-500 text-white px-4 py-1 rounded-full text-sm font-medium">
-                                🔍 ¿Qué necesitas?
-                            </div>
-                            <div className="w-full md:w-1/3 relative mt-2">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-emerald-500 w-5 h-5" />
-                                <Input
-                                    type="text"
-                                    placeholder="Busca tu técnico..."
-                                    value={searchTerm}
-                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-                                    className="w-full pl-10 border-emerald-200 focus:border-emerald-500 focus:ring-emerald-500 h-12 text-lg rounded-xl"
-                                />
-                            </div>
-                            <div className="w-full md:w-1/3">
-                                <Select onValueChange={(val: string) => setSelectedSpecialization(val === 'all' ? '' : val)} value={selectedSpecialization || 'all'}>
-                                    <SelectTrigger className="w-full border-gray-200 focus:border-blue-500 focus:ring-blue-500 h-12 text-lg">
-                                        <SelectValue placeholder="Especialización" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem key="all" value="all">
-                                            Todas las Especializaciones
-                                        </SelectItem>
-                                        {availableSpecializations.map((specialization) => (
-                                            <SelectItem key={specialization} value={specialization}>
-                                                {specialization}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="w-full md:w-1/3">
-                                <Select onValueChange={(val: string) => setSelectedLocation(val === 'all' ? '' : val)} value={selectedLocation || 'all'}>
-                                    <SelectTrigger className="w-full border-gray-200 focus:border-blue-500 focus:ring-blue-500 h-12 text-lg">
-                                        <SelectValue placeholder="Ubicación" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem key="all" value="all">
-                                            Todas las Ubicaciones
-                                        </SelectItem>
-                                        {availableLocations.map((location) => (
-                                            <SelectItem key={location} value={location}>
-                                                {location}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-
-                        {loading ? (
-                            <div className="flex justify-center items-center h-48">
-                                <Loader2 className="animate-spin text-4xl text-blue-500" />
-                            </div>
-                        ) : filteredTechnicians.length === 0 ? (
-                            <div className="text-center py-12">
-                                <span className="text-6xl mb-4 block">🔍</span>
-                                <p className="text-gray-500 dark:text-gray-400 text-lg">
-                                    ¡Diache! No encontramo' técnicos con esos criterios.
-                                </p>
-                                <p className="text-emerald-600 dark:text-emerald-400 text-sm mt-2">
-                                    Prueba con otra búsqueda, manito.
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                <AnimatePresence>
-                                    {filteredTechnicians.map((technician) => (
-                                        <motion.div
-                                            key={technician.id}
-                                            variants={cardVariants}
-                                            initial="hidden"
-                                            animate="visible"
-                                            exit="exit"
-                                            whileHover={{ y: -5 }}
-                                        >
-                                            <Card className="bg-white dark:bg-gray-800 shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-emerald-300 overflow-hidden group h-full flex flex-col rounded-2xl">
-                                                {/* Prominent Photo Section */}
-                                                <div className="relative">
-                                                    {/* Background gradient banner */}
-                                                    <div className="h-24 bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500" />
-
-                                                    {/* Profile photo - overlapping the banner */}
-                                                    <div className="absolute left-1/2 -translate-x-1/2 -bottom-12">
-                                                        {technician.photoUrl ? (
-                                                            <img
-                                                                src={technician.photoUrl}
-                                                                alt={technician.name}
-                                                                className="w-24 h-24 rounded-full object-cover border-4 border-white dark:border-gray-800 shadow-xl ring-2 ring-emerald-400"
-                                                            />
-                                                        ) : (
-                                                            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center border-4 border-white dark:border-gray-800 shadow-xl">
-                                                                <User className="w-10 h-10 text-white" />
-                                                            </div>
-                                                        )}
-                                                        {technician.verified && (
-                                                            <div className="absolute -bottom-1 -right-1 bg-emerald-500 rounded-full p-1 border-2 border-white shadow-md">
-                                                                <CheckCircle className="w-4 h-4 text-white" />
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                <CardHeader className="pt-14 pb-4 text-center">
-                                                    <h3 className="text-xl font-bold text-gray-800 dark:text-white group-hover:text-emerald-600 transition-colors">
-                                                        {technician.name}
-                                                    </h3>
-                                                    <p className="text-emerald-600 dark:text-emerald-400 font-medium text-sm flex items-center justify-center gap-1">
-                                                        <span className="text-base">🔧</span>
-                                                        {technician.specialization}
-                                                    </p>
-                                                    {technician.verified && (
-                                                        <span className="inline-flex items-center gap-1 mt-2 bg-emerald-100 text-emerald-700 text-xs px-3 py-1 rounded-full font-medium">
-                                                            <CheckCircle className="w-3 h-3" /> Técnico Verificado
-                                                        </span>
-                                                    )}
-                                                </CardHeader>
-                                                <CardContent className="pt-6 flex-grow">
-                                                    <div className="space-y-3 mb-6">
-                                                        <p className="text-gray-600 dark:text-gray-300 flex items-center gap-2 text-sm">
-                                                            <MapPin className="w-4 h-4 text-gray-400" />
-                                                            {technician.location}
-                                                        </p>
-                                                        <p className="text-gray-600 dark:text-gray-300 flex items-center gap-2 text-sm">
-                                                            <Phone className="w-4 h-4 text-gray-400" />
-                                                            {technician.phone}
-                                                        </p>
-                                                        <p className="text-gray-600 dark:text-gray-300 flex items-center gap-2 text-sm">
-                                                            <Mail className="w-4 h-4 text-gray-400" />
-                                                            {technician.email}
-                                                        </p>
-                                                    </div>
-
-                                                    <div className="flex items-center justify-between mb-6 bg-gray-50 dark:bg-gray-700/30 p-3 rounded-lg">
-                                                        <div className="flex items-center">
-                                                            <Star className="w-5 h-5 text-yellow-400 fill-yellow-400 mr-1" />
-                                                            <span className="text-gray-800 dark:text-white font-bold text-lg">
-                                                                {technician.rating > 0 ? technician.rating.toFixed(1) : '-'}
-                                                            </span>
-                                                            <span className="text-gray-400 text-xs ml-1">/ 5.0</span>
-                                                        </div>
-                                                        <span className="text-xs text-gray-500">
-                                                            {technician.reviews.length} {technician.reviews.length === 1 ? 'reseña' : 'reseñas'}
-                                                        </span>
-                                                    </div>
-
-                                                    <div>
-                                                        <h4 className="text-sm font-semibold text-gray-800 dark:text-white mb-3 uppercase tracking-wider text-xs">Reseñas Recientes</h4>
-                                                        <div className="space-y-3 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
-                                                            <AnimatePresence>
-                                                                {technician.reviews.length > 0 ? (
-                                                                    technician.reviews.slice(0, 2).map((review) => (
-                                                                        <motion.div
-                                                                            key={review.id}
-                                                                            variants={reviewVariants}
-                                                                            initial="hidden"
-                                                                            animate="visible"
-                                                                            exit="exit"
-                                                                            className="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-700 text-sm"
-                                                                        >
-                                                                            <div className="flex items-center justify-between mb-1">
-                                                                                <span className="font-medium text-gray-800 dark:text-gray-200">{review.author}</span>
-                                                                                <div className="flex items-center">
-                                                                                    <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                                                                                    <span className="ml-1 text-xs text-gray-600 dark:text-gray-400">{review.rating}</span>
-                                                                                </div>
-                                                                            </div>
-                                                                            <p className="text-gray-600 dark:text-gray-300 text-xs line-clamp-2 italic">"{review.comment}"</p>
-                                                                        </motion.div>
-                                                                    ))
-                                                                ) : (
-                                                                    <p className="text-gray-400 text-xs italic text-center py-2">Sin reseñas aún.</p>
-                                                                )}
-                                                            </AnimatePresence>
-                                                        </div>
-                                                    </div>
-                                                </CardContent>
-                                                <CardFooter className="pt-0 pb-6 px-6">
-                                                    <div className={`grid gap-3 w-full ${hasCompletedBookingWithTechnician(technician.id) ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                                                        {hasCompletedBookingWithTechnician(technician.id) && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                className="w-full border-amber-300 text-amber-600 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-400 transition-colors rounded-xl"
-                                                                onClick={() => setShowReviewForm({ technicianId: technician.id, show: true })}
-                                                            >
-                                                                ⭐ Calificar
-                                                            </Button>
-                                                        )}
-                                                        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                                                            <Button
-                                                                size="sm"
-                                                                className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-md hover:shadow-lg transition-all rounded-xl"
-                                                                onClick={() => {
-                                                                    if (!currentUser) {
-                                                                        setShowLoginForm(true);
-                                                                        return;
-                                                                    }
-                                                                    setShowBookingForm({
-                                                                        technician: {
-                                                                            id: technician.id,
-                                                                            name: technician.name,
-                                                                            specialization: technician.specialization,
-                                                                        },
-                                                                        show: true,
-                                                                    });
-                                                                }}
-                                                            >
-                                                                📅 ¡Contratarlo!
-                                                            </Button>
-                                                        </motion.div>
-                                                    </div>
-                                                </CardFooter>
-                                            </Card>
-                                        </motion.div>
-                                    ))}
-                                </AnimatePresence>
-                            </div>
-                        )}
-                    </main>
-                </>
+            {currentView === "home" && (
+                <HomeView
+                    technicians={technicians}
+                    filteredTechnicians={filteredTechnicians}
+                    loading={loading}
+                    error={directoryError || null}
+                    searchTerm={searchTerm}
+                    setSearchTerm={setSearchTerm}
+                    selectedSpecialization={selectedSpecialization}
+                    setSelectedSpecialization={setSelectedSpecialization}
+                    selectedLocation={selectedLocation}
+                    setSelectedLocation={setSelectedLocation}
+                    specializations={availableSpecializations}
+                    locations={availableLocations}
+                    currentUser={currentUser}
+                    onLoginRequired={() => setShowLoginForm(true)}
+                    onBook={(technician) => setShowBookingForm({
+                        technician: {
+                            id: technician.id,
+                            name: technician.name,
+                            specialization: technician.specialization,
+                        },
+                        show: true,
+                    })}
+                    onReview={(technicianId) => {
+                        setReviewSubmitError('');
+                        setShowReviewForm({ technicianId, show: true });
+                    }}
+                    hasCompletedBooking={(technicianId) =>
+                        hasCompletedBookingWithTechnician(technicianId) && !reviewedTechnicianIds.has(technicianId)
+                    }
+                    onRetry={() => setDirectoryReloadKey((key) => key + 1)}
+                    onResetFilters={() => {
+                        setSearchTerm("");
+                        setSelectedSpecialization("");
+                        setSelectedLocation("");
+                    }}
+                />
             )}
 
             {/* About Us View */}
-            {currentView === 'about' && (
-                <main className="container mx-auto px-4 py-8">
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="max-w-4xl mx-auto"
-                    >
-                        {/* Header */}
-                        <div className="text-center mb-12">
-                            <h2 className="text-4xl font-bold text-gray-800 dark:text-white mb-4 flex items-center justify-center gap-3">
-                                <span className="text-5xl">🌴</span>
-                                Sobre Nosotros
-                                <span className="text-5xl">🇩🇴</span>
-                            </h2>
-                            <p className="text-xl text-gray-600 dark:text-gray-300">
-                                Conectando al Cibao con los mejores técnicos
-                            </p>
-                        </div>
-
-                        {/* Mission Card */}
-                        <motion.div
-                            whileHover={{ scale: 1.02 }}
-                            className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-3xl p-8 text-white shadow-2xl mb-8"
-                        >
-                            <h3 className="text-2xl font-bold mb-4 flex items-center gap-2">
-                                🎯 Nuestra Misión
-                            </h3>
-                            <p className="text-lg leading-relaxed">
-                                En Técnicos en RD, nuestra misión es conectar a los residentes de Santiago de los Caballeros
-                                y toda la región del Cibao con técnicos profesionales calificados. Creemos que encontrar
-                                un buen técnico no debería ser difícil - por eso creamos una plataforma que hace el proceso
-                                fácil, seguro y confiable.
-                            </p>
-                        </motion.div>
-
-                        {/* Values Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                            <motion.div
-                                whileHover={{ scale: 1.02 }}
-                                className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border-l-4 border-amber-500"
-                            >
-                                <h4 className="text-xl font-bold text-gray-800 dark:text-white mb-3 flex items-center gap-2">
-                                    ⭐ Calidad Garantizada
-                                </h4>
-                                <p className="text-gray-600 dark:text-gray-300">
-                                    Todos nuestros técnicos pasan por un proceso de verificación para asegurar
-                                    que recibas el mejor servicio posible.
-                                </p>
-                            </motion.div>
-
-                            <motion.div
-                                whileHover={{ scale: 1.02 }}
-                                className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border-l-4 border-blue-500"
-                            >
-                                <h4 className="text-xl font-bold text-gray-800 dark:text-white mb-3 flex items-center gap-2">
-                                    🤝 Confianza
-                                </h4>
-                                <p className="text-gray-600 dark:text-gray-300">
-                                    Las reseñas y calificaciones de otros usuarios te ayudan a tomar
-                                    decisiones informadas sobre qué técnico contratar.
-                                </p>
-                            </motion.div>
-
-                            <motion.div
-                                whileHover={{ scale: 1.02 }}
-                                className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border-l-4 border-emerald-500"
-                            >
-                                <h4 className="text-xl font-bold text-gray-800 dark:text-white mb-3 flex items-center gap-2">
-                                    🏆 Comunidad Local
-                                </h4>
-                                <p className="text-gray-600 dark:text-gray-300">
-                                    Apoyamos a los técnicos locales de Santiago y el Cibao, fortaleciendo
-                                    nuestra economía regional.
-                                </p>
-                            </motion.div>
-
-                            <motion.div
-                                whileHover={{ scale: 1.02 }}
-                                className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border-l-4 border-purple-500"
-                            >
-                                <h4 className="text-xl font-bold text-gray-800 dark:text-white mb-3 flex items-center gap-2">
-                                    📱 Tecnología Moderna
-                                </h4>
-                                <p className="text-gray-600 dark:text-gray-300">
-                                    Nuestra plataforma es fácil de usar, rápida y disponible las 24 horas
-                                    del día, los 7 días de la semana.
-                                </p>
-                            </motion.div>
-                        </div>
-
-                        {/* Team Section */}
-                        <div className="bg-gradient-to-r from-sky-100 to-emerald-100 dark:from-gray-800 dark:to-gray-700 rounded-3xl p-8 mb-8">
-                            <h3 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 text-center">
-                                🔧 Servicios Disponibles
-                            </h3>
-                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                                {['⚡ Electricistas', '🔧 Plomeros', '🚗 Mecánicos', '🪚 Carpinteros', '❄️ A/C'].map((service) => (
-                                    <div key={service} className="bg-white dark:bg-gray-600 rounded-xl p-4 text-center shadow-md">
-                                        <span className="text-lg font-medium text-gray-700 dark:text-white">{service}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* CTA */}
-                        <div className="text-center">
-                            <h3 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
-                                ¿Listo para encontrar tu técnico?
-                            </h3>
-                            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                                <Button
-                                    onClick={() => setCurrentView('home')}
-                                    className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white px-8 py-3 text-lg"
-                                >
-                                    🔍 Buscar Técnicos
-                                </Button>
-                                <Button
-                                    onClick={() => setShowUserRegisterForm(true)}
-                                    variant="outline"
-                                    className="border-emerald-500 text-emerald-600 hover:bg-emerald-50 px-8 py-3 text-lg"
-                                >
-                                    📝 Únete Ahora
-                                </Button>
-                            </div>
-                        </div>
-                    </motion.div>
-                </main>
+            {currentView === "about" && (
+                <AboutView
+                    onBrowse={() => setCurrentView("home")}
+                    onJoin={() => setShowUserRegisterForm(true)}
+                />
             )}
 
-            {/* Footer - Dominican Style */}
-            <footer className="bg-gradient-to-br from-gray-900 via-gray-800 to-emerald-900 text-gray-300 py-12 mt-12 relative overflow-hidden">
-                {/* Decorative elements */}
-                <div className="absolute top-5 right-10 text-4xl opacity-10">🌴</div>
-                <div className="absolute bottom-5 left-10 text-4xl opacity-10">🇩🇴</div>
-
-                <div className="container mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-8 relative z-10">
-                    <div>
-                        <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                            <span className="text-2xl">🔧🌴</span>
-                            Técnicos en RD
-                        </h3>
-                        <p className="text-sm text-gray-400">
-                            ¡El mejor equipo de tígueres pa' resolver to' lo de tu casa! 💪
-                        </p>
-                        <p className="text-emerald-400 text-xs mt-2">
-                            Desde el Cibao pa'l mundo 🌴
+            <footer className="border-t border-slate-800 bg-slate-950 text-slate-300">
+                <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr] lg:px-8">
+                    <div className="max-w-md">
+                        <div className="flex items-center gap-3 text-white">
+                            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600">
+                                <Wrench className="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <span className="text-lg font-bold">Técnicos en RD</span>
+                        </div>
+                        <p className="mt-4 text-sm leading-6 text-slate-400">
+                            Una forma clara y segura de encontrar profesionales locales para el hogar y el negocio en Santiago y el Cibao.
                         </p>
                     </div>
                     <div>
-                        <h4 className="text-lg font-semibold text-white mb-4">🔗 Enlaces Rápidos</h4>
-                        <ul className="space-y-2 text-sm">
-                            <li><button onClick={() => setCurrentView('home')} className="hover:text-emerald-400 transition-colors">🏠 Inicio</button></li>
-                            <li><button onClick={() => setCurrentView('home')} className="hover:text-emerald-400 transition-colors">🔍 Buscar Técnicos</button></li>
-                            <li><button onClick={() => setShowUserRegisterForm(true)} className="hover:text-emerald-400 transition-colors">📝 Registrarse</button></li>
-                            <li><button onClick={() => setCurrentView('about')} className="hover:text-emerald-400 transition-colors">ℹ️ Sobre Nosotros</button></li>
+                        <h3 className="text-sm font-bold uppercase tracking-wider text-white">Explora</h3>
+                        <ul className="mt-4 space-y-3 text-sm">
+                            <li><button onClick={() => setCurrentView('home')} className="transition-colors hover:text-emerald-300">Buscar técnicos</button></li>
+                            <li><button onClick={() => setCurrentView('about')} className="transition-colors hover:text-emerald-300">Cómo funciona</button></li>
+                            {!currentUser && <li><button onClick={() => setShowUserRegisterForm(true)} className="transition-colors hover:text-emerald-300">Crear una cuenta</button></li>}
                         </ul>
                     </div>
                     <div>
-                        <h4 className="text-lg font-semibold text-white mb-4">📞 Contáctanos</h4>
-                        <ul className="space-y-2 text-sm">
-                            <li className="flex items-center gap-2"><Mail className="w-4 h-4 text-emerald-400" /> contacto@santiagotech.rd</li>
-                            <li className="flex items-center gap-2"><Phone className="w-4 h-4 text-emerald-400" /> (809) 555-0000</li>
-                            <li className="flex items-center gap-2"><MapPin className="w-4 h-4 text-emerald-400" /> Santiago de los Caballeros, RD 🇩🇴</li>
-                        </ul>
+                        <h3 className="text-sm font-bold uppercase tracking-wider text-white">Cobertura</h3>
+                        <p className="mt-4 flex items-start gap-2 text-sm leading-6 text-slate-400">
+                            <MapPin className="mt-0.5 h-4 w-4 flex-none text-emerald-400" aria-hidden="true" />
+                            Santiago de los Caballeros y municipios del Cibao, República Dominicana.
+                        </p>
                     </div>
                 </div>
-                <div className="border-t border-gray-700/50 mt-8 pt-8 text-center">
-                    <p className="text-sm text-gray-500">
-                        &copy; {new Date().getFullYear()} Técnicos en RD. Todos los derechos reservados.
-                    </p>
-                    <p className="text-emerald-500 text-xs mt-2">
-                        Hecho con ❤️ en República Dominicana 🇩🇴
-                    </p>
+                <div className="border-t border-slate-800">
+                    <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-5 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+                        <p>&copy; {new Date().getFullYear()} Técnicos en RD. Todos los derechos reservados.</p>
+                        <p>Hecho para conectar al Cibao.</p>
+                    </div>
                 </div>
             </footer>
-
-            {/* Floating Home Button - visible on all views except home - TOP LEFT */}
-            <AnimatePresence>
-                {currentView !== 'home' && (
-                    <motion.button
-                        initial={{ opacity: 0, scale: 0.5, x: -20 }}
-                        animate={{ opacity: 1, scale: 1, x: 0 }}
-                        exit={{ opacity: 0, scale: 0.5, x: -20 }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setCurrentView('home')}
-                        className="fixed top-20 left-4 z-40 bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-4 py-2.5 rounded-full shadow-lg hover:shadow-emerald-500/40 transition-all flex items-center gap-2"
-                        title="Volver al inicio"
-                    >
-                        <Home className="w-5 h-5" />
-                        <span className="text-sm font-medium">Pa'l inicio</span>
-                    </motion.button>
-                )}
-            </AnimatePresence>
 
             {/* Technician Registration Form Modal */}
             <AnimatePresence>
@@ -3188,20 +2756,32 @@ const SantiagoTechRDApp = () => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4"
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm"
                     >
                         <motion.div
                             initial={{ scale: 0.8, y: -20 }}
                             animate={{ scale: 1, y: 0 }}
                             exit={{ scale: 0.8, y: -20 }}
-                            className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="registration-dialog-title"
+                            className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-800"
                         >
-                            <h2 className="text-2xl font-semibold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-                                <span>🌴</span> ¡Únete a Santiago Tech!
+                            <button
+                                type="button"
+                                aria-label="Cerrar registro"
+                                onClick={() => setShowUserRegisterForm(false)}
+                                className="absolute right-4 top-4 rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                            <h2 id="registration-dialog-title" className="mb-2 pr-8 text-2xl font-bold text-gray-900 dark:text-white">
+                                Crea tu cuenta
                             </h2>
+                            <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">Reserva servicios o publica tu perfil profesional.</p>
                             {userRegistrationSuccess ? (
                                 <div className="bg-green-100 dark:bg-green-900 border border-green-400 dark:border-green-600 text-green-700 dark:text-green-300 px-4 py-3 rounded relative mb-4" role="alert">
-                                    <strong className="font-bold">¡Registro Exitoso! 🎉</strong>
+                                    <strong className="font-bold">Registro exitoso. </strong>
                                     <span className="block sm:inline">Tu cuenta ha sido creada. Por favor revisa tu correo para verificar tu cuenta.</span>
                                     <CheckCircle className="absolute top-3 left-4 w-5 h-5 text-green-500" />
                                     <Button
@@ -3234,7 +2814,7 @@ const SantiagoTechRDApp = () => {
                                                     {...registerUser('accountType')}
                                                     className="sr-only"
                                                 />
-                                                <User className={cn(
+                                                <UserIcon className={cn(
                                                     "w-8 h-8 mb-2",
                                                     selectedAccountType === 'user' ? "text-emerald-600" : "text-gray-400"
                                                 )} />
@@ -3572,12 +3152,12 @@ const SantiagoTechRDApp = () => {
                                             ) : selectedAccountType === 'technician' ? (
                                                 <>
                                                     <Wrench className="mr-2 h-4 w-4" />
-                                                    ¡Registrarme como Técnico!
+                                                    Registrarme como técnico
                                                 </>
                                             ) : (
                                                 <>
-                                                    <User className="mr-2 h-4 w-4" />
-                                                    ¡Crear mi Cuenta!
+                                                    <UserIcon className="mr-2 h-4 w-4" />
+                                                    Crear mi cuenta
                                                 </>
                                             )}
                                         </Button>
@@ -3602,34 +3182,20 @@ const SantiagoTechRDApp = () => {
                             initial={{ scale: 0.8, y: -20 }}
                             animate={{ scale: 1, y: 0 }}
                             exit={{ scale: 0.8, y: -20 }}
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="review-dialog-title"
                             className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6"
                         >
-                            <h2 className="text-2xl font-semibold text-gray-800 dark:text-white mb-4">
-                                Agregar Reseña
+                            <h2 id="review-dialog-title" className="text-2xl font-semibold text-gray-800 dark:text-white mb-4">
+                                Comparte tu experiencia
                             </h2>
-                            <form onSubmit={handleReviewSubmit((data) => {
-                                if (showReviewForm?.technicianId) {
-                                    handleAddReview(showReviewForm.technicianId, data);
-                                }
-                            })} className="space-y-4">
-                                <div>
-                                    <label htmlFor="author" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        Tu Nombre
-                                    </label>
-                                    <Input
-                                        type="text"
-                                        id="author"
-                                        {...registerReview('author')}
-                                        className={cn(
-                                            'mt-1',
-                                            reviewErrors.author && 'border-red-500 focus:ring-red-500 focus:border-red-500'
-                                        )}
-                                        placeholder="Tu nombre"
-                                    />
-                                    {reviewErrors.author && (
-                                        <p className="text-red-500 text-sm mt-1">{reviewErrors.author.message}</p>
-                                    )}
-                                </div>
+                            <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">Tu nombre se toma de tu cuenta verificada.</p>
+                            <form onSubmit={handleReviewSubmit((data) =>
+                                showReviewForm?.technicianId
+                                    ? handleAddReview(showReviewForm.technicianId, data)
+                                    : Promise.resolve()
+                            )} className="space-y-4">
                                 <div>
                                     <label htmlFor="comment" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                         Comentario
@@ -3663,12 +3229,13 @@ const SantiagoTechRDApp = () => {
                                                         key={star}
                                                         type="button"
                                                         onClick={() => field.onChange(star)}
+                                                        aria-label={`${star} ${star === 1 ? 'estrella' : 'estrellas'}`}
+                                                        aria-pressed={star === field.value}
                                                         className={cn(
-                                                            'mr-1',
+                                                            'mr-1 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2',
                                                             star <= (field.value || 0)
                                                                 ? 'text-yellow-400'
-                                                                : 'text-gray-300 dark:text-gray-500',
-                                                            'focus:outline-none'
+                                                                : 'text-gray-300 dark:text-gray-500'
                                                         )}
                                                     >
                                                         <Star className="w-6 h-6" />
@@ -3681,6 +3248,11 @@ const SantiagoTechRDApp = () => {
                                         <p className="text-red-500 text-sm mt-1">{reviewErrors.rating.message}</p>
                                     )}
                                 </div>
+                                {reviewSubmitError && (
+                                    <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                                        {reviewSubmitError}
+                                    </p>
+                                )}
                                 <div className="flex justify-end gap-4">
                                     <Button
                                         type="button"
@@ -3720,23 +3292,29 @@ const SantiagoTechRDApp = () => {
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50"
+                            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm"
                         >
                             <motion.div
                                 initial={{ scale: 0.8, y: -20 }}
                                 animate={{ scale: 1, y: 0 }}
                                 exit={{ scale: 0.8, y: -20 }}
-                                className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6 relative"
+                                role="dialog"
+                                aria-modal="true"
+                                aria-labelledby="login-dialog-title"
+                                className="relative w-full max-w-md rounded-2xl bg-white p-7 shadow-2xl dark:bg-gray-800"
                             >
                                 <button
+                                    type="button"
+                                    aria-label="Cerrar inicio de sesión"
                                     onClick={() => setShowLoginForm(false)}
-                                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                                    className="absolute right-4 top-4 rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:hover:bg-gray-700 dark:hover:text-gray-200"
                                 >
                                     <X className="w-5 h-5" />
                                 </button>
-                                <h2 className="text-2xl font-semibold text-gray-800 dark:text-white mb-6 text-center">
-                                    Iniciar Sesión
+                                <h2 id="login-dialog-title" className="mb-2 text-center text-2xl font-bold text-gray-900 dark:text-white">
+                                    Iniciar sesión
                                 </h2>
+                                <p className="mb-6 text-center text-sm text-gray-500 dark:text-gray-400">Accede a tus reservas, puntos y perfil.</p>
                                 <form onSubmit={handleLoginSubmit(handleLogin)} className="space-y-4">
                                     <div>
                                         <label htmlFor="loginEmail" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -3746,6 +3324,8 @@ const SantiagoTechRDApp = () => {
                                             type="email"
                                             id="loginEmail"
                                             {...registerLogin('email')}
+                                            aria-invalid={Boolean(loginErrors.email)}
+                                            aria-describedby={loginErrors.email ? 'login-email-error' : undefined}
                                             className={cn(
                                                 'mt-1',
                                                 loginErrors.email && 'border-red-500 focus:ring-red-500 focus:border-red-500'
@@ -3753,7 +3333,7 @@ const SantiagoTechRDApp = () => {
                                             placeholder="tu.correo@ejemplo.com"
                                         />
                                         {loginErrors.email && (
-                                            <p className="text-red-500 text-sm mt-1">{loginErrors.email.message}</p>
+                                            <p id="login-email-error" role="alert" className="text-red-500 text-sm mt-1">{loginErrors.email.message}</p>
                                         )}
                                     </div>
                                     <div>
@@ -3764,6 +3344,8 @@ const SantiagoTechRDApp = () => {
                                             type="password"
                                             id="loginPassword"
                                             {...registerLogin('password')}
+                                            aria-invalid={Boolean(loginErrors.password)}
+                                            aria-describedby={loginErrors.password ? 'login-password-error' : undefined}
                                             className={cn(
                                                 'mt-1',
                                                 loginErrors.password && 'border-red-500 focus:ring-red-500 focus:border-red-500'
@@ -3771,13 +3353,13 @@ const SantiagoTechRDApp = () => {
                                             placeholder="******"
                                         />
                                         {loginErrors.password && (
-                                            <p className="text-red-500 text-sm mt-1">{loginErrors.password.message}</p>
+                                            <p id="login-password-error" role="alert" className="text-red-500 text-sm mt-1">{loginErrors.password.message}</p>
                                         )}
                                     </div>
                                     <Button
                                         type="submit"
                                         disabled={isLoginSubmitting}
-                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white mt-2"
+                                        className="mt-2 w-full"
                                     >
                                         {isLoginSubmitting ? (
                                             <>
@@ -3791,6 +3373,7 @@ const SantiagoTechRDApp = () => {
                                 </form>
                                 <div className="mt-4 text-center space-y-2">
                                     <button
+                                        type="button"
                                         onClick={() => {
                                             setShowLoginForm(false);
                                             setShowForgotPasswordForm(true);
@@ -3804,6 +3387,7 @@ const SantiagoTechRDApp = () => {
                                     <p className="text-sm text-gray-600 dark:text-gray-400">
                                         ¿No tienes cuenta?{' '}
                                         <button
+                                            type="button"
                                             onClick={() => {
                                                 setShowLoginForm(false);
                                                 setShowUserRegisterForm(true);
@@ -4005,7 +3589,7 @@ const SantiagoTechRDApp = () => {
                                                     className="w-full h-full object-cover"
                                                 />
                                             ) : (
-                                                <User className="w-12 h-12 text-white" />
+                                                <UserIcon className="w-12 h-12 text-white" />
                                             )}
                                         </div>
                                         {/* Upload button overlay */}
@@ -4051,7 +3635,7 @@ const SantiagoTechRDApp = () => {
                                                 : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200"
                                         )}
                                     >
-                                        <User className="w-4 h-4" />
+                                        <UserIcon className="w-4 h-4" />
                                         <span className="hidden sm:inline">Mi Info</span>
                                     </button>
                                     {currentUser.role === 'technician' && (
@@ -4186,7 +3770,7 @@ const SantiagoTechRDApp = () => {
                                         ) : (
                                             <div className="space-y-4">
                                                 <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                                                    <User className="w-5 h-5 text-gray-400" />
+                                                    <UserIcon className="w-5 h-5 text-gray-400" />
                                                     <div>
                                                         <p className="text-xs text-gray-500 dark:text-gray-400">Nombre</p>
                                                         <p className="font-medium text-gray-800 dark:text-white">{currentUser.name}</p>
@@ -4420,7 +4004,6 @@ const SantiagoTechRDApp = () => {
                 {showBookingForm?.show && currentUser && (
                     <BookingForm
                         technician={showBookingForm.technician}
-                        customerId={currentUser.id}
                         onSubmit={handleCreateBooking}
                         onClose={() => setShowBookingForm(null)}
                     />

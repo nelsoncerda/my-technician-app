@@ -41,6 +41,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.checkAvailability = checkAvailability;
 exports.getAvailableSlots = getAvailableSlots;
@@ -59,31 +62,61 @@ exports.removeTimeOff = removeTimeOff;
 exports.getTechnicianTimeOffs = getTechnicianTimeOffs;
 exports.getAllBookings = getAllBookings;
 const client_1 = require("@prisma/client");
+const prisma_1 = __importDefault(require("../prisma"));
 const gamificationService = __importStar(require("./gamificationService"));
-const prisma = new client_1.PrismaClient();
 // Default business hours (8 AM - 6 PM) when no availability is configured
 const DEFAULT_START_TIME = '08:00';
 const DEFAULT_END_TIME = '18:00';
+function timeToMinutes(time) {
+    const match = /^(\d{2}):(\d{2})$/.exec(time);
+    if (!match)
+        return null;
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    if (hours > 23 || minutes > 59)
+        return null;
+    return hours * 60 + minutes;
+}
+function minutesToTime(totalMinutes) {
+    return `${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')}`;
+}
+function bookingDayRange(date) {
+    const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + 1);
+    return { start, end };
+}
+function overlaps(start, duration, otherStart, otherDuration) {
+    return start < otherStart + otherDuration && otherStart < start + duration;
+}
 // Check if a time slot is available
 function checkAvailability(technicianId_1, date_1, time_1) {
-    return __awaiter(this, arguments, void 0, function* (technicianId, date, time, duration = 60) {
-        const dayOfWeek = date.getDay();
+    return __awaiter(this, arguments, void 0, function* (technicianId, date, time, duration = 60, db = prisma_1.default) {
+        const dayOfWeek = date.getUTCDay();
+        const requestedStart = timeToMinutes(time);
+        if (requestedStart === null || !Number.isInteger(duration) || duration < 15 || duration > 480) {
+            return false;
+        }
+        const requestedEnd = requestedStart + duration;
         // Check if technician has any availability configured
-        const hasAnyAvailability = yield prisma.availabilitySlot.count({
+        const hasAnyAvailability = yield db.availabilitySlot.count({
             where: { technicianId },
         });
         if (hasAnyAvailability > 0) {
             // Check if technician has availability for this specific day
-            const availabilitySlot = yield prisma.availabilitySlot.findFirst({
+            const availabilitySlots = yield db.availabilitySlot.findMany({
                 where: {
                     technicianId,
                     dayOfWeek,
                     isAvailable: true,
-                    startTime: { lte: time },
-                    endTime: { gte: time },
                 },
             });
-            if (!availabilitySlot) {
+            const fitsAvailability = availabilitySlots.some((slot) => {
+                const slotStart = timeToMinutes(slot.startTime);
+                const slotEnd = timeToMinutes(slot.endTime);
+                return slotStart !== null && slotEnd !== null && slotStart <= requestedStart && slotEnd >= requestedEnd;
+            });
+            if (!fitsAvailability) {
                 return false;
             }
         }
@@ -94,12 +127,14 @@ function checkAvailability(technicianId_1, date_1, time_1) {
                 return false;
             }
             // Check if time is within default business hours
-            if (time < DEFAULT_START_TIME || time >= DEFAULT_END_TIME) {
+            const defaultStart = timeToMinutes(DEFAULT_START_TIME);
+            const defaultEnd = timeToMinutes(DEFAULT_END_TIME);
+            if (requestedStart < defaultStart || requestedEnd > defaultEnd) {
                 return false;
             }
         }
         // Check for time off
-        const timeOff = yield prisma.timeOff.findFirst({
+        const timeOff = yield db.timeOff.findFirst({
             where: {
                 technicianId,
                 startDate: { lte: date },
@@ -110,23 +145,28 @@ function checkAvailability(technicianId_1, date_1, time_1) {
             return false;
         }
         // Check for conflicting bookings
-        const existingBooking = yield prisma.booking.findFirst({
+        const { start: dayStart, end: dayEnd } = bookingDayRange(date);
+        const existingBookings = yield db.booking.findMany({
             where: {
                 technicianId,
-                scheduledDate: date,
-                scheduledTime: time,
+                scheduledDate: { gte: dayStart, lt: dayEnd },
                 status: { notIn: ['CANCELLED', 'NO_SHOW'] },
             },
+            select: { scheduledTime: true, estimatedDuration: true },
         });
-        return !existingBooking;
+        return !existingBookings.some((booking) => {
+            const bookedStart = timeToMinutes(booking.scheduledTime);
+            return bookedStart !== null && overlaps(requestedStart, duration, bookedStart, booking.estimatedDuration);
+        });
     });
 }
 // Get available time slots for a technician on a specific date
 function getAvailableSlots(technicianId, date) {
     return __awaiter(this, void 0, void 0, function* () {
-        const dayOfWeek = date.getDay();
+        const dayOfWeek = date.getUTCDay();
+        const { start: dayStart, end: dayEnd } = bookingDayRange(date);
         // Check for time off first
-        const timeOff = yield prisma.timeOff.findFirst({
+        const timeOff = yield prisma_1.default.timeOff.findFirst({
             where: {
                 technicianId,
                 startDate: { lte: date },
@@ -137,7 +177,7 @@ function getAvailableSlots(technicianId, date) {
             return [];
         }
         // Get availability slots for this day
-        const availabilitySlots = yield prisma.availabilitySlot.findMany({
+        const availabilitySlots = yield prisma_1.default.availabilitySlot.findMany({
             where: {
                 technicianId,
                 dayOfWeek,
@@ -146,19 +186,27 @@ function getAvailableSlots(technicianId, date) {
             orderBy: { startTime: 'asc' },
         });
         // Check if technician has any availability configured at all
-        const hasAnyAvailability = yield prisma.availabilitySlot.count({
+        const hasAnyAvailability = yield prisma_1.default.availabilitySlot.count({
             where: { technicianId },
         });
         // Get existing bookings for this date
-        const existingBookings = yield prisma.booking.findMany({
+        const existingBookings = yield prisma_1.default.booking.findMany({
             where: {
                 technicianId,
-                scheduledDate: date,
+                scheduledDate: { gte: dayStart, lt: dayEnd },
                 status: { notIn: ['CANCELLED', 'NO_SHOW'] },
             },
             select: { scheduledTime: true, estimatedDuration: true },
         });
-        const bookedTimes = new Set(existingBookings.map((b) => b.scheduledTime));
+        const isSlotFree = (timeSlot) => {
+            const slotStart = timeToMinutes(timeSlot);
+            if (slotStart === null)
+                return false;
+            return !existingBookings.some((booking) => {
+                const bookedStart = timeToMinutes(booking.scheduledTime);
+                return bookedStart !== null && overlaps(slotStart, 60, bookedStart, booking.estimatedDuration);
+            });
+        };
         // Generate available time slots
         const slots = [];
         if (hasAnyAvailability === 0) {
@@ -167,11 +215,11 @@ function getAvailableSlots(technicianId, date) {
             if (dayOfWeek === 0) {
                 return [];
             }
-            const startHour = parseInt(DEFAULT_START_TIME.split(':')[0]);
-            const endHour = parseInt(DEFAULT_END_TIME.split(':')[0]);
-            for (let hour = startHour; hour < endHour; hour++) {
-                const timeSlot = `${hour.toString().padStart(2, '0')}:00`;
-                if (!bookedTimes.has(timeSlot)) {
+            const startMinutes = timeToMinutes(DEFAULT_START_TIME);
+            const endMinutes = timeToMinutes(DEFAULT_END_TIME);
+            for (let minutes = startMinutes; minutes + 60 <= endMinutes; minutes += 60) {
+                const timeSlot = minutesToTime(minutes);
+                if (isSlotFree(timeSlot)) {
                     slots.push(timeSlot);
                 }
             }
@@ -183,56 +231,60 @@ function getAvailableSlots(technicianId, date) {
         else {
             // Use configured availability slots
             for (const availability of availabilitySlots) {
-                const startHour = parseInt(availability.startTime.split(':')[0]);
-                const endHour = parseInt(availability.endTime.split(':')[0]);
-                for (let hour = startHour; hour < endHour; hour++) {
-                    const timeSlot = `${hour.toString().padStart(2, '0')}:00`;
-                    if (!bookedTimes.has(timeSlot)) {
+                const startMinutes = timeToMinutes(availability.startTime);
+                const endMinutes = timeToMinutes(availability.endTime);
+                if (startMinutes === null || endMinutes === null)
+                    continue;
+                for (let minutes = startMinutes; minutes + 60 <= endMinutes; minutes += 60) {
+                    const timeSlot = minutesToTime(minutes);
+                    if (isSlotFree(timeSlot)) {
                         slots.push(timeSlot);
                     }
                 }
             }
         }
-        return slots;
+        return Array.from(new Set(slots)).sort();
     });
 }
 // Create a new booking
 function createBooking(input) {
     return __awaiter(this, void 0, void 0, function* () {
         const { customerId, technicianId, scheduledDate, scheduledTime, serviceType, description, address, city, phone, estimatedDuration = 60, } = input;
-        // Verify availability
-        const isAvailable = yield checkAvailability(technicianId, scheduledDate, scheduledTime, estimatedDuration);
-        if (!isAvailable) {
-            throw new Error('El horario seleccionado no está disponible');
-        }
-        // Create the booking
-        const booking = yield prisma.booking.create({
-            data: {
-                customerId,
-                technicianId,
-                scheduledDate,
-                scheduledTime,
-                serviceType,
-                description,
-                address,
-                city,
-                phone,
-                estimatedDuration,
-                status: 'PENDING',
-            },
-            include: {
-                customer: {
-                    select: { id: true, name: true, email: true, phone: true },
+        const booking = yield prisma_1.default.$transaction((tx) => __awaiter(this, void 0, void 0, function* () {
+            const isAvailable = yield checkAvailability(technicianId, scheduledDate, scheduledTime, estimatedDuration, tx);
+            if (!isAvailable) {
+                throw new Error('El horario seleccionado no está disponible');
+            }
+            return tx.booking.create({
+                data: {
+                    customerId,
+                    technicianId,
+                    scheduledDate,
+                    scheduledTime,
+                    serviceType,
+                    description,
+                    address,
+                    city,
+                    phone,
+                    estimatedDuration,
+                    status: 'PENDING',
                 },
-                technician: {
-                    include: {
-                        user: { select: { id: true, name: true, email: true, phone: true } },
+                include: {
+                    customer: {
+                        select: { id: true, name: true, email: true, phone: true },
+                    },
+                    technician: {
+                        include: {
+                            user: { select: { id: true, name: true, email: true, phone: true } },
+                        },
                     },
                 },
-            },
+            });
+        }), {
+            isolationLevel: client_1.Prisma.TransactionIsolationLevel.Serializable,
         });
         // Check if this is the customer's first booking
-        const customerBookingsCount = yield prisma.booking.count({
+        const customerBookingsCount = yield prisma_1.default.booking.count({
             where: { customerId },
         });
         if (customerBookingsCount === 1) {
@@ -249,7 +301,7 @@ function createBooking(input) {
 // Get booking by ID
 function getBookingById(bookingId) {
     return __awaiter(this, void 0, void 0, function* () {
-        return prisma.booking.findUnique({
+        return prisma_1.default.booking.findUnique({
             where: { id: bookingId },
             include: {
                 customer: {
@@ -277,7 +329,7 @@ function getCustomerBookings(customerId, filters) {
         if (filters === null || filters === void 0 ? void 0 : filters.endDate) {
             where.scheduledDate = Object.assign(Object.assign({}, where.scheduledDate), { lte: filters.endDate });
         }
-        return prisma.booking.findMany({
+        return prisma_1.default.booking.findMany({
             where,
             include: {
                 technician: {
@@ -303,7 +355,7 @@ function getTechnicianBookings(technicianId, filters) {
         if (filters === null || filters === void 0 ? void 0 : filters.endDate) {
             where.scheduledDate = Object.assign(Object.assign({}, where.scheduledDate), { lte: filters.endDate });
         }
-        return prisma.booking.findMany({
+        return prisma_1.default.booking.findMany({
             where,
             include: {
                 customer: {
@@ -315,9 +367,9 @@ function getTechnicianBookings(technicianId, filters) {
     });
 }
 // Confirm booking (technician)
-function confirmBooking(bookingId, technicianUserId) {
+function confirmBooking(bookingId, actor) {
     return __awaiter(this, void 0, void 0, function* () {
-        const booking = yield prisma.booking.findUnique({
+        const booking = yield prisma_1.default.booking.findUnique({
             where: { id: bookingId },
             include: {
                 technician: { select: { userId: true } },
@@ -326,7 +378,7 @@ function confirmBooking(bookingId, technicianUserId) {
         if (!booking) {
             throw new Error('Reserva no encontrada');
         }
-        if (booking.technician.userId !== technicianUserId) {
+        if (actor.role !== 'admin' && booking.technician.userId !== actor.userId) {
             throw new Error('No autorizado');
         }
         if (booking.status !== 'PENDING') {
@@ -336,7 +388,7 @@ function confirmBooking(bookingId, technicianUserId) {
         const createdAt = new Date(booking.createdAt);
         const now = new Date();
         const hoursDiff = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
-        const updatedBooking = yield prisma.booking.update({
+        const updatedBooking = yield prisma_1.default.booking.update({
             where: { id: bookingId },
             data: {
                 status: 'CONFIRMED',
@@ -352,7 +404,7 @@ function confirmBooking(bookingId, technicianUserId) {
         // Award quick response bonus if within 1 hour
         if (hoursDiff <= 1) {
             yield gamificationService.awardPointsForEvent({
-                userId: technicianUserId,
+                userId: booking.technician.userId,
                 eventType: 'QUICK_RESPONSE',
                 sourceId: bookingId,
             });
@@ -361,9 +413,9 @@ function confirmBooking(bookingId, technicianUserId) {
     });
 }
 // Start booking (technician marks as in progress)
-function startBooking(bookingId, technicianUserId) {
+function startBooking(bookingId, actor) {
     return __awaiter(this, void 0, void 0, function* () {
-        const booking = yield prisma.booking.findUnique({
+        const booking = yield prisma_1.default.booking.findUnique({
             where: { id: bookingId },
             include: {
                 technician: { select: { userId: true } },
@@ -372,22 +424,25 @@ function startBooking(bookingId, technicianUserId) {
         if (!booking) {
             throw new Error('Reserva no encontrada');
         }
-        if (booking.technician.userId !== technicianUserId) {
+        if (actor.role !== 'admin' && booking.technician.userId !== actor.userId) {
             throw new Error('No autorizado');
         }
         if (booking.status !== 'CONFIRMED') {
             throw new Error('La reserva debe estar confirmada primero');
         }
-        return prisma.booking.update({
+        return prisma_1.default.booking.update({
             where: { id: bookingId },
             data: { status: 'IN_PROGRESS' },
         });
     });
 }
 // Complete booking
-function completeBooking(bookingId, technicianUserId, totalPrice) {
+function completeBooking(bookingId, actor, totalPrice) {
     return __awaiter(this, void 0, void 0, function* () {
-        const booking = yield prisma.booking.findUnique({
+        if (totalPrice !== undefined && (!Number.isFinite(totalPrice) || totalPrice < 0)) {
+            throw new Error('El precio total no es válido');
+        }
+        const booking = yield prisma_1.default.booking.findUnique({
             where: { id: bookingId },
             include: {
                 technician: {
@@ -399,35 +454,45 @@ function completeBooking(bookingId, technicianUserId, totalPrice) {
         if (!booking) {
             throw new Error('Reserva no encontrada');
         }
-        if (booking.technician.user.id !== technicianUserId) {
+        if (actor.role !== 'admin' && booking.technician.user.id !== actor.userId) {
             throw new Error('No autorizado');
         }
         if (!['CONFIRMED', 'IN_PROGRESS'].includes(booking.status)) {
             throw new Error('La reserva no puede ser completada');
         }
         const now = new Date();
-        // Update booking
-        const updatedBooking = yield prisma.booking.update({
-            where: { id: bookingId },
-            data: {
-                status: 'COMPLETED',
-                completedAt: now,
-                totalPrice,
-            },
-            include: {
-                customer: { select: { id: true, name: true, email: true, phone: true } },
-                technician: {
-                    include: { user: { select: { id: true, name: true, email: true, phone: true } } },
+        // Claim the state transition and increment technician stats atomically. The
+        // conditional update prevents concurrent/retried requests from completing
+        // and crediting the same booking twice.
+        const updatedBooking = yield prisma_1.default.$transaction((tx) => __awaiter(this, void 0, void 0, function* () {
+            const transition = yield tx.booking.updateMany({
+                where: {
+                    id: bookingId,
+                    status: { in: ['CONFIRMED', 'IN_PROGRESS'] },
                 },
-            },
-        });
-        // Update technician stats
-        yield prisma.technician.update({
-            where: { id: booking.technicianId },
-            data: {
-                totalJobsCompleted: { increment: 1 },
-            },
-        });
+                data: {
+                    status: 'COMPLETED',
+                    completedAt: now,
+                    totalPrice,
+                },
+            });
+            if (transition.count !== 1) {
+                throw new Error('La reserva ya fue completada o cambió de estado');
+            }
+            yield tx.technician.update({
+                where: { id: booking.technicianId },
+                data: { totalJobsCompleted: { increment: 1 } },
+            });
+            return tx.booking.findUniqueOrThrow({
+                where: { id: bookingId },
+                include: {
+                    customer: { select: { id: true, name: true, email: true, phone: true } },
+                    technician: {
+                        include: { user: { select: { id: true, name: true, email: true, phone: true } } },
+                    },
+                },
+            });
+        }));
         // Award points to customer
         yield gamificationService.awardPointsForEvent({
             userId: booking.customerId,
@@ -436,30 +501,17 @@ function completeBooking(bookingId, technicianUserId, totalPrice) {
         });
         // Award points to technician
         yield gamificationService.awardPointsForEvent({
-            userId: technicianUserId,
+            userId: booking.technician.user.id,
             eventType: 'JOB_COMPLETED',
             sourceId: bookingId,
         });
-        // Check for on-time arrival bonus (if started on scheduled time)
-        const scheduledDateTime = new Date(booking.scheduledDate);
-        const [hours, minutes] = booking.scheduledTime.split(':').map(Number);
-        scheduledDateTime.setHours(hours, minutes, 0, 0);
-        // Give a 15-minute grace period
-        const gracePeriod = 15 * 60 * 1000;
-        if (now.getTime() - scheduledDateTime.getTime() <= gracePeriod) {
-            yield gamificationService.awardPointsForEvent({
-                userId: technicianUserId,
-                eventType: 'ON_TIME_ARRIVAL',
-                sourceId: bookingId,
-            });
-        }
         return updatedBooking;
     });
 }
 // Cancel booking
-function cancelBooking(bookingId, cancelledBy, cancellerUserId, reason) {
+function cancelBooking(bookingId, actor, reason) {
     return __awaiter(this, void 0, void 0, function* () {
-        const booking = yield prisma.booking.findUnique({
+        const booking = yield prisma_1.default.booking.findUnique({
             where: { id: bookingId },
             include: {
                 customer: { select: { id: true } },
@@ -469,17 +521,23 @@ function cancelBooking(bookingId, cancelledBy, cancellerUserId, reason) {
         if (!booking) {
             throw new Error('Reserva no encontrada');
         }
-        // Verify authorization
-        if (cancelledBy === 'customer' && booking.customerId !== cancellerUserId) {
-            throw new Error('No autorizado');
+        let cancelledBy;
+        if (actor.role === 'admin') {
+            cancelledBy = 'admin';
         }
-        if (cancelledBy === 'technician' && booking.technician.userId !== cancellerUserId) {
+        else if (booking.customerId === actor.userId) {
+            cancelledBy = 'customer';
+        }
+        else if (booking.technician.userId === actor.userId) {
+            cancelledBy = 'technician';
+        }
+        else {
             throw new Error('No autorizado');
         }
         if (['COMPLETED', 'CANCELLED'].includes(booking.status)) {
             throw new Error('La reserva no puede ser cancelada');
         }
-        return prisma.booking.update({
+        return prisma_1.default.booking.update({
             where: { id: bookingId },
             data: {
                 status: 'CANCELLED',
@@ -493,14 +551,14 @@ function cancelBooking(bookingId, cancelledBy, cancellerUserId, reason) {
 function setAvailability(technicianId, slots) {
     return __awaiter(this, void 0, void 0, function* () {
         // Delete existing recurring slots
-        yield prisma.availabilitySlot.deleteMany({
+        yield prisma_1.default.availabilitySlot.deleteMany({
             where: {
                 technicianId,
                 isRecurring: true,
             },
         });
         // Create new slots
-        const createdSlots = yield prisma.availabilitySlot.createMany({
+        const createdSlots = yield prisma_1.default.availabilitySlot.createMany({
             data: slots.map((slot) => {
                 var _a;
                 return ({
@@ -519,7 +577,7 @@ function setAvailability(technicianId, slots) {
 // Get technician availability
 function getTechnicianAvailability(technicianId) {
     return __awaiter(this, void 0, void 0, function* () {
-        return prisma.availabilitySlot.findMany({
+        return prisma_1.default.availabilitySlot.findMany({
             where: {
                 technicianId,
                 isRecurring: true,
@@ -531,7 +589,7 @@ function getTechnicianAvailability(technicianId) {
 // Add time off
 function addTimeOff(technicianId, startDate, endDate, reason) {
     return __awaiter(this, void 0, void 0, function* () {
-        return prisma.timeOff.create({
+        return prisma_1.default.timeOff.create({
             data: {
                 technicianId,
                 startDate,
@@ -544,13 +602,13 @@ function addTimeOff(technicianId, startDate, endDate, reason) {
 // Remove time off
 function removeTimeOff(timeOffId, technicianId) {
     return __awaiter(this, void 0, void 0, function* () {
-        const timeOff = yield prisma.timeOff.findUnique({
+        const timeOff = yield prisma_1.default.timeOff.findUnique({
             where: { id: timeOffId },
         });
         if (!timeOff || timeOff.technicianId !== technicianId) {
             throw new Error('No autorizado');
         }
-        return prisma.timeOff.delete({
+        return prisma_1.default.timeOff.delete({
             where: { id: timeOffId },
         });
     });
@@ -558,7 +616,7 @@ function removeTimeOff(timeOffId, technicianId) {
 // Get technician time offs
 function getTechnicianTimeOffs(technicianId) {
     return __awaiter(this, void 0, void 0, function* () {
-        return prisma.timeOff.findMany({
+        return prisma_1.default.timeOff.findMany({
             where: {
                 technicianId,
                 endDate: { gte: new Date() },
@@ -581,7 +639,7 @@ function getAllBookings(filters) {
             where.scheduledDate = Object.assign(Object.assign({}, where.scheduledDate), { lte: filters.endDate });
         }
         const [bookings, total] = yield Promise.all([
-            prisma.booking.findMany({
+            prisma_1.default.booking.findMany({
                 where,
                 include: {
                     customer: { select: { id: true, name: true, email: true, phone: true } },
@@ -595,7 +653,7 @@ function getAllBookings(filters) {
                 take: (filters === null || filters === void 0 ? void 0 : filters.limit) || 50,
                 skip: (filters === null || filters === void 0 ? void 0 : filters.offset) || 0,
             }),
-            prisma.booking.count({ where }),
+            prisma_1.default.booking.count({ where }),
         ]);
         return { bookings, total };
     });

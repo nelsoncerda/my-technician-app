@@ -2,6 +2,9 @@ import { Request, Response } from 'express';
 import prisma from '../prisma';
 import { sendVerificationEmail, sendWelcomeEmail, sendPasswordResetEmail } from '../services/emailService';
 import crypto from 'crypto';
+import { hashPassword, verifyPassword } from '../security/password';
+import { createAuthToken, normalizeAuthRole } from '../security/token';
+import { safeUserSelect } from '../utils/safeUser';
 
 const APP_URL = process.env.APP_URL || 'https://tecnicosenrd.com';
 
@@ -9,13 +12,52 @@ export const register = async (req: Request, res: Response) => {
     try {
         const { name, email, password, phone, accountType, specializations, location, photoBase64, companyName } = req.body;
 
+        if (
+            typeof name !== 'string' || !name.trim() ||
+            typeof email !== 'string' || !email.trim() ||
+            typeof password !== 'string' || password.length < 8
+        ) {
+            return res.status(400).json({ message: 'Nombre, correo y contraseña válida son requeridos' });
+        }
+
+        const normalizedEmail = email.trim().toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+            return res.status(400).json({ message: 'El correo no tiene un formato válido' });
+        }
+        if (accountType !== 'user' && accountType !== 'technician') {
+            return res.status(400).json({ message: 'El tipo de cuenta no es válido' });
+        }
+
+        const normalizedSpecializations = Array.isArray(specializations)
+            ? specializations
+                .filter((value: unknown): value is string => typeof value === 'string')
+                .map((value: string) => value.trim())
+                .filter(Boolean)
+            : [];
+        const normalizedLocation = typeof location === 'string' ? location.trim() : '';
+
+        if (accountType === 'technician' && (normalizedSpecializations.length === 0 || !normalizedLocation)) {
+            return res.status(400).json({ message: 'Los técnicos deben indicar especialidades y ubicación' });
+        }
+        if (normalizedSpecializations.length > 10) {
+            return res.status(400).json({ message: 'Puedes seleccionar hasta 10 especialidades' });
+        }
+        if (photoBase64 && (typeof photoBase64 !== 'string' || photoBase64.length > 2.8 * 1024 * 1024)) {
+            return res.status(400).json({ message: 'La foto de perfil es demasiado grande' });
+        }
+
         // Check if user exists
-        const existingUser = await prisma.user.findUnique({ where: { email } });
+        const existingUser = await prisma.user.findFirst({
+            where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+            select: { id: true },
+        });
         if (existingUser) {
             return res.status(400).json({ message: 'User already exists' });
         }
 
         const verificationToken = crypto.randomBytes(32).toString('hex');
+        const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        const passwordHash = await hashPassword(password);
 
         // Determine the role based on account type
         const role = accountType === 'technician' ? 'technician' : 'user';
@@ -25,25 +67,27 @@ export const register = async (req: Request, res: Response) => {
             // Create user
             const user = await tx.user.create({
                 data: {
-                    name,
-                    email,
-                    password, // Note: In production, hash this password!
-                    phone,
+                    name: name.trim(),
+                    email: normalizedEmail,
+                    password: passwordHash,
+                    phone: typeof phone === 'string' && phone.trim() ? phone.trim() : null,
                     role,
                     verificationToken,
+                    verificationTokenExpires,
                     photoUrl: photoBase64 || null, // Save profile photo if provided
                 },
+                select: safeUserSelect,
             });
 
             // If the user is a technician, also create a technician record
             // Technicians are also users, so they can book services from other technicians
-            if (accountType === 'technician' && specializations && specializations.length > 0 && location) {
+            if (accountType === 'technician') {
                 await tx.technician.create({
                     data: {
                         userId: user.id,
-                        specializations, // Array of specializations/services
-                        location,
-                        companyName: companyName || null, // Optional company name
+                        specializations: normalizedSpecializations,
+                        location: normalizedLocation,
+                        companyName: typeof companyName === 'string' && companyName.trim() ? companyName.trim() : null,
                         verified: false,
                     },
                 });
@@ -64,12 +108,12 @@ export const register = async (req: Request, res: Response) => {
         });
 
         // Send verification email
-        const previewUrl = await sendVerificationEmail(email, verificationToken, name);
+        await sendVerificationEmail(normalizedEmail, verificationToken, name.trim());
 
-        res.status(201).json({ ...result, previewUrl });
+        res.status(201).json(result);
     } catch (error) {
         console.error('Registration error:', error);
-        res.status(500).json({ message: 'Error registering user', error });
+        res.status(500).json({ message: 'Error registering user' });
     }
 };
 
@@ -81,7 +125,13 @@ export const verifyEmail = async (req: Request, res: Response) => {
             return res.status(400).send(getVerificationPage('error', 'Token invalido'));
         }
 
-        const user = await prisma.user.findFirst({ where: { verificationToken: token } });
+        const user = await prisma.user.findFirst({
+            where: {
+                verificationToken: token,
+                verificationTokenExpires: { gt: new Date() },
+            },
+            select: { id: true, email: true, name: true, emailVerified: true },
+        });
 
         if (!user) {
             return res.status(400).send(getVerificationPage('error', 'El token es invalido o ya fue utilizado'));
@@ -91,10 +141,23 @@ export const verifyEmail = async (req: Request, res: Response) => {
             return res.send(getVerificationPage('already', 'Tu cuenta ya estaba verificada'));
         }
 
-        await prisma.user.update({
-            where: { id: user.id },
-            data: { emailVerified: true, verificationToken: null },
+        const verification = await prisma.user.updateMany({
+            where: {
+                id: user.id,
+                emailVerified: false,
+                verificationToken: token,
+                verificationTokenExpires: { gt: new Date() },
+            },
+            data: {
+                emailVerified: true,
+                verificationToken: null,
+                verificationTokenExpires: null,
+            },
         });
+
+        if (verification.count !== 1) {
+            return res.send(getVerificationPage('already', 'El enlace ya fue utilizado'));
+        }
 
         // Send welcome email
         await sendWelcomeEmail(user.email, user.name);
@@ -110,11 +173,15 @@ export const resendVerification = async (req: Request, res: Response) => {
     try {
         const { email } = req.body;
 
-        if (!email) {
+        if (typeof email !== 'string' || !email.trim()) {
             return res.status(400).json({ message: 'Email is required' });
         }
 
-        const user = await prisma.user.findUnique({ where: { email } });
+        const normalizedEmail = email.trim().toLowerCase();
+        const user = await prisma.user.findFirst({
+            where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+            select: { id: true, email: true, name: true, emailVerified: true },
+        });
 
         if (!user) {
             // Don't reveal if user exists or not for security
@@ -122,7 +189,7 @@ export const resendVerification = async (req: Request, res: Response) => {
         }
 
         if (user.emailVerified) {
-            return res.status(400).json({ message: 'El correo ya esta verificado' });
+            return res.json({ message: 'Si el correo requiere verificación, se enviará un nuevo enlace' });
         }
 
         // Generate new token
@@ -130,15 +197,17 @@ export const resendVerification = async (req: Request, res: Response) => {
 
         await prisma.user.update({
             where: { id: user.id },
-            data: { verificationToken: newToken },
+            data: {
+                verificationToken: newToken,
+                verificationTokenExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            },
         });
 
         // Send new verification email
-        const previewUrl = await sendVerificationEmail(email, newToken, user.name);
+        await sendVerificationEmail(user.email, newToken, user.name);
 
         res.json({
-            message: 'Se ha enviado un nuevo enlace de verificacion a tu correo',
-            previewUrl
+            message: 'Se ha enviado un nuevo enlace de verificacion a tu correo'
         });
     } catch (error) {
         console.error('Error resending verification:', error);
@@ -148,14 +217,8 @@ export const resendVerification = async (req: Request, res: Response) => {
 
 export const checkVerificationStatus = async (req: Request, res: Response) => {
     try {
-        const { email } = req.query;
-
-        if (!email || typeof email !== 'string') {
-            return res.status(400).json({ message: 'Email is required' });
-        }
-
         const user = await prisma.user.findUnique({
-            where: { email },
+            where: { id: req.auth!.userId },
             select: { emailVerified: true }
         });
 
@@ -175,11 +238,14 @@ export const forgotPassword = async (req: Request, res: Response) => {
     try {
         const { email } = req.body;
 
-        if (!email) {
+        if (typeof email !== 'string' || !email.trim()) {
             return res.status(400).json({ message: 'El correo es requerido' });
         }
 
-        const user = await prisma.user.findUnique({ where: { email } });
+        const user = await prisma.user.findFirst({
+            where: { email: { equals: email.trim().toLowerCase(), mode: 'insensitive' } },
+            select: { id: true, email: true, name: true },
+        });
 
         // Always return success to prevent email enumeration
         if (!user) {
@@ -199,7 +265,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
         });
 
         // Send reset email
-        await sendPasswordResetEmail(email, resetToken, user.name);
+        await sendPasswordResetEmail(user.email, resetToken, user.name);
 
         res.json({ message: 'Si el correo existe, recibirás un enlace para restablecer tu contraseña' });
     } catch (error) {
@@ -213,36 +279,33 @@ export const resetPassword = async (req: Request, res: Response) => {
     try {
         const { token, newPassword } = req.body;
 
-        if (!token || !newPassword) {
+        if (typeof token !== 'string' || !token || typeof newPassword !== 'string' || !newPassword) {
             return res.status(400).json({ message: 'Token y nueva contraseña son requeridos' });
         }
 
-        if (newPassword.length < 6) {
-            return res.status(400).json({ message: 'La contraseña debe tener al menos 6 caracteres' });
+        if (newPassword.length < 8) {
+            return res.status(400).json({ message: 'La contraseña debe tener al menos 8 caracteres' });
         }
 
-        const user = await prisma.user.findFirst({
+        const passwordHash = await hashPassword(newPassword);
+
+        // Consume the token and update the password in one conditional write so
+        // two concurrent requests cannot reuse the same reset link.
+        const reset = await prisma.user.updateMany({
             where: {
                 resetPasswordToken: token,
-                resetPasswordExpires: {
-                    gt: new Date(), // Token must not be expired
-                },
+                resetPasswordExpires: { gt: new Date() },
             },
-        });
-
-        if (!user) {
-            return res.status(400).json({ message: 'El enlace es inválido o ha expirado' });
-        }
-
-        // Update password and clear reset token
-        await prisma.user.update({
-            where: { id: user.id },
             data: {
-                password: newPassword, // Note: In production, hash this!
+                password: passwordHash,
                 resetPasswordToken: null,
                 resetPasswordExpires: null,
             },
         });
+
+        if (reset.count !== 1) {
+            return res.status(400).json({ message: 'El enlace es inválido o ha expirado' });
+        }
 
         res.json({ message: 'Tu contraseña ha sido actualizada exitosamente' });
     } catch (error) {
@@ -285,33 +348,46 @@ export const login = async (req: Request, res: Response) => {
     try {
         const { email, password } = req.body;
 
-        // Admin check (hardcoded for demo)
-        if (email === 'admin@tech.com' && password === 'admin123') {
-            return res.json({
-                id: 'admin-1',
-                name: 'Administrador',
-                email: email,
-                role: 'admin',
-                emailVerified: true,
-            });
+        if (typeof email !== 'string' || typeof password !== 'string' || !email.trim() || !password) {
+            return res.status(400).json({ message: 'Email and password are required' });
         }
 
         // Get user with technician data if applicable
-        const user = await prisma.user.findUnique({
-            where: { email },
-            include: { technician: true }
+        const user = await prisma.user.findFirst({
+            where: { email: { equals: email.trim().toLowerCase(), mode: 'insensitive' } },
+            select: {
+                ...safeUserSelect,
+                password: true,
+                technician: true,
+            },
         });
 
-        if (!user || user.password !== password) {
+        if (!user) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
+
+        const passwordResult = await verifyPassword(password, user.password);
+        if (!passwordResult.valid) {
+            return res.status(401).json({ message: 'Invalid credentials' });
+        }
+
+        // Transparently migrate accounts created before password hashing was added.
+        if (passwordResult.needsRehash) {
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { password: await hashPassword(password) },
+            });
+        }
+
+        const role = normalizeAuthRole(user.role);
+        const token = createAuthToken(user.id, role);
 
         // Return user with technician fields if applicable
         const responseData = {
             id: user.id,
             name: user.name,
             email: user.email,
-            role: user.role,
+            role,
             phone: user.phone,
             photoUrl: user.photoUrl,
             emailVerified: user.emailVerified,
@@ -322,11 +398,12 @@ export const login = async (req: Request, res: Response) => {
                 location: user.technician.location,
                 companyName: user.technician.companyName,
             }),
+            token,
         };
 
         res.json(responseData);
     } catch (error) {
-        res.status(500).json({ message: 'Error logging in', error });
+        res.status(500).json({ message: 'Error logging in' });
     }
 };
 

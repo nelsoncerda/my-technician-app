@@ -2,28 +2,69 @@ import { Request, Response } from 'express';
 import * as bookingService from '../services/bookingService';
 import * as notificationService from '../services/notificationService';
 
+function parseBookingDate(value: unknown): Date {
+  if (typeof value !== 'string') throw new Error('Fecha inválida');
+
+  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const date = dateOnlyMatch
+    ? new Date(Date.UTC(
+        Number(dateOnlyMatch[1]),
+        Number(dateOnlyMatch[2]) - 1,
+        Number(dateOnlyMatch[3])
+      ))
+    : new Date(value);
+
+  if (Number.isNaN(date.getTime())) throw new Error('Fecha inválida');
+  if (dateOnlyMatch && (
+    date.getUTCFullYear() !== Number(dateOnlyMatch[1]) ||
+    date.getUTCMonth() !== Number(dateOnlyMatch[2]) - 1 ||
+    date.getUTCDate() !== Number(dateOnlyMatch[3])
+  )) {
+    throw new Error('Fecha inválida');
+  }
+  return date;
+}
+
 // Create a new booking
 export async function createBooking(req: Request, res: Response) {
   try {
     const { technicianId, scheduledDate, scheduledTime, serviceType, description, address, city, phone, estimatedDuration } = req.body;
 
-    // Get customerId from authenticated user (for now, from body)
-    const customerId = req.body.customerId;
+    const customerId = req.auth!.userId;
 
     if (!customerId || !technicianId || !scheduledDate || !scheduledTime || !serviceType || !address || !city || !phone) {
       return res.status(400).json({ error: 'Faltan campos requeridos' });
     }
 
+    const parsedDate = parseBookingDate(scheduledDate);
+    const today = new Date();
+    const todayUtc = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+    if (parsedDate < todayUtc) {
+      return res.status(400).json({ error: 'La fecha de la reserva ya pasó' });
+    }
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(scheduledTime)) {
+      return res.status(400).json({ error: 'La hora no tiene un formato válido' });
+    }
+    if (estimatedDuration !== undefined && (!Number.isInteger(estimatedDuration) || estimatedDuration < 15 || estimatedDuration > 480)) {
+      return res.status(400).json({ error: 'La duración estimada debe estar entre 15 y 480 minutos' });
+    }
+    if ([serviceType, address, city, phone].some((value) => typeof value !== 'string' || !value.trim() || value.length > 500)) {
+      return res.status(400).json({ error: 'Los detalles de la reserva no son válidos' });
+    }
+    if (description !== undefined && (typeof description !== 'string' || description.length > 2000)) {
+      return res.status(400).json({ error: 'La descripción es demasiado larga' });
+    }
+
     const booking = await bookingService.createBooking({
       customerId,
       technicianId,
-      scheduledDate: new Date(scheduledDate),
+      scheduledDate: parsedDate,
       scheduledTime,
-      serviceType,
-      description,
-      address,
-      city,
-      phone,
+      serviceType: serviceType.trim(),
+      description: typeof description === 'string' && description.trim() ? description.trim() : undefined,
+      address: address.trim(),
+      city: city.trim(),
+      phone: phone.trim(),
       estimatedDuration,
     });
 
@@ -52,6 +93,14 @@ export async function getBooking(req: Request, res: Response) {
       return res.status(404).json({ error: 'Reserva no encontrada' });
     }
 
+    const canView =
+      req.auth!.role === 'admin' ||
+      booking.customer.id === req.auth!.userId ||
+      booking.technician.user.id === req.auth!.userId;
+    if (!canView) {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
+
     res.json(booking);
   } catch (error: any) {
     console.error('Error getting booking:', error);
@@ -67,8 +116,8 @@ export async function getCustomerBookings(req: Request, res: Response) {
 
     const filters: any = {};
     if (status) filters.status = status as string;
-    if (startDate) filters.startDate = new Date(startDate as string);
-    if (endDate) filters.endDate = new Date(endDate as string);
+    if (startDate) filters.startDate = parseBookingDate(startDate);
+    if (endDate) filters.endDate = parseBookingDate(endDate);
 
     const bookings = await bookingService.getCustomerBookings(userId, filters);
     res.json(bookings);
@@ -86,8 +135,8 @@ export async function getTechnicianBookings(req: Request, res: Response) {
 
     const filters: any = {};
     if (status) filters.status = status as string;
-    if (startDate) filters.startDate = new Date(startDate as string);
-    if (endDate) filters.endDate = new Date(endDate as string);
+    if (startDate) filters.startDate = parseBookingDate(startDate);
+    if (endDate) filters.endDate = parseBookingDate(endDate);
 
     const bookings = await bookingService.getTechnicianBookings(technicianId, filters);
     res.json(bookings);
@@ -101,13 +150,7 @@ export async function getTechnicianBookings(req: Request, res: Response) {
 export async function confirmBooking(req: Request, res: Response) {
   try {
     const { id } = req.params;
-    const { technicianUserId } = req.body;
-
-    if (!technicianUserId) {
-      return res.status(400).json({ error: 'ID del técnico requerido' });
-    }
-
-    const booking = await bookingService.confirmBooking(id, technicianUserId);
+    const booking = await bookingService.confirmBooking(id, req.auth!);
 
     // Send confirmation notification
     try {
@@ -127,13 +170,7 @@ export async function confirmBooking(req: Request, res: Response) {
 export async function startBooking(req: Request, res: Response) {
   try {
     const { id } = req.params;
-    const { technicianUserId } = req.body;
-
-    if (!technicianUserId) {
-      return res.status(400).json({ error: 'ID del técnico requerido' });
-    }
-
-    const booking = await bookingService.startBooking(id, technicianUserId);
+    const booking = await bookingService.startBooking(id, req.auth!);
     res.json(booking);
   } catch (error: any) {
     console.error('Error starting booking:', error);
@@ -145,13 +182,9 @@ export async function startBooking(req: Request, res: Response) {
 export async function completeBooking(req: Request, res: Response) {
   try {
     const { id } = req.params;
-    const { technicianUserId, totalPrice } = req.body;
+    const { totalPrice } = req.body;
 
-    if (!technicianUserId) {
-      return res.status(400).json({ error: 'ID del técnico requerido' });
-    }
-
-    const booking = await bookingService.completeBooking(id, technicianUserId, totalPrice);
+    const booking = await bookingService.completeBooking(id, req.auth!, totalPrice);
 
     // Send completion notification
     try {
@@ -171,13 +204,10 @@ export async function completeBooking(req: Request, res: Response) {
 export async function cancelBooking(req: Request, res: Response) {
   try {
     const { id } = req.params;
-    const { cancelledBy, cancellerUserId, reason } = req.body;
+    const { reason } = req.body;
 
-    if (!cancelledBy || !cancellerUserId) {
-      return res.status(400).json({ error: 'Información de cancelación requerida' });
-    }
-
-    const booking = await bookingService.cancelBooking(id, cancelledBy, cancellerUserId, reason);
+    const booking = await bookingService.cancelBooking(id, req.auth!, reason);
+    const cancelledBy = booking.cancelledBy || 'admin';
 
     // Get full booking for notification
     const fullBooking = await bookingService.getBookingById(id);
@@ -206,7 +236,7 @@ export async function getAvailableSlots(req: Request, res: Response) {
       return res.status(400).json({ error: 'Fecha requerida' });
     }
 
-    const slots = await bookingService.getAvailableSlots(technicianId, new Date(date as string));
+    const slots = await bookingService.getAvailableSlots(technicianId, parseBookingDate(date));
     res.json(slots);
   } catch (error: any) {
     console.error('Error getting available slots:', error);
@@ -252,7 +282,12 @@ export async function addTimeOff(req: Request, res: Response) {
       return res.status(400).json({ error: 'Fechas de tiempo libre requeridas' });
     }
 
-    const timeOff = await bookingService.addTimeOff(technicianId, new Date(startDate), new Date(endDate), reason);
+    const timeOff = await bookingService.addTimeOff(
+      technicianId,
+      parseBookingDate(startDate),
+      parseBookingDate(endDate),
+      reason
+    );
     res.status(201).json(timeOff);
   } catch (error: any) {
     console.error('Error adding time off:', error);
@@ -297,8 +332,8 @@ export async function getAllBookings(req: Request, res: Response) {
 
     const filters: any = {};
     if (status) filters.status = status as string;
-    if (startDate) filters.startDate = new Date(startDate as string);
-    if (endDate) filters.endDate = new Date(endDate as string);
+    if (startDate) filters.startDate = parseBookingDate(startDate);
+    if (endDate) filters.endDate = parseBookingDate(endDate);
     if (limit) filters.limit = parseInt(limit as string);
     if (offset) filters.offset = parseInt(offset as string);
 

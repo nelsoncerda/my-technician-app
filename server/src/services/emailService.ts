@@ -2,14 +2,14 @@ import nodemailer from 'nodemailer';
 
 // Configuration - use environment variables in production
 const APP_URL = process.env.APP_URL || 'https://tecnicosenrd.com';
-const API_URL = process.env.API_URL || 'https://api.tecnicosenrd.com';
+const API_URL = process.env.API_URL || 'https://tecnicosenrd.com';
 
 // SMTP Configuration from environment variables
 const SMTP_HOST = process.env.SMTP_HOST;
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587');
 const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
-const SMTP_FROM = process.env.SMTP_FROM || '"Técnicos en RD" <no-reply@santiagotech.rd>';
+const SMTP_FROM = process.env.SMTP_FROM || '"Técnicos en RD" <no-reply@tecnicosenrd.com>';
 
 // Flag to check if real SMTP is configured
 const useRealSMTP = SMTP_HOST && SMTP_USER && SMTP_PASS;

@@ -14,9 +14,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getAdminStats = exports.updateUserRole = exports.deleteUser = exports.uploadProfilePhoto = exports.getUserProfileHistory = exports.updateUserProfile = exports.updateUser = exports.getUsers = void 0;
 const prisma_1 = __importDefault(require("../prisma"));
+const safeUser_1 = require("../utils/safeUser");
 const getUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const users = yield prisma_1.default.user.findMany();
+        const users = yield prisma_1.default.user.findMany({ select: safeUser_1.safeUserSelect });
         res.json(users);
     }
     catch (error) {
@@ -28,9 +29,16 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     try {
         const { id } = req.params;
         const { name, phone } = req.body;
+        if (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 100) {
+            return res.status(400).json({ message: 'El nombre no es válido' });
+        }
+        if (phone !== undefined && (typeof phone !== 'string' || phone.trim().length > 30)) {
+            return res.status(400).json({ message: 'El teléfono no es válido' });
+        }
         const user = yield prisma_1.default.user.update({
             where: { id },
-            data: { name, phone },
+            data: { name: name.trim(), phone: typeof phone === 'string' && phone.trim() ? phone.trim() : null },
+            select: safeUser_1.safeUserSelect,
         });
         res.json(user);
     }
@@ -44,31 +52,51 @@ const updateUserProfile = (req, res) => __awaiter(void 0, void 0, void 0, functi
     var _a, _b, _c, _d, _e, _f, _g, _h, _j;
     try {
         const { id } = req.params;
-        const { name, phone, photoUrl, changedBy, specializations } = req.body;
+        const { name, phone, photoUrl, specializations } = req.body;
         const ipAddress = req.ip || ((_a = req.headers['x-forwarded-for']) === null || _a === void 0 ? void 0 : _a.toString()) || 'unknown';
+        if (name !== undefined && (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 100)) {
+            return res.status(400).json({ message: 'El nombre no es válido' });
+        }
+        if (phone !== undefined && (typeof phone !== 'string' || phone.trim().length > 30)) {
+            return res.status(400).json({ message: 'El teléfono no es válido' });
+        }
+        if (photoUrl !== undefined && (typeof photoUrl !== 'string' || photoUrl.length > 2.8 * 1024 * 1024)) {
+            return res.status(400).json({ message: 'La foto de perfil es demasiado grande' });
+        }
+        if (specializations !== undefined && (!Array.isArray(specializations) ||
+            specializations.length === 0 ||
+            specializations.length > 10 ||
+            specializations.some((value) => typeof value !== 'string' || !value.trim()))) {
+            return res.status(400).json({ message: 'Las especialidades no son válidas' });
+        }
+        const normalizedName = typeof name === 'string' ? name.trim() : undefined;
+        const normalizedPhone = typeof phone === 'string' ? phone.trim() || null : undefined;
+        const normalizedSpecializations = Array.isArray(specializations)
+            ? specializations.map((value) => value.trim())
+            : undefined;
         // Get current user data with technician info
         const currentUser = yield prisma_1.default.user.findUnique({
             where: { id },
-            include: { technician: true }
+            select: Object.assign(Object.assign({}, safeUser_1.safeUserSelect), { technician: true }),
         });
         if (!currentUser) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
         }
         // Track changes
         const changes = [];
-        if (name !== undefined && name !== currentUser.name) {
-            changes.push({ fieldName: 'name', oldValue: currentUser.name, newValue: name });
+        if (normalizedName !== undefined && normalizedName !== currentUser.name) {
+            changes.push({ fieldName: 'name', oldValue: currentUser.name, newValue: normalizedName });
         }
-        if (phone !== undefined && phone !== currentUser.phone) {
-            changes.push({ fieldName: 'phone', oldValue: currentUser.phone, newValue: phone });
+        if (normalizedPhone !== undefined && normalizedPhone !== currentUser.phone) {
+            changes.push({ fieldName: 'phone', oldValue: currentUser.phone, newValue: normalizedPhone });
         }
         if (photoUrl !== undefined && photoUrl !== currentUser.photoUrl) {
             changes.push({ fieldName: 'photoUrl', oldValue: currentUser.photoUrl, newValue: photoUrl });
         }
         // Track specializations changes for technicians
-        if (specializations !== undefined && currentUser.technician) {
+        if (normalizedSpecializations !== undefined && currentUser.technician) {
             const oldSpecs = currentUser.technician.specializations.join(', ');
-            const newSpecs = specializations.join(', ');
+            const newSpecs = normalizedSpecializations.join(', ');
             if (oldSpecs !== newSpecs) {
                 changes.push({ fieldName: 'specializations', oldValue: oldSpecs, newValue: newSpecs });
             }
@@ -86,21 +114,22 @@ const updateUserProfile = (req, res) => __awaiter(void 0, void 0, void 0, functi
                     fieldName: change.fieldName,
                     oldValue: change.oldValue,
                     newValue: change.newValue,
-                    changedBy: changedBy || id,
+                    changedBy: req.auth.userId,
                     ipAddress,
                 })),
             });
             // Update user
             const updatedUser = yield tx.user.update({
                 where: { id },
-                data: Object.assign(Object.assign(Object.assign({}, (name !== undefined && { name })), (phone !== undefined && { phone })), (photoUrl !== undefined && { photoUrl })),
+                data: Object.assign(Object.assign(Object.assign({}, (normalizedName !== undefined && { name: normalizedName })), (normalizedPhone !== undefined && { phone: normalizedPhone })), (photoUrl !== undefined && { photoUrl })),
+                select: safeUser_1.safeUserSelect,
             });
             // Update technician specializations if applicable
             let technician = currentUser.technician;
-            if (specializations !== undefined && technician) {
+            if (normalizedSpecializations !== undefined && technician) {
                 technician = yield tx.technician.update({
                     where: { userId: id },
-                    data: { specializations },
+                    data: { specializations: normalizedSpecializations },
                 });
             }
             return { updatedUser, technician };
@@ -148,7 +177,10 @@ const uploadProfilePhoto = (req, res) => __awaiter(void 0, void 0, void 0, funct
         }
         const ipAddress = req.ip || ((_a = req.headers['x-forwarded-for']) === null || _a === void 0 ? void 0 : _a.toString()) || 'unknown';
         // Get current user to track old photo
-        const currentUser = yield prisma_1.default.user.findUnique({ where: { id } });
+        const currentUser = yield prisma_1.default.user.findUnique({
+            where: { id },
+            select: { photoUrl: true },
+        });
         if (!currentUser) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
         }
@@ -161,7 +193,7 @@ const uploadProfilePhoto = (req, res) => __awaiter(void 0, void 0, void 0, funct
                     fieldName: 'photoUrl',
                     oldValue: currentUser.photoUrl ? '[previous photo]' : null,
                     newValue: '[new photo uploaded]',
-                    changedBy: id,
+                    changedBy: req.auth.userId,
                     ipAddress,
                 },
             });
@@ -169,6 +201,7 @@ const uploadProfilePhoto = (req, res) => __awaiter(void 0, void 0, void 0, funct
             const updatedUser = yield tx.user.update({
                 where: { id },
                 data: { photoUrl: photoBase64 },
+                select: { photoUrl: true },
             });
             return updatedUser;
         }));
@@ -229,9 +262,23 @@ const updateUserRole = (req, res) => __awaiter(void 0, void 0, void 0, function*
         if (!['user', 'technician', 'admin'].includes(role)) {
             return res.status(400).json({ message: 'Invalid role' });
         }
+        const currentUser = yield prisma_1.default.user.findUnique({
+            where: { id },
+            select: { role: true, technician: { select: { id: true } } },
+        });
+        if (!currentUser) {
+            return res.status(404).json({ message: 'Usuario no encontrado' });
+        }
+        if (role === 'technician' && !currentUser.technician) {
+            return res.status(400).json({ message: 'Crea primero el perfil técnico del usuario' });
+        }
+        if (currentUser.technician && role !== 'technician') {
+            return res.status(400).json({ message: 'No se puede cambiar el rol mientras exista un perfil técnico' });
+        }
         const user = yield prisma_1.default.user.update({
             where: { id },
             data: { role },
+            select: safeUser_1.safeUserSelect,
         });
         res.json(user);
     }

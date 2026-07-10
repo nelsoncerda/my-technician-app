@@ -42,8 +42,8 @@ export const LEVELS = [
   { level: 6, name: 'Elite', minPoints: 15000, maxPoints: 999999 },
 ];
 
-// API Base URL - use environment variable, localhost for dev, or production API
-export const API_BASE_URL = process.env.REACT_APP_API_URL ||
-  (window.location.hostname === 'localhost'
-    ? 'http://localhost:3001'
-    : 'https://api.tecnicosenrd.com');
+// Use an explicit API URL when configured. Production defaults to the same
+// origin so the reverse-proxy setup in DEPLOYMENT.md works without CORS.
+export const API_BASE_URL = (process.env.REACT_APP_API_URL ||
+  (window.location.hostname === 'localhost' ? 'http://localhost:3001' : '')
+).replace(/\/$/, '');

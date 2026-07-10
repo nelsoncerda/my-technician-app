@@ -27,6 +27,7 @@ model User {
   role                 String      @default("user") // "user", "technician", "admin"
   emailVerified        Boolean     @default(false)
   verificationToken    String?
+  verificationTokenExpires DateTime?
   resetPasswordToken   String?     // Token for password reset
   resetPasswordExpires DateTime?   // Expiration time for reset token
   createdAt            DateTime    @default(now())

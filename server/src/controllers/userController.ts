@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma';
+import { safeUserSelect } from '../utils/safeUser';
 
 export const getUsers = async (req: Request, res: Response) => {
     try {
-        const users = await prisma.user.findMany();
+        const users = await prisma.user.findMany({ select: safeUserSelect });
         res.json(users);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching users', error });
@@ -15,9 +16,17 @@ export const updateUser = async (req: Request, res: Response) => {
         const { id } = req.params;
         const { name, phone } = req.body;
 
+        if (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 100) {
+            return res.status(400).json({ message: 'El nombre no es válido' });
+        }
+        if (phone !== undefined && (typeof phone !== 'string' || phone.trim().length > 30)) {
+            return res.status(400).json({ message: 'El teléfono no es válido' });
+        }
+
         const user = await prisma.user.update({
             where: { id },
-            data: { name, phone },
+            data: { name: name.trim(), phone: typeof phone === 'string' && phone.trim() ? phone.trim() : null },
+            select: safeUserSelect,
         });
 
         res.json(user);
@@ -30,13 +39,40 @@ export const updateUser = async (req: Request, res: Response) => {
 export const updateUserProfile = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        const { name, phone, photoUrl, changedBy, specializations } = req.body;
+        const { name, phone, photoUrl, specializations } = req.body;
         const ipAddress = req.ip || req.headers['x-forwarded-for']?.toString() || 'unknown';
+
+        if (name !== undefined && (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 100)) {
+            return res.status(400).json({ message: 'El nombre no es válido' });
+        }
+        if (phone !== undefined && (typeof phone !== 'string' || phone.trim().length > 30)) {
+            return res.status(400).json({ message: 'El teléfono no es válido' });
+        }
+        if (photoUrl !== undefined && (typeof photoUrl !== 'string' || photoUrl.length > 2.8 * 1024 * 1024)) {
+            return res.status(400).json({ message: 'La foto de perfil es demasiado grande' });
+        }
+        if (specializations !== undefined && (
+            !Array.isArray(specializations) ||
+            specializations.length === 0 ||
+            specializations.length > 10 ||
+            specializations.some((value: unknown) => typeof value !== 'string' || !value.trim())
+        )) {
+            return res.status(400).json({ message: 'Las especialidades no son válidas' });
+        }
+
+        const normalizedName = typeof name === 'string' ? name.trim() : undefined;
+        const normalizedPhone = typeof phone === 'string' ? phone.trim() || null : undefined;
+        const normalizedSpecializations = Array.isArray(specializations)
+            ? specializations.map((value: string) => value.trim())
+            : undefined;
 
         // Get current user data with technician info
         const currentUser = await prisma.user.findUnique({
             where: { id },
-            include: { technician: true }
+            select: {
+                ...safeUserSelect,
+                technician: true,
+            },
         });
         if (!currentUser) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
@@ -45,20 +81,20 @@ export const updateUserProfile = async (req: Request, res: Response) => {
         // Track changes
         const changes: { fieldName: string; oldValue: string | null; newValue: string | null }[] = [];
 
-        if (name !== undefined && name !== currentUser.name) {
-            changes.push({ fieldName: 'name', oldValue: currentUser.name, newValue: name });
+        if (normalizedName !== undefined && normalizedName !== currentUser.name) {
+            changes.push({ fieldName: 'name', oldValue: currentUser.name, newValue: normalizedName });
         }
-        if (phone !== undefined && phone !== currentUser.phone) {
-            changes.push({ fieldName: 'phone', oldValue: currentUser.phone, newValue: phone });
+        if (normalizedPhone !== undefined && normalizedPhone !== currentUser.phone) {
+            changes.push({ fieldName: 'phone', oldValue: currentUser.phone, newValue: normalizedPhone });
         }
         if (photoUrl !== undefined && photoUrl !== currentUser.photoUrl) {
             changes.push({ fieldName: 'photoUrl', oldValue: currentUser.photoUrl, newValue: photoUrl });
         }
 
         // Track specializations changes for technicians
-        if (specializations !== undefined && currentUser.technician) {
+        if (normalizedSpecializations !== undefined && currentUser.technician) {
             const oldSpecs = currentUser.technician.specializations.join(', ');
-            const newSpecs = specializations.join(', ');
+            const newSpecs = normalizedSpecializations.join(', ');
             if (oldSpecs !== newSpecs) {
                 changes.push({ fieldName: 'specializations', oldValue: oldSpecs, newValue: newSpecs });
             }
@@ -84,7 +120,7 @@ export const updateUserProfile = async (req: Request, res: Response) => {
                     fieldName: change.fieldName,
                     oldValue: change.oldValue,
                     newValue: change.newValue,
-                    changedBy: changedBy || id,
+                    changedBy: req.auth!.userId,
                     ipAddress,
                 })),
             });
@@ -93,18 +129,19 @@ export const updateUserProfile = async (req: Request, res: Response) => {
             const updatedUser = await tx.user.update({
                 where: { id },
                 data: {
-                    ...(name !== undefined && { name }),
-                    ...(phone !== undefined && { phone }),
+                    ...(normalizedName !== undefined && { name: normalizedName }),
+                    ...(normalizedPhone !== undefined && { phone: normalizedPhone }),
                     ...(photoUrl !== undefined && { photoUrl }),
                 },
+                select: safeUserSelect,
             });
 
             // Update technician specializations if applicable
             let technician = currentUser.technician;
-            if (specializations !== undefined && technician) {
+            if (normalizedSpecializations !== undefined && technician) {
                 technician = await tx.technician.update({
                     where: { userId: id },
-                    data: { specializations },
+                    data: { specializations: normalizedSpecializations },
                 });
             }
 
@@ -163,7 +200,10 @@ export const uploadProfilePhoto = async (req: Request, res: Response) => {
         const ipAddress = req.ip || req.headers['x-forwarded-for']?.toString() || 'unknown';
 
         // Get current user to track old photo
-        const currentUser = await prisma.user.findUnique({ where: { id } });
+        const currentUser = await prisma.user.findUnique({
+            where: { id },
+            select: { photoUrl: true },
+        });
         if (!currentUser) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
         }
@@ -177,7 +217,7 @@ export const uploadProfilePhoto = async (req: Request, res: Response) => {
                     fieldName: 'photoUrl',
                     oldValue: currentUser.photoUrl ? '[previous photo]' : null,
                     newValue: '[new photo uploaded]',
-                    changedBy: id,
+                    changedBy: req.auth!.userId,
                     ipAddress,
                 },
             });
@@ -186,6 +226,7 @@ export const uploadProfilePhoto = async (req: Request, res: Response) => {
             const updatedUser = await tx.user.update({
                 where: { id },
                 data: { photoUrl: photoBase64 },
+                select: { photoUrl: true },
             });
 
             return updatedUser;
@@ -250,9 +291,24 @@ export const updateUserRole = async (req: Request, res: Response) => {
             return res.status(400).json({ message: 'Invalid role' });
         }
 
+        const currentUser = await prisma.user.findUnique({
+            where: { id },
+            select: { role: true, technician: { select: { id: true } } },
+        });
+        if (!currentUser) {
+            return res.status(404).json({ message: 'Usuario no encontrado' });
+        }
+        if (role === 'technician' && !currentUser.technician) {
+            return res.status(400).json({ message: 'Crea primero el perfil técnico del usuario' });
+        }
+        if (currentUser.technician && role !== 'technician') {
+            return res.status(400).json({ message: 'No se puede cambiar el rol mientras exista un perfil técnico' });
+        }
+
         const user = await prisma.user.update({
             where: { id },
             data: { role },
+            select: safeUserSelect,
         });
 
         res.json(user);

@@ -72,7 +72,19 @@ const BookingList: React.FC<BookingListProps> = ({
     return groups;
   }, {} as Record<string, Booking[]>);
 
-  const sortedDates = Object.keys(groupedBookings).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+  Object.values(groupedBookings).forEach((items) => {
+    items.sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
+  });
+
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const sortedDates = Object.keys(groupedBookings).sort((a, b) => {
+    const aIsUpcoming = a >= todayKey;
+    const bIsUpcoming = b >= todayKey;
+
+    if (aIsUpcoming !== bIsUpcoming) return aIsUpcoming ? -1 : 1;
+    return aIsUpcoming ? a.localeCompare(b) : b.localeCompare(a);
+  });
 
   const formatDateHeader = (dateStr: string) => {
     const date = new Date(dateStr + 'T00:00:00');

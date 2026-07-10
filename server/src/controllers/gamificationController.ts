@@ -94,11 +94,11 @@ export async function getUserAchievements(req: Request, res: Response) {
 // Check and unlock achievements (triggered by events)
 export async function checkAchievements(req: Request, res: Response) {
   try {
-    const { userId, triggerEvent } = req.body;
-
-    if (!userId) {
-      return res.status(400).json({ error: 'ID de usuario requerido' });
-    }
+    const { triggerEvent } = req.body;
+    const requestedUserId = req.body.userId;
+    const userId = req.auth!.role === 'admin' && typeof requestedUserId === 'string'
+      ? requestedUserId
+      : req.auth!.userId;
 
     const newAchievements = await gamificationService.checkAndUnlockAchievements(userId, triggerEvent);
 
@@ -173,7 +173,8 @@ export async function getAffordableRewards(req: Request, res: Response) {
 // Redeem a reward
 export async function redeemReward(req: Request, res: Response) {
   try {
-    const { userId, rewardCode } = req.body;
+    const { rewardCode } = req.body;
+    const userId = req.auth!.userId;
 
     if (!userId || !rewardCode) {
       return res.status(400).json({ error: 'Usuario y código de recompensa requeridos' });

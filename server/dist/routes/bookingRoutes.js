@@ -35,26 +35,27 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const bookingController = __importStar(require("../controllers/bookingController"));
+const auth_1 = require("../middleware/auth");
 const router = (0, express_1.Router)();
 // Booking management
-router.post('/', bookingController.createBooking);
-router.get('/all', bookingController.getAllBookings); // Admin
+router.post('/', auth_1.requireAuth, bookingController.createBooking);
+router.get('/all', auth_1.requireAuth, auth_1.requireAdmin, bookingController.getAllBookings); // Admin
 // Customer bookings (must be before /:id to avoid conflict)
-router.get('/customer/:userId', bookingController.getCustomerBookings);
+router.get('/customer/:userId', auth_1.requireAuth, (0, auth_1.requireSelfOrAdmin)('userId'), bookingController.getCustomerBookings);
 // Technician bookings (must be before /:id to avoid conflict)
-router.get('/technician/:technicianId', bookingController.getTechnicianBookings);
+router.get('/technician/:technicianId', auth_1.requireAuth, (0, auth_1.requireTechnicianOwnerOrAdmin)('technicianId'), bookingController.getTechnicianBookings);
 // Availability (must be before /:id to avoid conflict)
 router.get('/availability/:technicianId', bookingController.getAvailability);
-router.post('/availability', bookingController.setAvailability);
+router.post('/availability', auth_1.requireAuth, (0, auth_1.requireTechnicianOwnerOrAdmin)('technicianId', 'body'), bookingController.setAvailability);
 router.get('/availability/:technicianId/slots', bookingController.getAvailableSlots);
 // Time off (must be before /:id to avoid conflict)
-router.get('/time-off/:technicianId', bookingController.getTimeOffs);
-router.post('/time-off', bookingController.addTimeOff);
-router.delete('/time-off/:id', bookingController.removeTimeOff);
+router.get('/time-off/:technicianId', auth_1.requireAuth, (0, auth_1.requireTechnicianOwnerOrAdmin)('technicianId'), bookingController.getTimeOffs);
+router.post('/time-off', auth_1.requireAuth, (0, auth_1.requireTechnicianOwnerOrAdmin)('technicianId', 'body'), bookingController.addTimeOff);
+router.delete('/time-off/:id', auth_1.requireAuth, (0, auth_1.requireTechnicianOwnerOrAdmin)('technicianId', 'body'), bookingController.removeTimeOff);
 // Single booking by ID (generic route must be last)
-router.get('/:id', bookingController.getBooking);
-router.put('/:id/confirm', bookingController.confirmBooking);
-router.put('/:id/start', bookingController.startBooking);
-router.put('/:id/complete', bookingController.completeBooking);
-router.put('/:id/cancel', bookingController.cancelBooking);
+router.get('/:id', auth_1.requireAuth, bookingController.getBooking);
+router.put('/:id/confirm', auth_1.requireAuth, bookingController.confirmBooking);
+router.put('/:id/start', auth_1.requireAuth, bookingController.startBooking);
+router.put('/:id/complete', auth_1.requireAuth, bookingController.completeBooking);
+router.put('/:id/cancel', auth_1.requireAuth, bookingController.cancelBooking);
 exports.default = router;

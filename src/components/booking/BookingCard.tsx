@@ -87,11 +87,11 @@ const BookingCard: React.FC<BookingCardProps> = ({
   };
 
   const formatTime = (time: string) => {
-    const [hours] = time.split(':');
+    const [hours, minutes = '00'] = time.split(':');
     const hour = parseInt(hours);
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const hour12 = hour % 12 || 12;
-    return `${hour12}:00 ${ampm}`;
+    return `${hour12}:${minutes} ${ampm}`;
   };
 
   const contactPerson = userRole === 'customer' ? booking.technician?.user : booking.customer;
@@ -200,6 +200,7 @@ const BookingCard: React.FC<BookingCardProps> = ({
         <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900 flex gap-2 justify-end">
           {booking.status === 'PENDING' && userRole === 'technician' && onConfirm && (
             <button
+              type="button"
               onClick={onConfirm}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
             >
@@ -209,6 +210,7 @@ const BookingCard: React.FC<BookingCardProps> = ({
 
           {booking.status === 'CONFIRMED' && userRole === 'technician' && onStart && (
             <button
+              type="button"
               onClick={onStart}
               className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
             >
@@ -218,6 +220,7 @@ const BookingCard: React.FC<BookingCardProps> = ({
 
           {booking.status === 'IN_PROGRESS' && userRole === 'technician' && onComplete && (
             <button
+              type="button"
               onClick={onComplete}
               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
             >
@@ -227,6 +230,7 @@ const BookingCard: React.FC<BookingCardProps> = ({
 
           {['PENDING', 'CONFIRMED'].includes(booking.status) && onCancel && (
             <button
+              type="button"
               onClick={onCancel}
               className="px-4 py-2 border border-red-300 text-red-600 dark:border-red-800 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm font-medium"
             >

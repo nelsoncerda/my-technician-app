@@ -1,7 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { randomBytes } from 'crypto';
+import prisma from '../prisma';
 import { POINT_VALUES, ACHIEVEMENTS, LEVELS, calculateLevel, pointsToNextLevel, getLevelProgress } from '../config/gamification';
-
-const prisma = new PrismaClient();
 
 export interface GamificationEvent {
   userId: string;
@@ -24,21 +24,17 @@ export interface UserPointsSummary {
 
 // Initialize user points record if not exists
 export async function initializeUserPoints(userId: string) {
-  const existing = await prisma.userPoints.findUnique({
+  await prisma.userPoints.upsert({
     where: { userId },
+    update: {},
+    create: {
+      userId,
+      totalPoints: 0,
+      currentLevel: 1,
+      levelProgress: 0,
+      lifetimePoints: 0,
+    },
   });
-
-  if (!existing) {
-    await prisma.userPoints.create({
-      data: {
-        userId,
-        totalPoints: 0,
-        currentLevel: 1,
-        levelProgress: 0,
-        lifetimePoints: 0,
-      },
-    });
-  }
 }
 
 // Get user points summary
@@ -79,34 +75,33 @@ export async function awardPoints(
 ) {
   await initializeUserPoints(userId);
 
-  // Create transaction record
-  await prisma.pointTransaction.create({
-    data: {
-      userId,
-      points,
-      type,
-      source,
-      sourceId,
-      description,
-    },
-  });
+  return prisma.$transaction(async (tx) => {
+    await tx.pointTransaction.create({
+      data: {
+        userId,
+        points,
+        type,
+        source,
+        sourceId,
+        description,
+      },
+    });
 
-  // Update user points
-  const updatedPoints = await prisma.userPoints.update({
-    where: { userId },
-    data: {
-      totalPoints: { increment: points },
-      lifetimePoints: { increment: points > 0 ? points : 0 },
-    },
-  });
-
-  // Check for level up
-  const newLevel = calculateLevel(updatedPoints.totalPoints);
-  if (newLevel.levelNumber > updatedPoints.currentLevel) {
-    await prisma.userPoints.update({
+    const updatedPoints = await tx.userPoints.update({
       where: { userId },
       data: {
-        currentLevel: newLevel.levelNumber,
+        totalPoints: { increment: points },
+        lifetimePoints: { increment: points > 0 ? points : 0 },
+      },
+    });
+
+    const newLevel = calculateLevel(updatedPoints.totalPoints);
+    const levelUp = newLevel.levelNumber > updatedPoints.currentLevel;
+
+    await tx.userPoints.update({
+      where: { userId },
+      data: {
+        ...(levelUp && { currentLevel: newLevel.levelNumber }),
         levelProgress: getLevelProgress(updatedPoints.totalPoints),
       },
     });
@@ -114,25 +109,13 @@ export async function awardPoints(
     return {
       pointsAwarded: points,
       newTotal: updatedPoints.totalPoints,
-      levelUp: true,
-      newLevel: newLevel.levelNumber,
-      newLevelName: newLevel.nameEs,
+      levelUp,
+      ...(levelUp && {
+        newLevel: newLevel.levelNumber,
+        newLevelName: newLevel.nameEs,
+      }),
     };
-  }
-
-  // Update level progress
-  await prisma.userPoints.update({
-    where: { userId },
-    data: {
-      levelProgress: getLevelProgress(updatedPoints.totalPoints),
-    },
   });
-
-  return {
-    pointsAwarded: points,
-    newTotal: updatedPoints.totalPoints,
-    levelUp: false,
-  };
 }
 
 // Award points for specific events
@@ -462,63 +445,58 @@ export async function getLeaderboard(period: 'WEEKLY' | 'MONTHLY' | 'ALL_TIME', 
 
 // Redeem a reward
 export async function redeemReward(userId: string, rewardCode: string) {
-  const reward = await prisma.reward.findUnique({
-    where: { code: rewardCode },
-  });
+  return prisma.$transaction(async (tx) => {
+    const reward = await tx.reward.findUnique({ where: { code: rewardCode } });
 
-  if (!reward || !reward.isActive) {
-    throw new Error('Recompensa no disponible');
-  }
+    if (!reward || !reward.isActive) {
+      throw new Error('Recompensa no disponible');
+    }
 
-  if (reward.stock !== null && reward.stock <= 0) {
-    throw new Error('Recompensa agotada');
-  }
+    if (reward.stock !== null) {
+      const stockClaim = await tx.reward.updateMany({
+        where: { id: reward.id, stock: { gt: 0 } },
+        data: { stock: { decrement: 1 } },
+      });
+      if (stockClaim.count !== 1) throw new Error('Recompensa agotada');
+    }
 
-  const userPoints = await prisma.userPoints.findUnique({
-    where: { userId },
-  });
-
-  if (!userPoints || userPoints.totalPoints < reward.pointsCost) {
-    throw new Error('Puntos insuficientes');
-  }
-
-  // Generate unique redemption code
-  const redemptionCode = `${rewardCode}-${Date.now().toString(36).toUpperCase()}`;
-
-  // Create redemption record
-  const redemption = await prisma.rewardRedemption.create({
-    data: {
-      userId,
-      rewardId: reward.id,
-      pointsUsed: reward.pointsCost,
-      code: redemptionCode,
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-    },
-  });
-
-  // Deduct points
-  await awardPoints(
-    userId,
-    -reward.pointsCost,
-    'REDEEMED',
-    'REWARD_REDEEMED',
-    `Canjeaste: ${reward.nameEs}`,
-    redemption.id
-  );
-
-  // Update stock if applicable
-  if (reward.stock !== null) {
-    await prisma.reward.update({
-      where: { id: reward.id },
-      data: { stock: { decrement: 1 } },
+    const pointsClaim = await tx.userPoints.updateMany({
+      where: { userId, totalPoints: { gte: reward.pointsCost } },
+      data: { totalPoints: { decrement: reward.pointsCost } },
     });
-  }
+    if (pointsClaim.count !== 1) throw new Error('Puntos insuficientes');
 
-  return {
-    redemption,
-    reward,
-    redemptionCode,
-  };
+    const redemptionCode = `${rewardCode}-${randomBytes(6).toString('hex').toUpperCase()}`;
+    const redemption = await tx.rewardRedemption.create({
+      data: {
+        userId,
+        rewardId: reward.id,
+        pointsUsed: reward.pointsCost,
+        code: redemptionCode,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      },
+    });
+
+    const updatedPoints = await tx.userPoints.findUniqueOrThrow({ where: { userId } });
+    await tx.pointTransaction.create({
+      data: {
+        userId,
+        points: -reward.pointsCost,
+        type: 'REDEEMED',
+        source: 'REWARD_REDEEMED',
+        sourceId: redemption.id,
+        description: `Canjeaste: ${reward.nameEs}`,
+      },
+    });
+    await tx.userPoints.update({
+      where: { userId },
+      data: { levelProgress: getLevelProgress(updatedPoints.totalPoints) },
+    });
+
+    return { redemption, reward, redemptionCode };
+  }, {
+    isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+  });
 }
 
 // Get available rewards

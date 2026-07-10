@@ -2,9 +2,11 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const technicianController_1 = require("../controllers/technicianController");
+const auth_1 = require("../middleware/auth");
 const router = (0, express_1.Router)();
 router.get('/', technicianController_1.getTechnicians);
-router.post('/', technicianController_1.registerTechnician);
-router.put('/:id/verify', technicianController_1.verifyTechnician);
-router.delete('/:id', technicianController_1.deleteTechnician);
+router.post('/', auth_1.requireAuth, (0, auth_1.requireRole)('user', 'technician'), technicianController_1.registerTechnician);
+router.post('/:id/reviews', auth_1.requireAuth, technicianController_1.addTechnicianReview);
+router.put('/:id/verify', auth_1.requireAuth, auth_1.requireAdmin, technicianController_1.verifyTechnician);
+router.delete('/:id', auth_1.requireAuth, (0, auth_1.requireTechnicianOwnerOrAdmin)('id'), technicianController_1.deleteTechnician);
 exports.default = router;
