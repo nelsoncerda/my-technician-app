@@ -79,9 +79,12 @@ SMTP_FROM=
 ```
 
 `AUTH_SECRET` must be a securely generated value of at least 32 characters.
-Run `chmod 600 /home/bitnami/apps/shared/server.env` after editing it. Configure
-PM2 startup once with `pm2 startup`, follow the command it prints, and run
-`pm2 save` after the first successful release.
+After the first release source is available, run
+`node deploy/prepare-production-env.cjs /home/bitnami/apps/shared/server.env`.
+It validates the database and SMTP settings, adds the production URLs, and
+generates `AUTH_SECRET` without printing it when one is not already configured.
+Configure PM2 startup once with `pm2 startup`, follow the command it prints,
+and run `pm2 save` after the first successful release.
 
 ## Version-controlled production configuration
 
@@ -133,6 +136,7 @@ git archive "$REVISION" | tar -x -C "$RELEASE"
 printf '%s\n' "$REVISION" > "$RELEASE/REVISION"
 printf '%s\n' "$PREVIOUS_SOURCE_REVISION" > "$BACKUP/previous-source-revision"
 ln -s "$SHARED/server.env" "$RELEASE/server/.env"
+node "$RELEASE/deploy/prepare-production-env.cjs" "$SHARED/server.env"
 
 cd "$RELEASE"
 npm ci
