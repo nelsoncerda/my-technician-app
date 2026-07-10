@@ -47,7 +47,9 @@ npm install --global pm2
 APP_ROOT=/home/bitnami/apps
 LEGACY="$APP_ROOT/my-technician-app"
 SOURCE="$APP_ROOT/release-source"
-mkdir -p "$APP_ROOT/releases" "$APP_ROOT/shared" "$APP_ROOT/backups"
+mkdir -p "$APP_ROOT/releases" "$APP_ROOT/shared" "$APP_ROOT/backups" "$APP_ROOT/incoming"
+chmod 711 "$APP_ROOT/releases"
+chmod 700 "$APP_ROOT/shared" "$APP_ROOT/backups" "$APP_ROOT/incoming"
 
 if [ ! -f "$APP_ROOT/shared/server.env" ]; then
   if [ -f "$LEGACY/server/.env" ]; then
@@ -61,6 +63,25 @@ if [ ! -d "$SOURCE/.git" ]; then
   git clone https://github.com/nelsoncerda/my-technician-app.git "$SOURCE"
 fi
 ```
+
+If GitHub authentication is temporarily unavailable, transfer the exact local
+commit without changing repository history:
+
+```bash
+# Local
+git bundle create /tmp/my-technician-app.bundle HEAD
+git bundle verify /tmp/my-technician-app.bundle
+scp /tmp/my-technician-app.bundle bitnami@tecnicosenrd.com:/home/bitnami/apps/incoming/
+
+# Lightsail
+cd /home/bitnami/apps/release-source
+git bundle verify /home/bitnami/apps/incoming/my-technician-app.bundle
+git fetch /home/bitnami/apps/incoming/my-technician-app.bundle HEAD
+git switch -C master FETCH_HEAD
+git remote set-url origin https://github.com/nelsoncerda/my-technician-app.git
+```
+
+Compare `git rev-parse HEAD` on both machines before building the release.
 
 Edit `/home/bitnami/apps/shared/server.env` and verify these keys. Keep actual
 credentials out of Git, terminal history, screenshots, and deployment logs.
@@ -133,6 +154,8 @@ STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 RELEASE="$RELEASES/${STAMP}-${REVISION:0:7}"
 BACKUP="$APP_ROOT/backups/$STAMP"
 mkdir "$RELEASE" "$BACKUP"
+chmod 711 "$RELEASES" "$RELEASE"
+chmod 700 "$BACKUP"
 
 git archive "$REVISION" | tar -x -C "$RELEASE"
 printf '%s\n' "$REVISION" > "$RELEASE/REVISION"
@@ -171,7 +194,14 @@ ln -sfn "$RELEASE" "$APP_ROOT/technician-current.next"
 mv -Tf "$APP_ROOT/technician-current.next" "$APP_ROOT/technician-current"
 
 cd "$APP_ROOT/technician-current"
-pm2 startOrReload deploy/ecosystem.config.cjs --env production --update-env
+if pm2 describe technician-api 2>/dev/null | \
+    grep -q "$APP_ROOT/technician-current/server"; then
+  pm2 startOrReload deploy/ecosystem.config.cjs --env production --update-env
+else
+  # The first versioned deployment must replace the legacy PM2 script path.
+  pm2 delete technician-api 2>/dev/null || true
+  pm2 start deploy/ecosystem.config.cjs --env production
+fi
 pm2 save
 curl --retry 10 --retry-connrefused --retry-delay 1 \
   --fail --silent --show-error http://127.0.0.1:3001/health
