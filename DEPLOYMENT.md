@@ -29,6 +29,8 @@ to the API on port `3001`, and exposes `/health`. PM2 runs the API as
   normal deployment.
 - The release commit is pushed to `origin/master` and `npm run check` passes
   locally.
+- Keep the repository `.npmrc` in the release; it makes `npm ci` reproducible
+  with the app's validated React Scripts 5 and TypeScript 5 combination.
 
 ## One-time server setup
 
