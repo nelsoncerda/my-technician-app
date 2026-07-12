@@ -85,12 +85,12 @@ test('loads the directory and filters technicians by search', async () => {
   render(<App />);
 
   expect(
-    screen.getByRole('heading', { name: /Resuelve lo de tu hogar/i })
+    screen.getByRole('heading', { name: /Encuentra un técnico cerca de ti/i })
   ).toBeInTheDocument();
   expect(await screen.findByText('María Rodríguez')).toBeInTheDocument();
   expect(screen.getByText('José Pérez')).toBeInTheDocument();
 
-  fireEvent.change(screen.getByLabelText('Nombre o servicio'), {
+  fireEvent.change(screen.getByLabelText('Servicio o técnico'), {
     target: { value: 'plomero' },
   });
 
@@ -102,7 +102,7 @@ test('autocompletes a service while the user types', async () => {
   render(<App />);
   await screen.findByText('María Rodríguez');
 
-  const search = screen.getByRole('combobox', { name: 'Nombre o servicio' });
+  const search = screen.getByRole('combobox', { name: 'Servicio o técnico' });
   fireEvent.change(search, { target: { value: 'plo' } });
 
   const listbox = screen.getByRole('listbox', { name: 'Sugerencias de búsqueda' });
@@ -116,17 +116,42 @@ test('autocompletes a service while the user types', async () => {
   ).not.toBeInTheDocument();
   fireEvent.click(serviceOption);
 
-  expect(search).toHaveValue('Plomero');
+  expect(search).toHaveValue('');
+  expect(screen.getByRole('combobox', { name: 'Servicio' })).toHaveTextContent('Plomero');
   expect(screen.queryByRole('listbox', { name: 'Sugerencias de búsqueda' })).not.toBeInTheDocument();
   expect(screen.queryByText('María Rodríguez')).not.toBeInTheDocument();
   expect(screen.getByText('José Pérez')).toBeInTheDocument();
+});
+
+test('places autocomplete suggestions above the field when the mobile keyboard leaves little room', async () => {
+  render(<App />);
+  await screen.findByText('María Rodríguez');
+
+  const search = screen.getByRole('combobox', { name: 'Servicio o técnico' });
+  search.getBoundingClientRect = () => ({
+    top: 650,
+    bottom: 700,
+    left: 20,
+    right: 355,
+    width: 335,
+    height: 50,
+    x: 20,
+    y: 650,
+    toJSON: () => ({}),
+  });
+
+  fireEvent.change(search, { target: { value: 'plo' } });
+
+  expect(
+    await screen.findByRole('listbox', { name: 'Sugerencias de búsqueda' })
+  ).toHaveClass('bottom-full');
 });
 
 test('supports keyboard autocomplete and includes technician ratings', async () => {
   render(<App />);
   await screen.findByText('María Rodríguez');
 
-  const search = screen.getByRole('combobox', { name: 'Nombre o servicio' });
+  const search = screen.getByRole('combobox', { name: 'Servicio o técnico' });
   fireEvent.change(search, { target: { value: 'maria' } });
 
   const listbox = screen.getByRole('listbox', { name: 'Sugerencias de búsqueda' });
@@ -165,12 +190,36 @@ test('search ignores accents in technician names', async () => {
   render(<App />);
   await screen.findByText('María Rodríguez');
 
-  fireEvent.change(screen.getByRole('combobox', { name: 'Nombre o servicio' }), {
+  fireEvent.change(screen.getByRole('combobox', { name: 'Servicio o técnico' }), {
     target: { value: 'jose' },
   });
 
   expect(screen.getByRole('heading', { name: 'José Pérez', level: 3 })).toBeInTheDocument();
   expect(screen.queryByRole('heading', { name: 'María Rodríguez', level: 3 })).not.toBeInTheDocument();
+});
+
+test('submits search from the mobile keyboard and avoids zero-value trust metrics', async () => {
+  render(<App />);
+  await screen.findByText('María Rodríguez');
+
+  expect(screen.getByText('Contacto privado')).toBeInTheDocument();
+  expect(screen.queryByText('perfiles verificados')).not.toBeInTheDocument();
+  expect(screen.queryByText('reseñas publicadas')).not.toBeInTheDocument();
+
+  const resultsSection = document.getElementById('technician-results');
+  resultsSection.scrollIntoView = jest.fn();
+  const search = screen.getByRole('combobox', { name: 'Servicio o técnico' });
+  fireEvent.change(search, { target: { value: 'jose' } });
+  fireEvent.keyDown(search, { key: 'Enter' });
+
+  expect(screen.queryByRole('listbox', { name: 'Sugerencias de búsqueda' })).not.toBeInTheDocument();
+  expect(resultsSection.scrollIntoView).toHaveBeenCalledWith({
+    behavior: 'smooth',
+    block: 'start',
+  });
+  await waitFor(() => {
+    expect(screen.getByRole('heading', { name: 'Técnicos disponibles' })).toHaveFocus();
+  });
 });
 
 test('top-level views are exclusive', async () => {
@@ -185,7 +234,7 @@ test('top-level views are exclusive', async () => {
   ).toBeInTheDocument();
   await waitFor(() => {
     expect(
-      screen.queryByRole('heading', { name: /Resuelve lo de tu hogar/i })
+      screen.queryByRole('heading', { name: /Encuentra un técnico cerca de ti/i })
     ).not.toBeInTheDocument();
   });
 });

@@ -26,6 +26,7 @@ import RewardCard from './components/gamification/RewardCard';
 import AchievementUnlocked from './components/gamification/AchievementUnlocked';
 import HomeView from './components/home/HomeView';
 import AboutView from './components/home/AboutView';
+import MobileAccountMenu from './components/navigation/MobileAccountMenu';
 import { API_BASE_URL } from './config/constants';
 import { apiFetch, clearAuthSession, getStoredUser, setAuthSession, updateStoredUser } from './lib/api';
 import { getTechnicianSpecializations, normalizeSearchValue } from './lib/search';
@@ -1414,82 +1415,162 @@ const SantiagoTechRDApp = () => {
     };
 
     return (
-        <div className="min-h-screen bg-stone-50 text-slate-900 dark:bg-gray-950 dark:text-white">
-            <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 backdrop-blur dark:border-gray-800 dark:bg-gray-950/95">
-                <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <div className="min-h-screen bg-brand-sand text-brand-charcoal dark:bg-gray-950 dark:text-white">
+            <header className="sticky top-0 z-50 border-b border-brand-border/90 bg-brand-cream/95 pt-[env(safe-area-inset-top)] backdrop-blur dark:border-gray-800 dark:bg-gray-950/95">
+                <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-3 sm:gap-4 sm:px-6 lg:px-8">
                     <button
                         type="button"
                         onClick={() => setCurrentView('home')}
-                        className="flex items-center gap-3 rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+                        className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500 focus-visible:ring-offset-2 sm:gap-3"
                         aria-label="Ir al inicio"
                     >
-                        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-clay-600 text-white shadow-sm">
                             <Wrench className="h-5 w-5" aria-hidden="true" />
                         </span>
-                        <span className="hidden min-[360px]:block">
-                            <span className="block text-base font-bold leading-tight text-slate-950 dark:text-white">Técnicos en RD</span>
-                            <span className="hidden text-xs text-slate-500 sm:block">Servicios confiables en Santiago</span>
+                        <span className="min-w-0">
+                            <span className="block whitespace-nowrap text-[15px] font-extrabold leading-tight text-brand-ink dark:text-white sm:text-base md:hidden">
+                                Técnicos RD
+                            </span>
+                            <span className="hidden whitespace-nowrap text-base font-extrabold leading-tight text-brand-ink dark:text-white md:block">
+                                Técnicos en RD
+                            </span>
+                            <span className="hidden text-xs text-brand-muted sm:block">Servicios confiables en Santiago</span>
                         </span>
                     </button>
 
                     {!currentUser && (
                         <nav className="hidden items-center gap-1 md:flex" aria-label="Navegación principal">
-                            <Button variant="ghost" size="sm" onClick={() => setCurrentView('home')}>Inicio</Button>
-                            <Button variant="ghost" size="sm" onClick={() => setCurrentView('about')}>Cómo funciona</Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setCurrentView('home')}
+                                aria-current={currentView === 'home' ? 'page' : undefined}
+                                className={cn(
+                                    'text-brand-ink hover:bg-brand-sand',
+                                    currentView === 'home' && 'bg-brand-sand text-brand-clay-600'
+                                )}
+                            >
+                                Inicio
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setCurrentView('about')}
+                                aria-current={currentView === 'about' ? 'page' : undefined}
+                                className={cn(
+                                    'text-brand-ink hover:bg-brand-sand',
+                                    currentView === 'about' && 'bg-brand-sand text-brand-clay-600'
+                                )}
+                            >
+                                Cómo funciona
+                            </Button>
                         </nav>
                     )}
 
                     <div className="flex items-center gap-1.5 sm:gap-2">
                         {currentUser ? (
                             <>
-                                <span className="mr-1 hidden max-w-36 truncate text-sm font-medium text-slate-600 lg:block">
-                                    {currentUser.name}
-                                </span>
-                                <Button
-                                    onClick={() => setCurrentView('bookings')}
-                                    variant={currentView === 'bookings' ? 'secondary' : 'ghost'}
-                                    size="icon"
-                                    aria-label="Mis reservas"
-                                    title="Mis reservas"
-                                >
-                                    <Calendar className="h-5 w-5" />
-                                </Button>
-                                <Button
-                                    onClick={() => setCurrentView('gamification')}
-                                    variant={currentView === 'gamification' ? 'secondary' : 'ghost'}
-                                    size="icon"
-                                    aria-label="Puntos y recompensas"
-                                    title="Puntos y recompensas"
-                                >
-                                    <Trophy className="h-5 w-5" />
-                                </Button>
-                                {currentUser.role === 'admin' && (
+                                <div className="md:hidden">
+                                    <MobileAccountMenu
+                                        currentView={currentView}
+                                        isAdmin={currentUser.role === 'admin'}
+                                        userName={currentUser.name}
+                                        onNavigate={setCurrentView}
+                                        onOpenProfile={() => setShowProfileModal(true)}
+                                        onLogout={handleLogout}
+                                    />
+                                </div>
+
+                                <nav className="hidden items-center gap-1.5 md:flex" aria-label="Navegación de la cuenta">
+                                    <span className="mr-1 hidden max-w-36 truncate text-sm font-medium text-brand-muted lg:block">
+                                        {currentUser.name}
+                                    </span>
                                     <Button
-                                        onClick={() => setCurrentView('admin')}
-                                        variant={currentView === 'admin' ? 'secondary' : 'ghost'}
+                                        onClick={() => setCurrentView('bookings')}
+                                        variant="ghost"
                                         size="icon"
-                                        aria-label="Panel administrativo"
-                                        title="Panel administrativo"
+                                        aria-label="Mis reservas"
+                                        title="Mis reservas"
+                                        aria-current={currentView === 'bookings' ? 'page' : undefined}
+                                        className={cn(
+                                            'h-11 w-11 text-brand-ink hover:bg-brand-sand',
+                                            currentView === 'bookings' && 'bg-brand-clay-50 text-brand-clay-600'
+                                        )}
                                     >
-                                        <Shield className="h-5 w-5" />
+                                        <Calendar className="h-5 w-5" aria-hidden="true" />
                                     </Button>
-                                )}
-                                <Button onClick={() => setShowProfileModal(true)} variant="ghost" size="icon" aria-label="Mi perfil" title="Mi perfil">
-                                    <UserIcon className="h-5 w-5" />
-                                </Button>
-                                <Button onClick={handleLogout} variant="ghost" size="icon" aria-label="Cerrar sesión" title="Cerrar sesión" className="text-slate-500 hover:text-red-600">
-                                    <LogOut className="h-5 w-5" />
-                                </Button>
+                                    <Button
+                                        onClick={() => setCurrentView('gamification')}
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label="Puntos y recompensas"
+                                        title="Puntos y recompensas"
+                                        aria-current={currentView === 'gamification' ? 'page' : undefined}
+                                        className={cn(
+                                            'h-11 w-11 text-brand-ink hover:bg-brand-sand',
+                                            currentView === 'gamification' && 'bg-brand-clay-50 text-brand-clay-600'
+                                        )}
+                                    >
+                                        <Trophy className="h-5 w-5" aria-hidden="true" />
+                                    </Button>
+                                    {currentUser.role === 'admin' && (
+                                        <Button
+                                            onClick={() => setCurrentView('admin')}
+                                            variant="ghost"
+                                            size="icon"
+                                            aria-label="Panel administrativo"
+                                            title="Panel administrativo"
+                                            aria-current={currentView === 'admin' ? 'page' : undefined}
+                                            className={cn(
+                                                'h-11 w-11 text-brand-ink hover:bg-brand-sand',
+                                                currentView === 'admin' && 'bg-brand-ocean-50 text-brand-ocean-500'
+                                            )}
+                                        >
+                                            <Shield className="h-5 w-5" aria-hidden="true" />
+                                        </Button>
+                                    )}
+                                    <Button
+                                        onClick={() => setShowProfileModal(true)}
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label="Mi perfil"
+                                        title="Mi perfil"
+                                        className="h-11 w-11 text-brand-ink hover:bg-brand-sand"
+                                    >
+                                        <UserIcon className="h-5 w-5" aria-hidden="true" />
+                                    </Button>
+                                    <Button
+                                        onClick={handleLogout}
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label="Cerrar sesión"
+                                        title="Cerrar sesión"
+                                        className="h-11 w-11 text-brand-muted hover:bg-red-50 hover:text-red-700"
+                                    >
+                                        <LogOut className="h-5 w-5" aria-hidden="true" />
+                                    </Button>
+                                </nav>
                             </>
                         ) : (
                             <>
-                                <Button onClick={() => setShowLoginForm(true)} variant="ghost" size="sm">
-                                    <LogIn className="mr-2 hidden h-4 w-4 sm:block" />
-                                    Entrar
+                                <Button
+                                    onClick={() => setShowLoginForm(true)}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-11 w-11 px-0 text-brand-ink hover:bg-brand-sand md:w-auto md:px-3"
+                                    aria-label="Entrar"
+                                >
+                                    <LogIn className="h-5 w-5 md:mr-2 md:h-4 md:w-4" aria-hidden="true" />
+                                    <span className="hidden md:inline">Entrar</span>
                                 </Button>
-                                <Button onClick={() => setShowUserRegisterForm(true)} size="sm">
-                                    <PlusCircle className="mr-2 hidden h-4 w-4 sm:block" />
-                                    Crear cuenta
+                                <Button
+                                    onClick={() => setShowUserRegisterForm(true)}
+                                    size="sm"
+                                    className="h-11 bg-brand-clay-600 px-3 text-white hover:bg-brand-clay-700 active:bg-brand-clay-700"
+                                >
+                                    <PlusCircle className="hidden h-4 w-4 md:block" aria-hidden="true" />
+                                    <span className="md:hidden">Registro</span>
+                                    <span className="hidden md:inline">Crear cuenta</span>
                                 </Button>
                             </>
                         )}
@@ -2501,37 +2582,37 @@ const SantiagoTechRDApp = () => {
                 />
             )}
 
-            <footer className="border-t border-slate-800 bg-slate-950 text-slate-300">
+            <footer className="border-t border-brand-ocean-700 bg-brand-ink pb-[env(safe-area-inset-bottom)] text-slate-200">
                 <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr] lg:px-8">
                     <div className="max-w-md">
                         <div className="flex items-center gap-3 text-white">
-                            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600">
+                            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-clay-600">
                                 <Wrench className="h-5 w-5" aria-hidden="true" />
                             </span>
                             <span className="text-lg font-bold">Técnicos en RD</span>
                         </div>
-                        <p className="mt-4 text-sm leading-6 text-slate-400">
+                        <p className="mt-4 text-sm leading-6 text-slate-300">
                             Una forma clara y segura de encontrar profesionales locales para el hogar y el negocio en Santiago y el Cibao.
                         </p>
                     </div>
                     <div>
                         <h3 className="text-sm font-bold uppercase tracking-wider text-white">Explora</h3>
                         <ul className="mt-4 space-y-3 text-sm">
-                            <li><button onClick={() => setCurrentView('home')} className="transition-colors hover:text-emerald-300">Buscar técnicos</button></li>
-                            <li><button onClick={() => setCurrentView('about')} className="transition-colors hover:text-emerald-300">Cómo funciona</button></li>
-                            {!currentUser && <li><button onClick={() => setShowUserRegisterForm(true)} className="transition-colors hover:text-emerald-300">Crear una cuenta</button></li>}
+                            <li><button onClick={() => setCurrentView('home')} className="min-h-11 transition-colors hover:text-brand-clay-100">Buscar técnicos</button></li>
+                            <li><button onClick={() => setCurrentView('about')} className="min-h-11 transition-colors hover:text-brand-clay-100">Cómo funciona</button></li>
+                            {!currentUser && <li><button onClick={() => setShowUserRegisterForm(true)} className="min-h-11 transition-colors hover:text-brand-clay-100">Crear una cuenta</button></li>}
                         </ul>
                     </div>
                     <div>
                         <h3 className="text-sm font-bold uppercase tracking-wider text-white">Cobertura</h3>
-                        <p className="mt-4 flex items-start gap-2 text-sm leading-6 text-slate-400">
-                            <MapPin className="mt-0.5 h-4 w-4 flex-none text-emerald-400" aria-hidden="true" />
+                        <p className="mt-4 flex items-start gap-2 text-sm leading-6 text-slate-300">
+                            <MapPin className="mt-0.5 h-4 w-4 flex-none text-brand-clay-100" aria-hidden="true" />
                             Santiago de los Caballeros y municipios del Cibao, República Dominicana.
                         </p>
                     </div>
                 </div>
-                <div className="border-t border-slate-800">
-                    <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-5 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+                <div className="border-t border-brand-ocean-700/60">
+                    <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-5 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
                         <p>&copy; {new Date().getFullYear()} Técnicos en RD. Todos los derechos reservados.</p>
                         <p>Hecho para conectar al Cibao.</p>
                     </div>
@@ -3574,13 +3655,19 @@ const SantiagoTechRDApp = () => {
                             animate={{ scale: 1, y: 0 }}
                             exit={{ scale: 0.8, y: -20 }}
                             onClick={(e) => e.stopPropagation()}
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="profile-modal-title"
                             className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
                         >
                             {/* Header */}
                             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-6 rounded-t-2xl relative">
                                 <button
+                                    type="button"
+                                    autoFocus
                                     onClick={() => { setShowProfileModal(false); setProfileTab('info'); setIsEditingProfile(false); }}
-                                    className="absolute top-4 right-4 text-white/80 hover:text-white"
+                                    className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full text-white/80 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                                    aria-label="Cerrar perfil"
                                 >
                                     <X className="w-6 h-6" />
                                 </button>
@@ -3615,7 +3702,7 @@ const SantiagoTechRDApp = () => {
                                             />
                                         </label>
                                     </div>
-                                    <h2 className="text-xl font-bold text-white mt-3">{currentUser.name}</h2>
+                                    <h2 id="profile-modal-title" className="text-xl font-bold text-white mt-3">{currentUser.name}</h2>
                                     <p className="text-white/80 text-sm">{currentUser.email}</p>
                                     <span className={cn(
                                         "mt-2 px-3 py-1 rounded-full text-xs font-semibold",

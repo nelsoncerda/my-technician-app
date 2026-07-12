@@ -306,7 +306,7 @@ const SelectTrigger = React.forwardRef<HTMLButtonElement, SelectTriggerProps>(({
             onClick={handleClick}
             onKeyDown={handleKeyDown}
             className={cn(
-                "flex h-10 w-full items-center justify-between gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-left text-sm text-gray-900 shadow-sm transition-colors focus-visible:border-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 disabled:opacity-70 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:focus-visible:border-sky-400 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-gray-950 dark:disabled:bg-gray-800 dark:disabled:text-gray-500",
+                "flex min-h-11 w-full items-center justify-between gap-2 rounded-md border border-brand-border bg-brand-cream px-3 py-2 text-left text-sm text-brand-charcoal shadow-sm transition-colors focus-visible:border-brand-ocean-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-brand-sand disabled:text-brand-muted disabled:opacity-70 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:focus-visible:border-blue-300 dark:focus-visible:ring-blue-300 dark:focus-visible:ring-offset-gray-950 dark:disabled:bg-gray-800 dark:disabled:text-gray-500",
                 className
             )}
         >
@@ -332,7 +332,7 @@ const SelectValue = ({ placeholder, className, ...props }: SelectValueProps) => 
     return (
         <span
             {...props}
-            className={cn(!hasValue && "text-gray-500 dark:text-gray-400", className)}
+            className={cn(!hasValue && "text-brand-muted dark:text-gray-400", className)}
         >
             {hasValue ? displayValue : placeholder}
         </span>
@@ -343,7 +343,13 @@ interface SelectContentProps extends React.HTMLAttributes<HTMLDivElement> {}
 
 const SelectContent = ({ children, className, style, ...props }: SelectContentProps) => {
     const context = useSelectContext("SelectContent")
-    const [position, setPosition] = React.useState({ top: 0, left: 0, width: 0 })
+    const [position, setPosition] = React.useState({
+        top: 0,
+        left: 0,
+        width: 0,
+        maxHeight: 240,
+        above: false,
+    })
     const {
         activeOptionId,
         closeSelect,
@@ -362,20 +368,37 @@ const SelectContent = ({ children, className, style, ...props }: SelectContentPr
             if (!trigger) return
 
             const rect = trigger.getBoundingClientRect()
+            const viewport = window.visualViewport
+            const viewportTop = viewport?.offsetTop ?? 0
+            const viewportHeight = viewport?.height ?? window.innerHeight
+            const viewportBottom = viewportTop + viewportHeight
+            const spaceBelow = Math.max(0, viewportBottom - rect.bottom - 8)
+            const spaceAbove = Math.max(0, rect.top - viewportTop - 8)
+            const placeAbove = spaceBelow < 176 && spaceAbove > spaceBelow
+            const availableSpace = placeAbove ? spaceAbove : spaceBelow
+            const maxHeight = Math.max(112, Math.min(240, availableSpace))
             setPosition({
-                top: rect.bottom + 4,
+                top: placeAbove
+                    ? rect.top - 4
+                    : rect.bottom + 4,
                 left: Math.max(8, Math.min(rect.left, window.innerWidth - rect.width - 8)),
                 width: rect.width,
+                maxHeight,
+                above: placeAbove,
             })
         }
 
         updatePosition()
         window.addEventListener("resize", updatePosition)
         window.addEventListener("scroll", updatePosition, true)
+        window.visualViewport?.addEventListener("resize", updatePosition)
+        window.visualViewport?.addEventListener("scroll", updatePosition)
 
         return () => {
             window.removeEventListener("resize", updatePosition)
             window.removeEventListener("scroll", updatePosition, true)
+            window.visualViewport?.removeEventListener("resize", updatePosition)
+            window.visualViewport?.removeEventListener("scroll", updatePosition)
         }
     }, [open, triggerRef])
 
@@ -420,14 +443,17 @@ const SelectContent = ({ children, className, style, ...props }: SelectContentPr
             hidden={!open}
             data-state={open ? "open" : "closed"}
             className={cn(
-                "fixed z-[9999] max-h-60 overflow-y-auto rounded-md border border-gray-200 bg-white p-1 text-gray-950 shadow-xl outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100",
+                "fixed z-[9999] overscroll-contain overflow-y-auto rounded-xl border border-brand-border bg-brand-cream p-1 text-brand-charcoal shadow-xl outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100",
                 className
             )}
             style={{
                 top: position.top,
                 left: position.left,
                 width: position.width,
+                maxHeight: position.maxHeight,
                 minWidth: "8rem",
+                transform: position.above ? "translateY(-100%)" : undefined,
+                transformOrigin: position.above ? "bottom" : "top",
                 ...style,
             }}
         >
@@ -508,8 +534,8 @@ const SelectItem = ({
             onMouseEnter={handleMouseEnter}
             onPointerDown={handlePointerDown}
             className={cn(
-                "relative flex w-full cursor-default select-none items-center rounded-sm px-3 py-2 text-sm outline-none transition-colors",
-                isActive && !isDisabled && "bg-emerald-50 text-emerald-950 dark:bg-gray-700 dark:text-white",
+                "relative flex min-h-11 w-full cursor-default select-none items-center rounded-lg px-3 py-2 text-sm outline-none transition-colors",
+                isActive && !isDisabled && "bg-brand-clay-50 text-brand-charcoal dark:bg-gray-700 dark:text-white",
                 isSelected && "font-semibold",
                 isDisabled && "cursor-not-allowed opacity-45",
                 className

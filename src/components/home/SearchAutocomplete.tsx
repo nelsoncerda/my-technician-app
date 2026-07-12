@@ -4,7 +4,7 @@ import { getTechnicianSpecializations, normalizeSearchValue } from '../../lib/se
 import { Input } from '../ui/input';
 import TechnicianRating, { type RatedTechnician } from './TechnicianRating';
 
-interface SearchTechnician extends RatedTechnician {
+export interface SearchTechnician extends RatedTechnician {
   id: string;
   name: string;
   companyName?: string;
@@ -20,7 +20,20 @@ interface SearchAutocompleteProps {
   setSearchTerm: (value: string) => void;
   selectedSpecialization: string;
   selectedLocation: string;
+  onSuggestionSelect?: (suggestion: SearchSuggestionSelection) => void;
+  onSubmit?: (value: string) => void;
 }
+
+export type SearchSuggestionSelection =
+  | {
+      kind: 'service';
+      value: string;
+    }
+  | {
+      kind: 'technician';
+      value: string;
+      technician: SearchTechnician;
+    };
 
 type SearchSuggestion =
   | {
@@ -59,12 +72,21 @@ const SearchAutocomplete: React.FC<SearchAutocompleteProps> = ({
   setSearchTerm,
   selectedSpecialization,
   selectedLocation,
+  onSuggestionSelect,
+  onSubmit,
 }) => {
   const [open, setOpen] = React.useState(false);
   const [activeIndex, setActiveIndex] = React.useState(-1);
+  const [selectionAnnouncement, setSelectionAnnouncement] = React.useState('');
+  const [listboxPosition, setListboxPosition] = React.useState({
+    above: false,
+    maxHeight: 320,
+  });
+  const inputRef = React.useRef<HTMLInputElement>(null);
   const optionRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
   const generatedId = React.useId().replace(/:/g, '');
   const listboxId = `home-search-suggestions-${generatedId}`;
+  const statusId = `${listboxId}-status`;
 
   const eligibleTechnicians = React.useMemo(
     () =>
@@ -129,6 +151,51 @@ const SearchAutocomplete: React.FC<SearchAutocompleteProps> = ({
     listboxVisible && activeIndex >= 0
       ? `${listboxId}-option-${activeIndex}`
       : undefined;
+  const normalizedSearchTerm = normalizeSearchValue(searchTerm);
+  const suggestionStatus = React.useMemo(() => {
+    if (selectionAnnouncement) return selectionAnnouncement;
+    if (!open || !normalizedSearchTerm) return '';
+    if (suggestions.length === 0) return 'No hay sugerencias para esta búsqueda.';
+
+    const resultLabel = suggestions.length === 1 ? 'sugerencia disponible' : 'sugerencias disponibles';
+    return `${suggestions.length} ${resultLabel}. Usa las flechas para navegar y Enter para seleccionar.`;
+  }, [normalizedSearchTerm, open, selectionAnnouncement, suggestions.length]);
+
+  React.useLayoutEffect(() => {
+    if (!listboxVisible) return;
+
+    const updateListboxPosition = () => {
+      const input = inputRef.current;
+      if (!input) return;
+
+      const rect = input.getBoundingClientRect();
+      const viewport = window.visualViewport;
+      const viewportTop = viewport?.offsetTop ?? 0;
+      const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight);
+      const spaceBelow = Math.max(0, viewportBottom - rect.bottom - 8);
+      const spaceAbove = Math.max(0, rect.top - viewportTop - 8);
+      const above = spaceBelow < 176 && spaceAbove > spaceBelow;
+      const availableSpace = above ? spaceAbove : spaceBelow;
+
+      setListboxPosition({
+        above,
+        maxHeight: Math.max(48, Math.min(320, Math.floor(availableSpace))),
+      });
+    };
+
+    updateListboxPosition();
+    window.addEventListener('resize', updateListboxPosition);
+    window.addEventListener('scroll', updateListboxPosition, true);
+    window.visualViewport?.addEventListener('resize', updateListboxPosition);
+    window.visualViewport?.addEventListener('scroll', updateListboxPosition);
+
+    return () => {
+      window.removeEventListener('resize', updateListboxPosition);
+      window.removeEventListener('scroll', updateListboxPosition, true);
+      window.visualViewport?.removeEventListener('resize', updateListboxPosition);
+      window.visualViewport?.removeEventListener('scroll', updateListboxPosition);
+    };
+  }, [listboxVisible]);
 
   React.useEffect(() => {
     if (activeIndex >= suggestions.length) setActiveIndex(-1);
@@ -143,11 +210,24 @@ const SearchAutocomplete: React.FC<SearchAutocompleteProps> = ({
 
   const selectSuggestion = (suggestion: SearchSuggestion) => {
     setSearchTerm(suggestion.value);
+    if (suggestion.kind === 'service') {
+      onSuggestionSelect?.({ kind: 'service', value: suggestion.value });
+      setSelectionAnnouncement(`Servicio ${suggestion.value} seleccionado.`);
+    } else {
+      onSuggestionSelect?.({
+        kind: 'technician',
+        value: suggestion.value,
+        technician: suggestion.technician,
+      });
+      setSelectionAnnouncement(`Técnico ${suggestion.value} seleccionado.`);
+    }
     setOpen(false);
     setActiveIndex(-1);
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.nativeEvent.isComposing) return;
+
     if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && suggestions.length > 0) {
       event.preventDefault();
       setOpen(true);
@@ -162,9 +242,19 @@ const SearchAutocomplete: React.FC<SearchAutocompleteProps> = ({
       return;
     }
 
-    if (event.key === 'Enter' && listboxVisible && activeIndex >= 0) {
+    if (event.key === 'Enter') {
       event.preventDefault();
-      selectSuggestion(suggestions[activeIndex]);
+
+      if (listboxVisible && activeIndex >= 0) {
+        selectSuggestion(suggestions[activeIndex]);
+      } else {
+        setOpen(false);
+        setActiveIndex(-1);
+        setSelectionAnnouncement(
+          normalizedSearchTerm ? `Búsqueda enviada: ${searchTerm.trim()}.` : 'Búsqueda enviada.'
+        );
+        onSubmit?.(searchTerm.trim());
+      }
       return;
     }
 
@@ -176,12 +266,13 @@ const SearchAutocomplete: React.FC<SearchAutocompleteProps> = ({
 
   return (
     <div>
-      <label htmlFor="home-technician-search" className="mb-1.5 block text-sm font-semibold text-slate-700">
-        Nombre o servicio
+      <label htmlFor="home-technician-search" className="mb-1.5 block text-sm font-semibold text-brand-charcoal">
+        Servicio o técnico
       </label>
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+      <div className="relative isolate">
+        <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-brand-ocean-500" aria-hidden="true" />
         <Input
+          ref={inputRef}
           id="home-technician-search"
           type="search"
           role="combobox"
@@ -190,8 +281,10 @@ const SearchAutocomplete: React.FC<SearchAutocompleteProps> = ({
             setSearchTerm(event.target.value);
             setOpen(true);
             setActiveIndex(-1);
+            setSelectionAnnouncement('');
           }}
           onFocus={() => {
+            setSelectionAnnouncement('');
             if (normalizeSearchValue(searchTerm)) setOpen(true);
           }}
           onBlur={() => {
@@ -199,21 +292,30 @@ const SearchAutocomplete: React.FC<SearchAutocompleteProps> = ({
             setActiveIndex(-1);
           }}
           onKeyDown={handleKeyDown}
-          placeholder="Ej. electricista, plomero..."
+          placeholder="Ej. plomero o nombre del técnico"
           autoComplete="off"
+          enterKeyHint="search"
           aria-autocomplete="list"
           aria-expanded={listboxVisible}
-          aria-controls={listboxId}
+          aria-controls={listboxVisible ? listboxId : undefined}
           aria-activedescendant={activeOptionId}
-          className="h-12 border-stone-300 bg-white pl-10 text-base text-slate-950 placeholder:text-slate-400 focus-visible:ring-emerald-500"
+          aria-describedby={statusId}
+          className="h-12 scroll-my-24 border-brand-border bg-brand-cream pl-10 text-base text-brand-charcoal placeholder:text-brand-muted focus-visible:ring-brand-clay-600"
         />
+
+        <span id={statusId} role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+          {suggestionStatus}
+        </span>
 
         {listboxVisible && (
           <ul
             id={listboxId}
             role="listbox"
             aria-label="Sugerencias de búsqueda"
-            className="absolute z-40 mt-2 max-h-80 w-full overflow-y-auto rounded-2xl border border-stone-200 bg-white p-2 shadow-xl"
+            className={`absolute z-40 w-full overscroll-contain overflow-y-auto scroll-pb-[env(safe-area-inset-bottom)] rounded-2xl border border-brand-border bg-brand-cream p-2 shadow-xl [scrollbar-gutter:stable] ${
+              listboxPosition.above ? 'bottom-full mb-2' : 'top-full mt-2'
+            }`}
+            style={{ maxHeight: `${listboxPosition.maxHeight}px` }}
           >
             {suggestions.map((suggestion, index) => {
               const isActive = activeIndex === index;
@@ -233,14 +335,14 @@ const SearchAutocomplete: React.FC<SearchAutocompleteProps> = ({
                     onPointerDown={(event) => event.preventDefault()}
                     onMouseEnter={() => setActiveIndex(index)}
                     onClick={() => selectSuggestion(suggestion)}
-                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none ${
-                      isActive ? 'bg-emerald-50' : 'hover:bg-stone-50'
+                    className={`flex w-full touch-manipulation items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none ${
+                      isActive ? 'bg-brand-clay-50' : 'hover:bg-brand-sand'
                     }`}
                   >
                     <span className={`flex h-9 w-9 flex-none items-center justify-center rounded-xl ${
                       suggestion.kind === 'service'
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : 'bg-slate-100 text-slate-700'
+                        ? 'bg-brand-clay-100 text-brand-clay-700'
+                        : 'bg-brand-ocean-50 text-brand-ocean-600'
                     }`}>
                       {suggestion.kind === 'service' ? (
                         <Wrench className="h-4 w-4" aria-hidden="true" />
@@ -250,10 +352,10 @@ const SearchAutocomplete: React.FC<SearchAutocompleteProps> = ({
                     </span>
 
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-bold text-slate-900">
+                      <span className="block truncate text-sm font-bold text-brand-charcoal">
                         {suggestion.value}
                       </span>
-                      <span className="block truncate text-xs text-slate-500">
+                      <span className="block truncate text-xs text-brand-muted">
                         {suggestion.kind === 'service'
                           ? 'Servicio'
                           : suggestion.technician.companyName ||

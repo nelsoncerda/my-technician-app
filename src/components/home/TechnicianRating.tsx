@@ -45,13 +45,13 @@ const TechnicianRating: React.FC<TechnicianRatingProps> = ({
     return (
       <span
         className={cn(
-          'inline-flex items-center gap-1.5 font-medium text-slate-500',
+          'inline-flex items-center gap-1.5 font-medium text-brand-muted',
           compact ? 'text-xs' : 'text-sm',
           className
         )}
         aria-label="Sin reseñas"
       >
-        <Star className="h-4 w-4 text-stone-400" aria-hidden="true" />
+        <Star className="h-4 w-4 text-brand-muted" aria-hidden="true" />
         Sin reseñas
       </span>
     );
@@ -62,15 +62,15 @@ const TechnicianRating: React.FC<TechnicianRatingProps> = ({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 font-semibold text-slate-800',
+        'inline-flex items-center gap-1.5 font-semibold text-brand-charcoal',
         compact ? 'text-xs' : 'text-sm',
         className
       )}
       aria-label={`${rating.toFixed(1)} de 5, ${reviewLabel}`}
     >
-      <Star className="h-4 w-4 fill-amber-400 text-amber-400" aria-hidden="true" />
+      <Star className="h-4 w-4 fill-brand-amber text-brand-amber" aria-hidden="true" />
       <span>{rating.toFixed(1)}</span>
-      <span className="font-normal text-slate-500">{reviewLabel}</span>
+      <span className="font-normal text-brand-muted">{reviewLabel}</span>
     </span>
   );
 };
