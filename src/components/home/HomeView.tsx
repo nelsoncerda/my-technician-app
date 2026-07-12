@@ -24,7 +24,6 @@ import {
   Zap,
   type LucideIcon,
 } from 'lucide-react';
-import { Input } from '../ui/input';
 import {
   Select,
   SelectContent,
@@ -32,6 +31,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
+import { getTechnicianSpecializations } from '../../lib/search';
+import SearchAutocomplete from './SearchAutocomplete';
+import TechnicianRating from './TechnicianRating';
 
 export interface HomeTechnicianReview {
   id: string;
@@ -106,13 +108,6 @@ const getInitials = (name: string) =>
     .map((part) => part.charAt(0).toUpperCase())
     .join('');
 
-const getTechnicianSpecializations = (technician: HomeTechnician) =>
-  Array.from(
-    new Set(
-      [technician.specialization, ...(technician.specializations || [])].filter(Boolean)
-    )
-  );
-
 interface TechnicianCardProps {
   technician: HomeTechnician;
   currentUser: HomeUser | null;
@@ -130,8 +125,6 @@ const TechnicianCard: React.FC<TechnicianCardProps> = ({
   onReview,
   canReview,
 }) => {
-  const reviewCount = technician.reviews?.length || 0;
-  const rating = technician.rating || 0;
   const technicianSpecializations = getTechnicianSpecializations(technician);
   const visibleSpecializations = technicianSpecializations.slice(0, 2);
   const remainingSpecializations = technicianSpecializations.length - visibleSpecializations.length;
@@ -190,20 +183,10 @@ const TechnicianCard: React.FC<TechnicianCardProps> = ({
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-            {rating > 0 ? (
-              <span
-                className="inline-flex items-center gap-1 font-semibold text-slate-800"
-                aria-label={`${rating.toFixed(1)} de 5, ${reviewCount} ${
-                  reviewCount === 1 ? 'reseña' : 'reseñas'
-                }`}
-              >
-                <Star className="h-4 w-4 fill-amber-400 text-amber-400" aria-hidden="true" />
-                {rating.toFixed(1)}
-                <span className="font-normal text-slate-500">({reviewCount})</span>
-              </span>
-            ) : (
-              <span className="text-sm font-medium text-slate-500">Perfil nuevo</span>
-            )}
+            <TechnicianRating
+              technician={technician}
+              className="rounded-full bg-amber-50 px-2.5 py-1"
+            />
             <span className="inline-flex min-w-0 items-center gap-1 text-slate-600">
               <MapPin className="h-4 w-4 flex-none text-emerald-600" aria-hidden="true" />
               <span className="truncate">{technician.location}</span>
@@ -353,23 +336,14 @@ const HomeView: React.FC<HomeViewProps> = ({
             </div>
 
             <div className="space-y-4">
-              <div>
-                <label htmlFor="home-technician-search" className="mb-1.5 block text-sm font-semibold text-slate-700">
-                  Nombre o servicio
-                </label>
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-                  <Input
-                    id="home-technician-search"
-                    type="search"
-                    value={searchTerm}
-                    onChange={(event) => setSearchTerm(event.target.value)}
-                    placeholder="Ej. electricista, plomero..."
-                    autoComplete="off"
-                    className="h-12 border-stone-300 bg-white pl-10 text-base text-slate-950 placeholder:text-slate-400 focus-visible:ring-emerald-500"
-                  />
-                </div>
-              </div>
+              <SearchAutocomplete
+                technicians={technicians}
+                specializations={specializations}
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                selectedSpecialization={selectedSpecialization}
+                selectedLocation={selectedLocation}
+              />
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>

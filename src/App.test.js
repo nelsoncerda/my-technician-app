@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import App, { DEFAULT_SPECIALIZATIONS } from './App';
+import { getTechnicianRatingDetails } from './components/home/TechnicianRating';
 
 test('fallback settings include the locally researched service categories', () => {
   expect(DEFAULT_SPECIALIZATIONS).toEqual(
@@ -12,6 +13,15 @@ test('fallback settings include the locally researched service categories', () =
     ])
   );
   expect(new Set(DEFAULT_SPECIALIZATIONS).size).toBe(DEFAULT_SPECIALIZATIONS.length);
+});
+
+test('calculates a rating from reviews when the stored average is stale', () => {
+  expect(
+    getTechnicianRatingDetails({
+      rating: 0,
+      reviews: [{ rating: 5 }, { rating: 4 }],
+    })
+  ).toEqual({ rating: 4.5, reviewCount: 2 });
 });
 
 const technicians = [
@@ -36,10 +46,10 @@ const technicians = [
   {
     id: 'tech-2',
     name: 'José Pérez',
-    specialization: 'Plomero',
-    specializations: ['Plomero'],
+    specialization: 'Plomero, Carpintero',
+    specializations: ['Plomero', 'Carpintero'],
     location: 'Tamboril',
-    rating: 4.7,
+    rating: 0,
     verified: true,
     reviews: [],
   },
@@ -84,8 +94,83 @@ test('loads the directory and filters technicians by search', async () => {
     target: { value: 'plomero' },
   });
 
+  expect(screen.queryByRole('heading', { name: 'María Rodríguez', level: 3 })).not.toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'José Pérez', level: 3 })).toBeInTheDocument();
+});
+
+test('autocompletes a service while the user types', async () => {
+  render(<App />);
+  await screen.findByText('María Rodríguez');
+
+  const search = screen.getByRole('combobox', { name: 'Nombre o servicio' });
+  fireEvent.change(search, { target: { value: 'plo' } });
+
+  const listbox = screen.getByRole('listbox', { name: 'Sugerencias de búsqueda' });
+  const serviceOption = within(listbox).getByRole('option', {
+    name: /Plomero Servicio/i,
+  });
+
+  expect(search).toHaveAttribute('aria-expanded', 'true');
+  expect(
+    within(listbox).queryByRole('option', { name: /Plomero, Carpintero Servicio/i })
+  ).not.toBeInTheDocument();
+  fireEvent.click(serviceOption);
+
+  expect(search).toHaveValue('Plomero');
+  expect(screen.queryByRole('listbox', { name: 'Sugerencias de búsqueda' })).not.toBeInTheDocument();
   expect(screen.queryByText('María Rodríguez')).not.toBeInTheDocument();
   expect(screen.getByText('José Pérez')).toBeInTheDocument();
+});
+
+test('supports keyboard autocomplete and includes technician ratings', async () => {
+  render(<App />);
+  await screen.findByText('María Rodríguez');
+
+  const search = screen.getByRole('combobox', { name: 'Nombre o servicio' });
+  fireEvent.change(search, { target: { value: 'maria' } });
+
+  const listbox = screen.getByRole('listbox', { name: 'Sugerencias de búsqueda' });
+  const technicianOption = within(listbox).getByRole('option', {
+    name: /María Rodríguez.*4\.9.*1 reseña/i,
+  });
+
+  fireEvent.keyDown(search, { key: 'ArrowDown' });
+  expect(technicianOption).toHaveAttribute('aria-selected', 'true');
+  expect(technicianOption).toHaveAttribute('tabindex', '-1');
+  expect(search).toHaveAttribute('aria-activedescendant', technicianOption.id);
+
+  fireEvent.keyDown(search, { key: 'Enter' });
+
+  expect(search).toHaveValue('María Rodríguez');
+  expect(screen.queryByRole('listbox', { name: 'Sugerencias de búsqueda' })).not.toBeInTheDocument();
+  expect(screen.getByText('María Rodríguez')).toBeInTheDocument();
+  expect(screen.queryByText('José Pérez')).not.toBeInTheDocument();
+});
+
+test('shows a rating or a clear no-reviews state on every result', async () => {
+  render(<App />);
+
+  const mariaName = await screen.findByText('María Rodríguez');
+  const joseName = screen.getByText('José Pérez');
+  const mariaCard = mariaName.closest('article');
+  const joseCard = joseName.closest('article');
+
+  expect(mariaCard).not.toBeNull();
+  expect(joseCard).not.toBeNull();
+  expect(within(mariaCard).getByLabelText('4.9 de 5, 1 reseña')).toBeInTheDocument();
+  expect(within(joseCard).getByLabelText('Sin reseñas')).toBeInTheDocument();
+});
+
+test('search ignores accents in technician names', async () => {
+  render(<App />);
+  await screen.findByText('María Rodríguez');
+
+  fireEvent.change(screen.getByRole('combobox', { name: 'Nombre o servicio' }), {
+    target: { value: 'jose' },
+  });
+
+  expect(screen.getByRole('heading', { name: 'José Pérez', level: 3 })).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'María Rodríguez', level: 3 })).not.toBeInTheDocument();
 });
 
 test('top-level views are exclusive', async () => {

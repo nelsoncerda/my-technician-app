@@ -28,6 +28,7 @@ import HomeView from './components/home/HomeView';
 import AboutView from './components/home/AboutView';
 import { API_BASE_URL } from './config/constants';
 import { apiFetch, clearAuthSession, getStoredUser, setAuthSession, updateStoredUser } from './lib/api';
+import { getTechnicianSpecializations, normalizeSearchValue } from './lib/search';
 
 // Default data (will be managed via state)
 export const DEFAULT_SPECIALIZATIONS = [
@@ -859,15 +860,13 @@ const SantiagoTechRDApp = () => {
 
     // Filtered Technicians based on search and filters
     const filteredTechnicians = technicians.filter((technician) => {
-        const normalizedSearch = searchTerm.trim().toLocaleLowerCase('es');
-        const technicianSpecializations = technician.specializations?.length
-            ? technician.specializations
-            : technician.specialization.split(',').map((item) => item.trim()).filter(Boolean);
+        const normalizedSearch = normalizeSearchValue(searchTerm);
+        const technicianSpecializations = getTechnicianSpecializations(technician);
         const searchMatch =
             !normalizedSearch ||
             [technician.name, technician.companyName, technician.location, ...technicianSpecializations]
                 .filter(Boolean)
-                .some((value) => value!.toLocaleLowerCase('es').includes(normalizedSearch));
+                .some((value) => normalizeSearchValue(value!).includes(normalizedSearch));
         const specializationMatch =
             !selectedSpecialization || technicianSpecializations.includes(selectedSpecialization);
         const locationMatch = !selectedLocation || technician.location === selectedLocation;
