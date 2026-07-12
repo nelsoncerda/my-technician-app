@@ -30,17 +30,25 @@ import { API_BASE_URL } from './config/constants';
 import { apiFetch, clearAuthSession, getStoredUser, setAuthSession, updateStoredUser } from './lib/api';
 
 // Default data (will be managed via state)
-const DEFAULT_SPECIALIZATIONS = [
+export const DEFAULT_SPECIALIZATIONS = [
     'Electricista',
     'Plomero',
     'Mecánico',
     'Carpintero',
-    'Técnico de Electrodomésticos',
-    'Pintor',
     'Albañil',
+    'Pintor',
+    'Técnico en Aires Acondicionados',
+    'Técnico en Refrigeración',
+    'Técnico en Electrodomésticos',
     'Cerrajero',
-    'Técnico de Aire Acondicionado',
     'Jardinero',
+    'Fumigador',
+    'Cosmiatra',
+    'Servicio de Limpieza',
+    'Tapicero',
+    'Mudanzas y Acarreo',
+    'Herrero',
+    'Técnico en Vidrios y Aluminio',
 ];
 
 interface Technician {

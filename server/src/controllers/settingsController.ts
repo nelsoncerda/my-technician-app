@@ -1,5 +1,10 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma';
+import {
+    cleanSettingValue,
+    hasEquivalentSettingValues,
+    normalizeSettingValue,
+} from '../utils/settingValue';
 
 // Default values for initial setup
 const DEFAULT_SPECIALIZATIONS = [
@@ -15,6 +20,12 @@ const DEFAULT_SPECIALIZATIONS = [
     'Cerrajero',
     'Jardinero',
     'Fumigador',
+    'Cosmiatra',
+    'Servicio de Limpieza',
+    'Tapicero',
+    'Mudanzas y Acarreo',
+    'Herrero',
+    'Técnico en Vidrios y Aluminio',
 ];
 
 const DEFAULT_LOCATIONS = [
@@ -64,16 +75,25 @@ export const updateSpecializations = async (req: Request, res: Response) => {
     try {
         const { specializations } = req.body;
 
-        if (!Array.isArray(specializations)) {
-            return res.status(400).json({ message: 'Specializations must be an array' });
+        if (!Array.isArray(specializations) || !specializations.every(value => typeof value === 'string')) {
+            return res.status(400).json({ message: 'Specializations must be an array of non-empty strings' });
+        }
+
+        const cleanedSpecializations = specializations.map(cleanSettingValue);
+        if (cleanedSpecializations.some(value => !value)) {
+            return res.status(400).json({ message: 'Specializations must be an array of non-empty strings' });
+        }
+
+        if (hasEquivalentSettingValues(cleanedSpecializations)) {
+            return res.status(400).json({ message: 'Specializations must not contain duplicates' });
         }
 
         const settings = await prisma.appSettings.upsert({
             where: { id: 'app_settings' },
-            update: { specializations },
+            update: { specializations: cleanedSpecializations },
             create: {
                 id: 'app_settings',
-                specializations,
+                specializations: cleanedSpecializations,
                 locations: DEFAULT_LOCATIONS,
             },
         });
@@ -122,7 +142,12 @@ export const addSpecialization = async (req: Request, res: Response) => {
     try {
         const { specialization } = req.body;
 
-        if (!specialization || typeof specialization !== 'string') {
+        if (typeof specialization !== 'string') {
+            return res.status(400).json({ message: 'Specialization must be a non-empty string' });
+        }
+
+        const cleanedSpecialization = cleanSettingValue(specialization);
+        if (!cleanedSpecialization) {
             return res.status(400).json({ message: 'Specialization must be a non-empty string' });
         }
 
@@ -131,17 +156,18 @@ export const addSpecialization = async (req: Request, res: Response) => {
         });
 
         const currentSpecs = settings?.specializations || DEFAULT_SPECIALIZATIONS;
+        const normalizedSpecialization = normalizeSettingValue(cleanedSpecialization);
 
-        if (currentSpecs.includes(specialization)) {
+        if (currentSpecs.some(spec => normalizeSettingValue(spec) === normalizedSpecialization)) {
             return res.status(400).json({ message: 'Specialization already exists' });
         }
 
         settings = await prisma.appSettings.upsert({
             where: { id: 'app_settings' },
-            update: { specializations: [...currentSpecs, specialization] },
+            update: { specializations: [...currentSpecs, cleanedSpecialization] },
             create: {
                 id: 'app_settings',
-                specializations: [...DEFAULT_SPECIALIZATIONS, specialization],
+                specializations: [...DEFAULT_SPECIALIZATIONS, cleanedSpecialization],
                 locations: DEFAULT_LOCATIONS,
             },
         });

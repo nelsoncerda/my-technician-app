@@ -1,5 +1,18 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import App from './App';
+import App, { DEFAULT_SPECIALIZATIONS } from './App';
+
+test('fallback settings include the locally researched service categories', () => {
+  expect(DEFAULT_SPECIALIZATIONS).toEqual(
+    expect.arrayContaining([
+      'Servicio de Limpieza',
+      'Tapicero',
+      'Mudanzas y Acarreo',
+      'Herrero',
+      'Técnico en Vidrios y Aluminio',
+    ])
+  );
+  expect(new Set(DEFAULT_SPECIALIZATIONS).size).toBe(DEFAULT_SPECIALIZATIONS.length);
+});
 
 const technicians = [
   {

@@ -14,6 +14,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.removeLocation = exports.addLocation = exports.removeSpecialization = exports.addSpecialization = exports.updateLocations = exports.updateSpecializations = exports.getSettings = void 0;
 const prisma_1 = __importDefault(require("../prisma"));
+const settingValue_1 = require("../utils/settingValue");
 // Default values for initial setup
 const DEFAULT_SPECIALIZATIONS = [
     'Electricista',
@@ -28,6 +29,12 @@ const DEFAULT_SPECIALIZATIONS = [
     'Cerrajero',
     'Jardinero',
     'Fumigador',
+    'Cosmiatra',
+    'Servicio de Limpieza',
+    'Tapicero',
+    'Mudanzas y Acarreo',
+    'Herrero',
+    'Técnico en Vidrios y Aluminio',
 ];
 const DEFAULT_LOCATIONS = [
     'Santiago Centro',
@@ -73,15 +80,22 @@ exports.getSettings = getSettings;
 const updateSpecializations = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { specializations } = req.body;
-        if (!Array.isArray(specializations)) {
-            return res.status(400).json({ message: 'Specializations must be an array' });
+        if (!Array.isArray(specializations) || !specializations.every(value => typeof value === 'string')) {
+            return res.status(400).json({ message: 'Specializations must be an array of non-empty strings' });
+        }
+        const cleanedSpecializations = specializations.map(settingValue_1.cleanSettingValue);
+        if (cleanedSpecializations.some(value => !value)) {
+            return res.status(400).json({ message: 'Specializations must be an array of non-empty strings' });
+        }
+        if ((0, settingValue_1.hasEquivalentSettingValues)(cleanedSpecializations)) {
+            return res.status(400).json({ message: 'Specializations must not contain duplicates' });
         }
         const settings = yield prisma_1.default.appSettings.upsert({
             where: { id: 'app_settings' },
-            update: { specializations },
+            update: { specializations: cleanedSpecializations },
             create: {
                 id: 'app_settings',
-                specializations,
+                specializations: cleanedSpecializations,
                 locations: DEFAULT_LOCATIONS,
             },
         });
@@ -127,22 +141,27 @@ exports.updateLocations = updateLocations;
 const addSpecialization = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { specialization } = req.body;
-        if (!specialization || typeof specialization !== 'string') {
+        if (typeof specialization !== 'string') {
+            return res.status(400).json({ message: 'Specialization must be a non-empty string' });
+        }
+        const cleanedSpecialization = (0, settingValue_1.cleanSettingValue)(specialization);
+        if (!cleanedSpecialization) {
             return res.status(400).json({ message: 'Specialization must be a non-empty string' });
         }
         let settings = yield prisma_1.default.appSettings.findUnique({
             where: { id: 'app_settings' },
         });
         const currentSpecs = (settings === null || settings === void 0 ? void 0 : settings.specializations) || DEFAULT_SPECIALIZATIONS;
-        if (currentSpecs.includes(specialization)) {
+        const normalizedSpecialization = (0, settingValue_1.normalizeSettingValue)(cleanedSpecialization);
+        if (currentSpecs.some(spec => (0, settingValue_1.normalizeSettingValue)(spec) === normalizedSpecialization)) {
             return res.status(400).json({ message: 'Specialization already exists' });
         }
         settings = yield prisma_1.default.appSettings.upsert({
             where: { id: 'app_settings' },
-            update: { specializations: [...currentSpecs, specialization] },
+            update: { specializations: [...currentSpecs, cleanedSpecialization] },
             create: {
                 id: 'app_settings',
-                specializations: [...DEFAULT_SPECIALIZATIONS, specialization],
+                specializations: [...DEFAULT_SPECIALIZATIONS, cleanedSpecialization],
                 locations: DEFAULT_LOCATIONS,
             },
         });
