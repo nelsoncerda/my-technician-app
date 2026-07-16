@@ -55,12 +55,14 @@ Never restore a dump over a populated production database without an approved ma
 Until the main-domain conflict is resolved, a mobile API release must preserve the active combined Nginx configuration:
 
 1. Build and test the server locally.
-2. Create a new immutable release directory from a committed revision.
-3. Link `server/.env` to the shared environment.
-4. Install dependencies, generate Prisma Client, build, back up the database, and apply migrations.
-5. Switch `technician-current` atomically.
-6. Restart `technician-api` with the repository ecosystem file and run all health checks.
-7. Do **not** install the repository’s historical main-domain Nginx file.
+2. Transfer or fetch the committed revision into `/home/bitnami/apps/release-source`.
+3. Run `deploy/release-mobile-api.sh <revision>` as `bitnami`.
+4. Verify the external API and public pages after the command completes.
+
+The release script creates an immutable release, preserves the shared environment,
+backs up PostgreSQL, applies migrations, switches `technician-current` atomically,
+restarts PM2, and verifies SMTP and all mobile publication pages. It deliberately
+does **not** install or reload the repository’s historical main-domain Nginx file.
 
 The public mobile pages expected after deployment are:
 
