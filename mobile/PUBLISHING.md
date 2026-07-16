@@ -17,6 +17,16 @@ curl -fsS https://api.tecnicosenrd.com/api/settings
 
 El dominio principal `tecnicosenrd.com` actualmente sirve otra aplicación. No lo uses como URL de soporte o privacidad hasta decidir si Técnicos en RD recuperará ese dominio o utilizará otro.
 
+### Builds de lanzamiento — 16 de julio de 2026
+
+- Proyecto Expo: `@nelsoncerda/tecnicos-en-rd`.
+- Android de prueba (APK): build `34583f85-b82a-4c5c-a9ce-82532c78a743`, finalizado.
+- Android de tienda (AAB, versión `1.0.0`, código `2`): build `e253c859-e937-4ecd-9c68-7269780b8c6e`, finalizado y validado.
+- iOS para simulador: build `ecee20e8-3801-4d5c-a177-78cdecc0d22b`, finalizado y probado.
+- iOS para TestFlight/App Store: pendiente de las credenciales de Apple Developer del propietario.
+
+Los builds se consultan en `https://expo.dev/accounts/nelsoncerda/projects/tecnicos-en-rd/builds`.
+
 ## 2. Cuentas necesarias
 
 1. Crear o confirmar una cuenta de Expo en <https://expo.dev>.

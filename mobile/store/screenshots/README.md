@@ -9,4 +9,15 @@ The `ios-6.3/` images were captured from EAS iOS Simulator build
 - Content: live production directory data from `api.tecnicosenrd.com`.
 
 Apple accepts this resolution for 6.3-inch iPhone screenshots. Google Play can
-also use these portrait images because they show the actual in-app experience.
+use the Android captures below, which match its phone screenshot constraints.
+
+## Android phone
+
+The `android-phone/` images were captured from the signed EAS Android preview
+build `34583f85-b82a-4c5c-a9ce-82532c78a743` on an Android 16 phone emulator.
+
+- Resolution: 1080 × 1920 portrait (9:16).
+- Format: JPEG without an alpha channel.
+- Content: the installed `com.tecnicosenrd.app` APK using live production data
+  from `api.tecnicosenrd.com`.
+- Screens: directory, technician profile, filtered search, and account/privacy.
