@@ -25,7 +25,7 @@ Antes de contestar que el desarrollador “recopila ubicación precisa”, confi
 - Sin rastreo entre aplicaciones o sitios.
 - Contraseñas almacenadas mediante hash; token de sesión guardado con SecureStore.
 - Cifrado en tránsito mediante HTTPS.
-- Eliminación iniciada dentro de la aplicación y explicada en una página pública.
+- Eliminación disponible dentro de la aplicación y mediante inicio de sesión seguro en la página pública, incluso después de desinstalarla.
 - GPS negable sin perder la entrada manual de dirección.
 - Sin ubicación en segundo plano, cámara, micrófono ni acelerómetro.
 

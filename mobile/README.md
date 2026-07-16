@@ -65,4 +65,4 @@ npx eas-cli@latest submit --profile production --platform ios
 npx eas-cli@latest submit --profile production --platform android
 ```
 
-No ejecutes los builds de producción hasta confirmar el correo público de soporte, publicar la política web y crear las cuentas de Apple/Google.
+No envíes builds a revisión pública hasta confirmar el correo público de soporte y completar las cuentas de Apple/Google. La política, los términos, el soporte y la eliminación web ya están publicados en `api.tecnicosenrd.com`.

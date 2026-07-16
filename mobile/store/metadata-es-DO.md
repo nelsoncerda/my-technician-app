@@ -52,7 +52,7 @@ La aplicación conecta clientes con profesionales locales. Las funciones princip
 
 El GPS se solicita únicamente después de pulsar “Usar mi ubicación” y sirve para sugerir una zona o completar la dirección del servicio. Si se rechaza el permiso, toda la función continúa disponible mediante entrada manual. No se solicita ubicación en segundo plano.
 
-La eliminación de cuenta está en Cuenta → Zona de cuidado → Eliminar cuenta y requiere una segunda confirmación.
+La eliminación de cuenta está en Cuenta → Zona de cuidado → Eliminar cuenta y requiere una segunda confirmación. La URL pública también permite iniciar sesión y completar la eliminación sin tener la aplicación instalada.
 
 ## Campos pendientes del propietario
 
