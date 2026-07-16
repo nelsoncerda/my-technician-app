@@ -46,7 +46,7 @@
           "locationWhenInUsePermission": "Permite que Técnicos en RD use tu ubicación para mostrar técnicos de tu zona y completar la dirección del servicio.",
           "locationAlwaysAndWhenInUsePermission": false,
           "locationAlwaysPermission": false,
-          "motionUsagePermission": false,
+          "motionUsagePermission": "Técnicos en RD puede usar la actividad de movimiento para mejorar la precisión de las funciones de ubicación al buscar técnicos cercanos.",
           "isIosBackgroundLocationEnabled": false,
           "isAndroidBackgroundLocationEnabled": false,
           "isAndroidForegroundServiceEnabled": false,
