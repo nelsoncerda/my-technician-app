@@ -45,6 +45,7 @@ técnicos,electricista,plomero,reparación,hogar,Santiago,Cibao,servicios,manten
 - Términos: `https://api.tecnicosenrd.com/terms`
 - Eliminación de cuenta: `https://api.tecnicosenrd.com/account-deletion`
 - Soporte: `https://api.tecnicosenrd.com/support`
+- Correo público de soporte de iOS: `ncerda@hotmail.com`
 
 ## Notas para revisión
 
@@ -56,8 +57,7 @@ La eliminación de cuenta está en Cuenta → Zona de cuidado → Eliminar cuent
 
 ## Campos pendientes del propietario
 
-- Correo público de soporte y privacidad.
+- Confirmar si Google Play utilizará el mismo correo público de soporte de iOS.
 - Nombre legal, dirección y teléfono del vendedor/desarrollador.
 - Cuenta de demostración para revisión.
-- URL definitiva de soporte.
 - Selección final de categoría según las opciones actuales de cada tienda.

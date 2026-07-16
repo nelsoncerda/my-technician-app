@@ -74,7 +74,7 @@ The public mobile pages expected after deployment are:
 
 ## Required operations follow-up
 
-- Confirm and set a monitored `SUPPORT_EMAIL` in `server.env` before store review.
+- Keep the confirmed monitored `SUPPORT_EMAIL` (`ncerda@hotmail.com`) in `server.env` for store review.
 - Decide whether Técnicos en RD should recover `tecnicosenrd.com` or use a new public website domain.
 - Keep automated database backups and verify restore archives regularly.
 - Confirm PM2 startup persists `technician-api` as online after instance reboot.

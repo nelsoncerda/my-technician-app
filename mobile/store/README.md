@@ -8,5 +8,5 @@
 - `screenshots/ios-6.3/`: four native 1206 × 2622 screenshots for App Store Connect.
 - `screenshots/android-phone/`: four native 1080 × 1920 screenshots for Google Play.
 
-Confirm the public support email, legal seller details, and review account before
-submitting these assets.
+Confirm whether Google Play will use the iOS support email, plus the legal seller
+details and review account, before submitting these assets.

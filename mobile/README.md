@@ -65,4 +65,4 @@ npx eas-cli@latest submit --profile production --platform ios
 npx eas-cli@latest submit --profile production --platform android
 ```
 
-No envíes builds a revisión pública hasta confirmar el correo público de soporte y completar las cuentas de Apple/Google. La política, los términos, el soporte y la eliminación web ya están publicados en `api.tecnicosenrd.com`.
+No envíes builds a revisión pública hasta confirmar si Google Play usará el correo público de soporte de iOS (`ncerda@hotmail.com`) y completar las cuentas de Apple/Google. La política, los términos, el soporte y la eliminación web ya están publicados en `api.tecnicosenrd.com`.

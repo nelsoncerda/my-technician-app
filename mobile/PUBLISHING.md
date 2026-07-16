@@ -32,7 +32,7 @@ Los builds se consultan en `https://expo.dev/accounts/nelsoncerda/projects/tecni
 1. Crear o confirmar una cuenta de Expo en <https://expo.dev>.
 2. Inscribirse en Apple Developer Program y aceptar los contratos de App Store Connect.
 3. Crear una cuenta de Google Play Console y completar la verificación del desarrollador.
-4. Definir un correo público y monitoreado para soporte y solicitudes de privacidad.
+4. Correo público y monitoreado de soporte para iOS: `ncerda@hotmail.com`. Confirmar si Google Play usará el mismo.
 
 Las credenciales, códigos de doble factor y acuerdos legales deben ser manejados por el titular de cada cuenta.
 
