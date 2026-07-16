@@ -25,7 +25,7 @@ El dominio principal `tecnicosenrd.com` actualmente sirve otra aplicación. No l
 - iOS para simulador: build `ecee20e8-3801-4d5c-a177-78cdecc0d22b`, finalizado y probado.
 - iOS para TestFlight/App Store (IPA, versión `1.0.0`, build `3`): build `481ddb88-b876-4935-8028-3e74f88fe89f`, finalizado, firmado y validado.
 - Ficha de App Store Connect: Apple ID `6791414260`, vinculada en `eas.json`.
-- Entrega a TestFlight: pendiente de configurar una App Store Connect API Key en EAS Submit.
+- Entrega a App Store Connect/TestFlight: submission `a0fb0e0f-a457-4965-8c2c-c4e033bfe1f6`, finalizada sin errores; procesamiento de Apple pendiente.
 
 Los builds se consultan en `https://expo.dev/accounts/nelsoncerda/projects/tecnicos-en-rd/builds`.
 
