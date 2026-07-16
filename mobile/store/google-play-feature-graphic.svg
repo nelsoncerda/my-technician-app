@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
+  <rect width="1024" height="500" fill="#17233C"/>
+  <circle cx="980" cy="40" r="250" fill="#2A7F74" opacity="0.16"/>
+  <circle cx="870" cy="500" r="215" fill="#2A6F97" opacity="0.17"/>
+  <path d="M560 75c86 29 91 106 160 119 78 15 126-64 226-22" fill="none" stroke="#6EB6AC" stroke-width="3" stroke-dasharray="8 12" opacity="0.36"/>
+  <circle cx="560" cy="75" r="7" fill="#6EB6AC" opacity="0.72"/>
+  <circle cx="946" cy="172" r="7" fill="#6EB6AC" opacity="0.72"/>
+
+  <g transform="translate(64 54)">
+    <rect width="78" height="78" rx="22" fill="#B94A35"/>
+    <path d="M45 23a13 13 0 0 0-15 16L17 52a6 6 0 0 0 9 9l13-13a13 13 0 0 0 16-15l-8 8a3 3 0 0 1-4 0l-5-5a3 3 0 0 1 0-4l7-9ZM21 58a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Z" fill="#FFFDF8"/>
+  </g>
+  <text x="164" y="91" fill="#FFFDF8" font-family="Arial, Helvetica, sans-serif" font-size="27" font-weight="800">Técnicos en RD</text>
+  <text x="164" y="121" fill="#BFE7E1" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">PROFESIONALES LOCALES</text>
+
+  <text x="64" y="221" fill="#FFFDF8" font-family="Arial, Helvetica, sans-serif" font-size="47" font-weight="900" letter-spacing="-1.2">Resuelve lo de tu hogar</text>
+  <text x="64" y="277" fill="#FFFDF8" font-family="Arial, Helvetica, sans-serif" font-size="47" font-weight="900" letter-spacing="-1.2">con gente de aquí.</text>
+  <text x="66" y="330" fill="#CAD1DD" font-family="Arial, Helvetica, sans-serif" font-size="21">Busca, compara y solicita servicios en minutos.</text>
+
+  <g transform="translate(65 374)">
+    <rect width="164" height="52" rx="26" fill="#B94A35"/>
+    <text x="82" y="33" text-anchor="middle" fill="#FFFDF8" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="800">Buscar técnicos</text>
+    <g transform="translate(252 3)">
+      <circle cx="23" cy="23" r="23" fill="#EAF3F7"/>
+      <path d="M23 13a8 8 0 0 0-8 8c0 6 8 14 8 14s8-8 8-14a8 8 0 0 0-8-8Zm0 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6Z" fill="#2A6F97"/>
+      <text x="58" y="29" fill="#D8E8F0" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">Santiago y el Cibao</text>
+    </g>
+  </g>
+
+  <g transform="translate(666 75)">
+    <rect width="294" height="350" rx="30" fill="#F6EFE5"/>
+    <rect x="22" y="22" width="250" height="54" rx="17" fill="#FFFDF8" stroke="#E3D7C7" stroke-width="2"/>
+    <circle cx="51" cy="49" r="10" fill="none" stroke="#2A6F97" stroke-width="3"/>
+    <path d="M59 57l8 8" stroke="#2A6F97" stroke-width="3" stroke-linecap="round"/>
+    <text x="79" y="56" fill="#667085" font-family="Arial, Helvetica, sans-serif" font-size="15">Plomero, electricista...</text>
+
+    <rect x="22" y="98" width="250" height="198" rx="22" fill="#FFFDF8"/>
+    <circle cx="67" cy="143" r="25" fill="#D8E8F0"/>
+    <path d="M73 130a11 11 0 0 0-13 13l-10 10a5 5 0 0 0 7 7l10-10a11 11 0 0 0 13-13l-7 7a2 2 0 0 1-3 0l-4-4a2 2 0 0 1 0-3l7-7Z" fill="#2A6F97"/>
+    <text x="104" y="136" fill="#17233C" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="800">Servicio local</text>
+    <text x="104" y="158" fill="#667085" font-family="Arial, Helvetica, sans-serif" font-size="13">Perfil claro y contacto protegido</text>
+    <path d="M43 190h208" stroke="#E3D7C7"/>
+    <circle cx="50" cy="217" r="7" fill="#2A7F74"/>
+    <text x="67" y="223" fill="#21665D" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">Disponible en tu zona</text>
+    <rect x="42" y="246" width="210" height="36" rx="18" fill="#B94A35"/>
+    <text x="147" y="270" text-anchor="middle" fill="#FFFDF8" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="800">Solicitar servicio</text>
+
+    <rect x="54" y="319" width="186" height="11" rx="6" fill="#E3D7C7"/>
+  </g>
+</svg>
