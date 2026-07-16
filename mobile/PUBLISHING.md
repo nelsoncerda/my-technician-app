@@ -25,8 +25,12 @@ El dominio principal `tecnicosenrd.com` actualmente sirve otra aplicación. No l
 - iOS para TestFlight/App Store (IPA, versión `1.0.0`, build `5`): build `2c3e7e5f-7aca-4b0b-a624-e7e773a1a7e7`, finalizado, firmado y validado. Se verificó directamente que el `Info.plist` del IPA incluye las descripciones de movimiento y ubicación. Artefacto: <https://expo.dev/artifacts/eas/lsO4V5fQS55x4ymRkdnZoLl7avnyopVHlzixuF5_O-k.ipa>.
 - Ficha de App Store Connect: Apple ID `6791414260`, vinculada en `eas.json`.
 - El build 4 quedó obsoleto después de que Apple reportó `ITMS-90683` por la ausencia de `NSMotionUsageDescription`. La configuración se corrigió y se añadió una prueba de regresión.
-- Entrega del build 5 a App Store Connect: submission `a054c1be-1ead-42bb-8a92-3c87ee629c77`, finalizada sin errores; procesamiento de Apple pendiente.
+- Entrega del build 5 a App Store Connect: submission EAS `a054c1be-1ead-42bb-8a92-3c87ee629c77`, finalizada sin errores y procesada por Apple.
+- Envío a App Review: submission Apple `46fef2e4-a062-4ed7-93bb-6fd06f55a286`, estado `Waiting for Review` desde el 16 de julio de 2026. La publicación permanece manual después de la aprobación.
 - Metadatos reproducibles: `store.config.js`, validados y sincronizados con EAS Metadata. Incluyen la ficha en español, categoría Lifestyle, lanzamiento manual, las cuatro capturas de iPhone y la cuenta dedicada de revisión obtenida desde macOS Keychain.
+- Capturas: cuatro imágenes para iPhone de 6.3 pulgadas y cuatro para el grupo obligatorio de 6.5 pulgadas (`1242 × 2688`).
+- Clasificación de edad: 4+; las preguntas nuevas de redes sociales y acceso social para menores de 13 se respondieron `No`.
+- EAS Metadata v0 todavía no representa esas dos preguntas sociales; después de futuras sincronizaciones de metadatos, verificarlas manualmente en App Information antes de enviar otra versión.
 - App Privacy publicada en App Store Connect: nueve tipos de datos, usados para funcionalidad, vinculados a la identidad y sin rastreo.
 
 Los builds se consultan en `https://expo.dev/accounts/nelsoncerda/projects/tecnicos-en-rd/builds`.
