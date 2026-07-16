@@ -17,6 +17,10 @@ EAS build was restored after capture.
 Apple accepts this resolution for 6.3-inch iPhone screenshots. Google Play can
 use the Android captures below, which match its phone screenshot constraints.
 
+The `ios-6.5/` images are centered, aspect-preserving crops of the same captures
+at 1242 × 2688. They populate Apple's required 6.5-inch display group without
+changing the screens or their data.
+
 ## Android phone
 
 The `android-phone/` images were recaptured on an Android 16 phone emulator from

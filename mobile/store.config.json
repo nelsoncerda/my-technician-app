@@ -29,6 +29,12 @@
         "privacyPolicyUrl": "https://api.tecnicosenrd.com/privacy",
         "privacyChoicesUrl": "https://api.tecnicosenrd.com/account-deletion",
         "screenshots": {
+          "APP_IPHONE_65": [
+            "store/screenshots/ios-6.5/01-directory.jpg",
+            "store/screenshots/ios-6.5/02-technician-profile.jpg",
+            "store/screenshots/ios-6.5/03-filtered-search.jpg",
+            "store/screenshots/ios-6.5/04-account-and-privacy.jpg"
+          ],
           "APP_IPHONE_61": [
             "store/screenshots/ios-6.3/01-directory.jpg",
             "store/screenshots/ios-6.3/02-technician-profile.jpg",
