@@ -64,7 +64,7 @@
       "healthOrWellnessTopics": false,
       "messagingAndChat": false,
       "parentalControls": false,
-      "userGeneratedContent": false
+      "userGeneratedContent": true
     }
   }
 }

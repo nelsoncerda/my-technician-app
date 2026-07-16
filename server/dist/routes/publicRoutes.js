@@ -71,11 +71,11 @@ router.get('/privacy', (_req, res) => {
     <h2>2. Cómo usamos la información</h2>
     <p>Usamos estos datos para operar la aplicación, conectar clientes con técnicos, gestionar reservas, enviar avisos del servicio, mantener la seguridad y cumplir obligaciones legales. No vendemos información personal.</p>
     <h2>3. Cuándo compartimos datos</h2>
-    <p>Compartimos los detalles necesarios de una reserva entre el cliente y el técnico seleccionado. También podemos utilizar proveedores que alojan la aplicación, la base de datos o el correo, sujetos a obligaciones de confidencialidad y seguridad.</p>
+    <p>Compartimos los detalles necesarios de una reserva entre el cliente y el técnico seleccionado. Amazon Web Services aloja la aplicación y la base de datos en Lightsail y procesa el correo transaccional mediante Amazon Simple Email Service (SES). Estos proveedores tratan la información únicamente para operar el servicio y están sujetos a obligaciones de confidencialidad y seguridad.</p>
     <h2>4. Ubicación y sensores</h2>
     <p>El GPS es opcional, se usa en primer plano y sirve para sugerir una zona o completar una dirección. Puedes negar el permiso y escribir la ubicación manualmente. La aplicación no utiliza acelerómetro, cámara ni micrófono.</p>
     <h2>5. Conservación y seguridad</h2>
-    <p>Conservamos la información mientras la cuenta esté activa o sea necesaria para prestar el servicio, resolver disputas y cumplir la ley. Aplicamos controles de acceso, conexiones cifradas y almacenamiento seguro del token de sesión en el dispositivo.</p>
+    <p>Conservamos la información mientras la cuenta esté activa o sea necesaria para prestar el servicio, resolver disputas y cumplir la ley. Los registros técnicos de acceso, que pueden incluir dirección IP, ruta solicitada, fecha, agente de usuario y resultado HTTP, rotan diariamente y se conservan durante 14 días salvo que sean necesarios para investigar un incidente de seguridad o cumplir una obligación legal. Aplicamos controles de acceso, conexiones cifradas y almacenamiento seguro del token de sesión en el dispositivo.</p>
     <h2>6. Tus opciones y derechos</h2>
     <p>Puedes cerrar sesión, negar el permiso de ubicación y eliminar permanentemente tu cuenta desde Cuenta → Eliminar cuenta. La eliminación borra el perfil y los datos asociados según lo permita la ley.</p>
     ${contactParagraph()}
