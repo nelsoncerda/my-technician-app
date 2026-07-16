@@ -22,9 +22,10 @@ El dominio principal `tecnicosenrd.com` actualmente sirve otra aplicación. No l
 - Proyecto Expo: `@nelsoncerda/tecnicos-en-rd`.
 - Android de tienda (AAB, versión `1.0.0`, código `3`): build `99643332-00bd-4164-9eb2-c975b59f0cae`, finalizado y validado. Artefacto: <https://expo.dev/artifacts/eas/gla3aP0nWveWByE4ZgoncOl9zNzcdzzAfc1OBDHf_JQ.aab>.
 - iOS para simulador: build `c56f4643-0742-42c2-ab7d-30f2faa9996a`, finalizado y probado.
-- iOS para TestFlight/App Store (IPA, versión `1.0.0`, build `4`): build `0096cb8f-8bc9-42ab-b281-498a0111d4f3`, finalizado, firmado y validado. Artefacto: <https://expo.dev/artifacts/eas/35gWCOWplycSY9U7-owR1Bh_wD9rVKQaKuTm_WzXbnA.ipa>.
+- iOS para TestFlight/App Store (IPA, versión `1.0.0`, build `5`): build `2c3e7e5f-7aca-4b0b-a624-e7e773a1a7e7`, finalizado, firmado y validado. Se verificó directamente que el `Info.plist` del IPA incluye las descripciones de movimiento y ubicación. Artefacto: <https://expo.dev/artifacts/eas/lsO4V5fQS55x4ymRkdnZoLl7avnyopVHlzixuF5_O-k.ipa>.
 - Ficha de App Store Connect: Apple ID `6791414260`, vinculada en `eas.json`.
-- Entrega del build 4 a App Store Connect: submission `2204ab00-3edc-43d3-adb3-08f2a902354f`, finalizada sin errores. Apple todavía debe terminar de procesar y mostrar el build antes de asociarlo a la versión 1.0.
+- El build 4 quedó obsoleto después de que Apple reportó `ITMS-90683` por la ausencia de `NSMotionUsageDescription`. La configuración se corrigió y se añadió una prueba de regresión.
+- Entrega del build 5 a App Store Connect: submission `a054c1be-1ead-42bb-8a92-3c87ee629c77`, finalizada sin errores; procesamiento de Apple pendiente.
 - Metadatos reproducibles: `store.config.js`, validados y sincronizados con EAS Metadata. Incluyen la ficha en español, categoría Lifestyle, lanzamiento manual, las cuatro capturas de iPhone y la cuenta dedicada de revisión obtenida desde macOS Keychain.
 - App Privacy publicada en App Store Connect: nueve tipos de datos, usados para funcionalidad, vinculados a la identidad y sin rastreo.
 
