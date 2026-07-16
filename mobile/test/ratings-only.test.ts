@@ -70,3 +70,18 @@ test('the mobile technician API does not expose review submission', () => {
   assert.doesNotMatch(apiSource, /\baddReview\b/);
   assert.doesNotMatch(apiSource, /\/reviews[^'"`]*['"`]\s*,\s*\{\s*method:\s*['"]POST['"]/s);
 });
+
+test('the iOS build declares the motion purpose string required by expo-location', () => {
+  const appConfig = JSON.parse(readFileSync('app.json', 'utf8')) as {
+    expo?: { plugins?: unknown[] };
+  };
+  const locationPlugin = appConfig.expo?.plugins?.find(
+    (plugin): plugin is [string, Record<string, unknown>] =>
+      Array.isArray(plugin) && plugin[0] === 'expo-location',
+  );
+  const purpose = locationPlugin?.[1]?.motionUsagePermission;
+
+  assert.ok(typeof purpose === 'string');
+  assert.ok(purpose.trim().length > 20);
+  assert.equal(locationPlugin?.[1]?.isIosBackgroundLocationEnabled, false);
+});

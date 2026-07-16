@@ -19,5 +19,6 @@
     "src/lib/technician.ts",
     "src/types/api.ts",
     "test/**/*.ts"
-  ]
+  ],
+  "exclude": []
 }
