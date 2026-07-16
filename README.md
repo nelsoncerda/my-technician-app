@@ -1,6 +1,6 @@
 # Técnicos en RD
 
-Marketplace local para encontrar, comparar y reservar técnicos en Santiago y el Cibao. El proyecto incluye una aplicación React, una API Express y PostgreSQL mediante Prisma.
+Marketplace local para encontrar, comparar y reservar técnicos en Santiago y el Cibao. El proyecto incluye una aplicación web React, una aplicación móvil Expo/React Native, una API Express y PostgreSQL mediante Prisma.
 
 ## Funciones principales
 
@@ -54,6 +54,20 @@ npm start
 
 La web queda en [http://localhost:3000](http://localhost:3000), la API en [http://localhost:3001](http://localhost:3001) y el estado del proceso en [http://localhost:3001/health](http://localhost:3001/health).
 
+## Aplicación móvil
+
+El cliente para iOS y Android vive en `mobile/` y reutiliza la API y las cuentas existentes:
+
+```bash
+cd mobile
+npm install
+npm start
+```
+
+Consulta [`mobile/README.md`](./mobile/README.md) para desarrollo y
+[`mobile/PUBLISHING.md`](./mobile/PUBLISHING.md) para TestFlight, Google Play y
+los datos requeridos por las tiendas.
+
 ## Verificación
 
 ```bash
@@ -73,4 +87,7 @@ npm test
 - Ejecuta `npx prisma migrate deploy` y `npm run db:seed` durante el despliegue.
 - Sirve `build/` desde el proxy web y dirige `/api` al proceso Express.
 
-Consulta [DEPLOYMENT.md](./DEPLOYMENT.md) para la guía de Nginx y Lightsail.
+La topología compartida actual y el despliegue seguro de la API móvil están en
+[`docs/mobile-api-operations.md`](./docs/mobile-api-operations.md). El antiguo
+despliegue de sitio completo se conserva únicamente como referencia histórica
+en [`DEPLOYMENT.md`](./DEPLOYMENT.md).

@@ -1,4 +1,12 @@
-# Production deployment: AWS Lightsail
+# Historical full-site deployment: AWS Lightsail
+
+> **Do not run this full-site procedure on the current shared instance.** Since
+> July 15, 2026, `tecnicosenrd.com` serves DriveForm and Técnicos en RD uses
+> `api.tecnicosenrd.com` for its API and mobile publication pages. Installing
+> the Nginx file referenced below would overwrite the other application. Use
+> [`docs/mobile-api-operations.md`](docs/mobile-api-operations.md) for the
+> current backend-only release procedure. This document is retained only as a
+> record of the earlier single-site topology.
 
 This runbook deploys **Técnicos en RD** to the existing Lightsail instance at
 `tecnicosenrd.com`. Deployments use immutable release directories and an atomic
@@ -90,9 +98,9 @@ credentials out of Git, terminal history, screenshots, and deployment logs.
 DATABASE_URL=
 AUTH_SECRET=
 NODE_ENV=production
-APP_URL=https://tecnicosenrd.com
-API_URL=https://tecnicosenrd.com
-CORS_ORIGIN=https://tecnicosenrd.com,https://www.tecnicosenrd.com
+APP_URL=https://api.tecnicosenrd.com
+API_URL=https://api.tecnicosenrd.com
+CORS_ORIGIN=https://api.tecnicosenrd.com
 PORT=3001
 SMTP_HOST=
 SMTP_PORT=587

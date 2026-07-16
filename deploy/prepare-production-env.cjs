@@ -25,9 +25,9 @@ const requiredValues = new Map([
   ['NODE_ENV', 'production'],
   ['PORT', '3001'],
   ['AUTH_SECRET', authSecret],
-  ['APP_URL', 'https://tecnicosenrd.com'],
-  ['API_URL', 'https://tecnicosenrd.com'],
-  ['CORS_ORIGIN', 'https://tecnicosenrd.com,https://www.tecnicosenrd.com'],
+  ['APP_URL', 'https://api.tecnicosenrd.com'],
+  ['API_URL', 'https://api.tecnicosenrd.com'],
+  ['CORS_ORIGIN', 'https://api.tecnicosenrd.com'],
 ]);
 
 const originalLines = fs.readFileSync(envFile, 'utf8').split(/\r?\n/);

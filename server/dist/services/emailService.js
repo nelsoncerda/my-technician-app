@@ -15,8 +15,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendPasswordResetEmail = exports.sendWelcomeEmail = exports.sendVerificationEmail = exports.sendEmail = void 0;
 const nodemailer_1 = __importDefault(require("nodemailer"));
 // Configuration - use environment variables in production
-const APP_URL = process.env.APP_URL || 'https://tecnicosenrd.com';
-const API_URL = process.env.API_URL || 'https://tecnicosenrd.com';
+const APP_URL = process.env.APP_URL || 'https://api.tecnicosenrd.com';
+const API_URL = process.env.API_URL || 'https://api.tecnicosenrd.com';
 // SMTP Configuration from environment variables
 const SMTP_HOST = process.env.SMTP_HOST;
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587');
@@ -257,7 +257,7 @@ exports.sendWelcomeEmail = sendWelcomeEmail;
 const sendPasswordResetEmail = (email, token, userName) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { transporter, testAccount } = yield createTransporter();
-        const resetLink = `${APP_URL}?reset=${token}`;
+        const resetLink = `${APP_URL}/reset-password?token=${token}`;
         const content = `
             <h2 style="margin: 0 0 20px; color: #333; font-size: 24px;">Restablecer contraseña</h2>
             <p style="margin: 0 0 20px; color: #555; font-size: 16px; line-height: 1.6;">

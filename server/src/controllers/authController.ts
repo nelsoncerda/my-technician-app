@@ -6,7 +6,7 @@ import { hashPassword, verifyPassword } from '../security/password';
 import { createAuthToken, normalizeAuthRole } from '../security/token';
 import { safeUserSelect } from '../utils/safeUser';
 
-const APP_URL = process.env.APP_URL || 'https://tecnicosenrd.com';
+const APP_URL = process.env.APP_URL || 'https://api.tecnicosenrd.com';
 
 export const register = async (req: Request, res: Response) => {
     try {

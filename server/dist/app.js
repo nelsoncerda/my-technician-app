@@ -13,6 +13,7 @@ const userRoutes_1 = __importDefault(require("./routes/userRoutes"));
 const bookingRoutes_1 = __importDefault(require("./routes/bookingRoutes"));
 const gamificationRoutes_1 = __importDefault(require("./routes/gamificationRoutes"));
 const settingsRoutes_1 = __importDefault(require("./routes/settingsRoutes"));
+const publicRoutes_1 = __importDefault(require("./routes/publicRoutes"));
 exports.app = (0, express_1.default)();
 exports.app.disable('x-powered-by');
 if (process.env.NODE_ENV === 'production') {
@@ -44,6 +45,7 @@ exports.app.use(express_1.default.urlencoded({ limit: '5mb', extended: true }));
 exports.app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
 });
+exports.app.use(publicRoutes_1.default);
 exports.app.use('/api/auth', authRoutes_1.default);
 exports.app.use('/api/technicians', technicianRoutes_1.default);
 exports.app.use('/api/users', userRoutes_1.default);

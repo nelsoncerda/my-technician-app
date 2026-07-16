@@ -7,6 +7,7 @@ import userRoutes from './routes/userRoutes';
 import bookingRoutes from './routes/bookingRoutes';
 import gamificationRoutes from './routes/gamificationRoutes';
 import settingsRoutes from './routes/settingsRoutes';
+import publicRoutes from './routes/publicRoutes';
 
 export const app = express();
 app.disable('x-powered-by');
@@ -46,6 +47,8 @@ app.use(express.urlencoded({ limit: '5mb', extended: true }));
 app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
 });
+
+app.use(publicRoutes);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/technicians', technicianRoutes);

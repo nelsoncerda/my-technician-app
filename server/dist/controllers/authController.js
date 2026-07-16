@@ -19,7 +19,7 @@ const crypto_1 = __importDefault(require("crypto"));
 const password_1 = require("../security/password");
 const token_1 = require("../security/token");
 const safeUser_1 = require("../utils/safeUser");
-const APP_URL = process.env.APP_URL || 'https://tecnicosenrd.com';
+const APP_URL = process.env.APP_URL || 'https://api.tecnicosenrd.com';
 const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { name, email, password, phone, accountType, specializations, location, photoBase64, companyName } = req.body;

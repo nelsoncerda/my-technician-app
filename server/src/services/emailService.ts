@@ -1,8 +1,8 @@
 import nodemailer from 'nodemailer';
 
 // Configuration - use environment variables in production
-const APP_URL = process.env.APP_URL || 'https://tecnicosenrd.com';
-const API_URL = process.env.API_URL || 'https://tecnicosenrd.com';
+const APP_URL = process.env.APP_URL || 'https://api.tecnicosenrd.com';
+const API_URL = process.env.API_URL || 'https://api.tecnicosenrd.com';
 
 // SMTP Configuration from environment variables
 const SMTP_HOST = process.env.SMTP_HOST;
@@ -271,7 +271,7 @@ export const sendPasswordResetEmail = async (email: string, token: string, userN
     try {
         const { transporter, testAccount } = await createTransporter();
 
-        const resetLink = `${APP_URL}?reset=${token}`;
+        const resetLink = `${APP_URL}/reset-password?token=${token}`;
 
         const content = `
             <h2 style="margin: 0 0 20px; color: #333; font-size: 24px;">Restablecer contraseña</h2>
