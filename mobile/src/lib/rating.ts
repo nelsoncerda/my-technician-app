@@ -7,9 +7,9 @@ export function formatRating(value: number): string {
   return clampRating(value).toFixed(1);
 }
 
-export function getRatingLabel(value: number, reviewCount?: number): string {
+export function getRatingLabel(value: number, ratingCount?: number): string {
   const rating = clampRating(value);
-  if (reviewCount === 0 || rating === 0) return 'Sin reseñas todavía';
+  if (rating === 0) return 'Sin calificaciones todavía';
 
   const quality = rating >= 4.5
     ? 'Excelente'
@@ -19,7 +19,9 @@ export function getRatingLabel(value: number, reviewCount?: number): string {
         ? 'Bueno'
         : 'Calificación';
 
-  if (reviewCount === undefined) return `${quality}, ${formatRating(rating)} de 5`;
-  const reviewWord = reviewCount === 1 ? 'reseña' : 'reseñas';
-  return `${quality}, ${formatRating(rating)} de 5, ${reviewCount} ${reviewWord}`;
+  if (ratingCount === undefined || ratingCount <= 0) {
+    return `${quality}, ${formatRating(rating)} de 5`;
+  }
+  const ratingWord = ratingCount === 1 ? 'calificación' : 'calificaciones';
+  return `${quality}, ${formatRating(rating)} de 5, ${ratingCount} ${ratingWord}`;
 }

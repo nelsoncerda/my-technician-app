@@ -24,7 +24,8 @@
         "track": "internal"
       },
       "ios": {
-        "ascAppId": "6791414260"
+        "ascAppId": "6791414260",
+        "metadataPath": "./store.config.js"
       }
     }
   }

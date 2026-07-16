@@ -5,11 +5,10 @@ import type {
   LoginResponse,
   MessageResponse,
   RegisterInput,
-  Review,
   Settings,
-  Technician,
   User,
 } from '@/types/api';
+import { normalizeTechnician, type TechnicianApiPayload } from '@/lib/technician';
 
 export const API_BASE_URL = (
   process.env.EXPO_PUBLIC_API_URL || 'https://api.tecnicosenrd.com'
@@ -152,16 +151,12 @@ export const api = {
     get: () => apiRequest<Settings>('/api/settings'),
   },
   technicians: {
-    list: () => apiRequest<Technician[]>('/api/technicians'),
-    addReview: (
-      technicianId: string,
-      input: Pick<Review, 'rating' | 'comment'>,
-      token: string
-    ) => apiRequest<Review>(`/api/technicians/${encodeURIComponent(technicianId)}/reviews`, {
-      method: 'POST',
-      token,
-      json: input,
-    }),
+    list: async () => {
+      const technicians = await apiRequest<TechnicianApiPayload[]>(
+        '/api/technicians?view=ratings'
+      );
+      return technicians.map(normalizeTechnician);
+    },
   },
   bookings: {
     create: (input: CreateBookingInput, token: string) =>

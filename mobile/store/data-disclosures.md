@@ -8,7 +8,7 @@ Este documento sirve para completar App Privacy y Google Play Data safety. Las r
 | --- | --- | --- | --- |
 | Información de contacto | nombre, correo, teléfono | cuenta, reserva, avisos y contacto entre las partes | con el técnico o cliente de la reserva; proveedores operativos |
 | Identificadores | ID interno de usuario y reserva | autenticación, seguridad y operación | proveedores operativos |
-| Contenido del usuario | foto opcional, descripción, dirección del servicio, reseñas | perfil y prestación del servicio | con usuarios involucrados; contenido de perfil/reseña puede ser público |
+| Contenido del usuario | foto opcional, descripción, dirección del servicio y calificaciones | perfil y prestación del servicio | con usuarios involucrados; las calificaciones solo se muestran de forma agregada |
 | Actividad de la aplicación | historial y estado de reservas | ofrecer y administrar la función solicitada | proveedores operativos |
 | Diagnóstico/seguridad | IP y registros básicos del servidor | seguridad, prevención de abuso y disponibilidad | proveedor de alojamiento |
 

@@ -8,6 +8,7 @@ SOURCE=${SOURCE:-$APP_ROOT/release-source}
 RELEASES=$APP_ROOT/releases
 SHARED=$APP_ROOT/shared
 ENV_FILE=$SHARED/server.env
+BACKUP_ROOT=$APP_ROOT/backups
 
 if [[ -s "$HOME/.nvm/nvm.sh" ]]; then
   # shellcheck disable=SC1090
@@ -22,7 +23,7 @@ REVISION=$(git -C "$SOURCE" rev-parse "${REVISION}^{commit}")
 
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 RELEASE=$RELEASES/${STAMP}-${REVISION:0:7}
-BACKUP=$APP_ROOT/backups/${STAMP}-mobile-api
+BACKUP=$BACKUP_ROOT/${STAMP}-mobile-api
 PREVIOUS=''
 CUTOVER_COMPLETE=0
 
@@ -67,6 +68,12 @@ PG_DUMP_BIN=/usr/lib/postgresql/13/bin/pg_dump \
   "$BACKUP/database.dump"
 chmod 600 "$BACKUP/database.dump"
 /usr/lib/postgresql/13/bin/pg_restore --list "$BACKUP/database.dump" >/dev/null
+
+# A fresh, validated rollback dump now exists. Prune only expired database
+# dumps from standard release backup directories; configuration and recovery
+# metadata stored beside them remain untouched.
+/usr/bin/flock -x "$SHARED/database-backup-retention.lock" \
+  "$RELEASE/deploy/prune-database-backups.sh" "$APP_ROOT"
 
 npx prisma migrate deploy
 npm prune --omit=dev

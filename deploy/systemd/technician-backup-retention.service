@@ -1,0 +1,16 @@
+[Unit]
+Description=Prune expired Tecnicos en RD database dumps
+ConditionPathIsExecutable=/home/bitnami/apps/technician-current/deploy/prune-database-backups.sh
+After=local-fs.target
+
+[Service]
+Type=oneshot
+User=bitnami
+Group=bitnami
+UMask=0077
+ExecStart=/usr/bin/flock -x -w 300 /home/bitnami/apps/shared/database-backup-retention.lock /home/bitnami/apps/technician-current/deploy/prune-database-backups.sh /home/bitnami/apps
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/bitnami/apps/backups /home/bitnami/apps/shared

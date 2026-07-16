@@ -1,6 +1,6 @@
 # Técnicos en RD — aplicación móvil
 
-Aplicación nativa para clientes, creada con Expo SDK 57 y React Native. Consume la API existente de Técnicos en RD y comparte sus usuarios, técnicos, reseñas y reservas.
+Aplicación nativa para clientes, creada con Expo SDK 57 y React Native. Consume la API existente de Técnicos en RD y comparte sus usuarios, técnicos, calificaciones agregadas y reservas.
 
 ## Alcance de la versión 1
 

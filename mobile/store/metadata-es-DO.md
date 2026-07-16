@@ -21,7 +21,7 @@ Técnicos en RD te permite buscar electricistas, plomeros, técnicos de aire aco
 Con la aplicación puedes:
 
 - Buscar por servicio, nombre o empresa con sugerencias mientras escribes.
-- Comparar especialidades, zonas, perfiles verificados, calificaciones y reseñas.
+- Comparar especialidades, zonas, perfiles verificados y calificaciones agregadas.
 - Consultar fechas y horarios disponibles antes de solicitar.
 - Completar la dirección manualmente o usar el GPS de forma opcional mientras utilizas la aplicación.
 - Revisar el estado y los detalles de cada reserva.

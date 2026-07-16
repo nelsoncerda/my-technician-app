@@ -7,7 +7,7 @@ const sections: LegalSection[] = [
     bullets: [
       'Nombre, correo electrónico, teléfono y credenciales protegidas de la cuenta.',
       'Dirección, ciudad, fecha, hora y descripción que proporcionas al solicitar un servicio.',
-      'Perfiles profesionales, especialidades, fotos opcionales, reservas y reseñas.',
+      'Perfiles profesionales, especialidades, fotos opcionales, reservas y calificaciones.',
       'Procesamiento temporal de la ubicación solo cuando pulsas “Usar mi ubicación”. Las coordenadas no se guardan en nuestra API y no usamos ubicación en segundo plano.',
       'Datos técnicos básicos necesarios para seguridad, diagnóstico y prevención de abuso.',
     ],

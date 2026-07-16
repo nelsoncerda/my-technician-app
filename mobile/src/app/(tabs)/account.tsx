@@ -254,7 +254,7 @@ export default function AccountScreen() {
             <Trash2 color={BrandColors.danger} size={24} accessible={false} />
             <Text style={styles.confirmationTitle}>¿Eliminar tu cuenta permanentemente?</Text>
             <Text style={styles.confirmationMessage}>
-              Se borrarán tu perfil, reservas y reseñas. Esta acción no se puede deshacer.
+              Se borrarán tu perfil, reservas y calificaciones. Esta acción no se puede deshacer.
             </Text>
             <View style={styles.confirmationActions}>
               <Button

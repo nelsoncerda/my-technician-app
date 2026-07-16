@@ -4,9 +4,7 @@ import {
   CalendarDays,
   CheckCircle2,
   MapPin,
-  MessageSquareText,
   ShieldCheck,
-  Star,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -25,14 +23,12 @@ import {
   DirectoryError,
   DirectoryRadius,
   DirectorySpacing,
-  getEffectiveRating,
   getInitials,
   getSpecializations,
   TechnicianRating,
 } from '@/components/technician';
 import { api } from '@/lib/api';
-import { formatDisplayDate } from '@/lib/date';
-import type { Review, Technician } from '@/types/api';
+import type { Technician } from '@/types/api';
 
 export default function TechnicianDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
@@ -114,7 +110,6 @@ export default function TechnicianDetailScreen() {
   }
 
   const services = getSpecializations(technician);
-  const rating = getEffectiveRating(technician);
 
   return (
     <SafeAreaView edges={['bottom']} style={styles.screen}>
@@ -131,8 +126,8 @@ export default function TechnicianDetailScreen() {
             <Text style={styles.company}>{technician.companyName}</Text>
           ) : null}
           <TechnicianRating
-            rating={rating}
-            reviewCount={technician.reviews.length}
+            rating={technician.rating}
+            ratingCount={technician.ratingCount}
             style={styles.rating}
           />
           <View style={styles.locationRow}>
@@ -171,37 +166,6 @@ export default function TechnicianDetailScreen() {
               Tus datos se comparten únicamente al gestionar una solicitud de servicio.
             </Text>
           </View>
-        </View>
-
-        <View style={styles.reviewsSection}>
-          <View style={styles.reviewsHeading}>
-            <View>
-              <Text accessibilityRole="header" style={styles.sectionTitle}>
-                Reseñas
-              </Text>
-              <Text style={styles.reviewCount}>
-                {technician.reviews.length}{' '}
-                {technician.reviews.length === 1 ? 'opinión publicada' : 'opiniones publicadas'}
-              </Text>
-            </View>
-            <MessageSquareText color={DirectoryColors.ocean} size={23} />
-          </View>
-
-          {technician.reviews.length ? (
-            <View style={styles.reviewList}>
-              {technician.reviews.map((review) => (
-                <ReviewCard key={review.id} review={review} />
-              ))}
-            </View>
-          ) : (
-            <View style={styles.noReviews}>
-              <Star color={DirectoryColors.amber} size={24} />
-              <Text style={styles.noReviewsTitle}>Todavía no hay reseñas</Text>
-              <Text style={styles.noReviewsDescription}>
-                Las opiniones aparecen después de servicios completados.
-              </Text>
-            </View>
-          )}
         </View>
       </ScrollView>
 
@@ -250,31 +214,6 @@ function DetailAvatar({ technician }: { technician: Technician }) {
           <BadgeCheck color={DirectoryColors.teal} fill={DirectoryColors.cream} size={27} />
         </View>
       ) : null}
-    </View>
-  );
-}
-
-function ReviewCard({ review }: { review: Review }) {
-  const date = formatDisplayDate(review.date);
-  const rating = Math.min(5, Math.max(0, Math.round(review.rating)));
-
-  return (
-    <View style={styles.reviewCard}>
-      <View style={styles.reviewTopRow}>
-        <View style={styles.stars} accessibilityLabel={`${rating} de 5 estrellas`}>
-          {Array.from({ length: 5 }, (_, index) => (
-            <Star
-              color={index < rating ? DirectoryColors.amber : DirectoryColors.border}
-              fill={index < rating ? DirectoryColors.amber : 'transparent'}
-              key={index}
-              size={15}
-            />
-          ))}
-        </View>
-        {date ? <Text style={styles.reviewDate}>{date}</Text> : null}
-      </View>
-      <Text style={styles.reviewComment}>{review.comment}</Text>
-      <Text style={styles.reviewAuthor}>{review.author}</Text>
     </View>
   );
 }
@@ -496,78 +435,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     marginTop: 3,
-  },
-  reviewsSection: {
-    paddingHorizontal: DirectorySpacing.lg,
-    paddingTop: DirectorySpacing.section,
-  },
-  reviewsHeading: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  reviewCount: {
-    color: DirectoryColors.muted,
-    fontSize: 13,
-    marginTop: 3,
-  },
-  reviewList: {
-    gap: DirectorySpacing.md,
-    marginTop: DirectorySpacing.lg,
-  },
-  reviewCard: {
-    backgroundColor: DirectoryColors.cream,
-    borderColor: DirectoryColors.border,
-    borderRadius: DirectoryRadius.lg,
-    borderWidth: 1,
-    padding: DirectorySpacing.lg,
-  },
-  reviewTopRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  stars: {
-    flexDirection: 'row',
-    gap: 2,
-  },
-  reviewDate: {
-    color: DirectoryColors.muted,
-    fontSize: 11,
-  },
-  reviewComment: {
-    color: DirectoryColors.charcoal,
-    fontSize: 14,
-    lineHeight: 21,
-    marginTop: DirectorySpacing.md,
-  },
-  reviewAuthor: {
-    color: DirectoryColors.ink,
-    fontSize: 12,
-    fontWeight: '800',
-    marginTop: DirectorySpacing.md,
-  },
-  noReviews: {
-    alignItems: 'center',
-    backgroundColor: DirectoryColors.cream,
-    borderColor: DirectoryColors.border,
-    borderRadius: DirectoryRadius.lg,
-    borderWidth: 1,
-    marginTop: DirectorySpacing.lg,
-    padding: DirectorySpacing.xxl,
-  },
-  noReviewsTitle: {
-    color: DirectoryColors.ink,
-    fontSize: 16,
-    fontWeight: '900',
-    marginTop: DirectorySpacing.md,
-  },
-  noReviewsDescription: {
-    color: DirectoryColors.muted,
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: DirectorySpacing.xs,
-    textAlign: 'center',
   },
   footer: {
     alignItems: 'center',

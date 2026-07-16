@@ -1,56 +1,49 @@
 import { Star } from 'lucide-react-native';
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { clampRating, formatRating, getRatingLabel } from '@/lib/rating';
+
 import { DirectoryColors } from './tokens';
 
 interface TechnicianRatingProps {
   rating?: number | null;
-  reviewCount?: number;
+  ratingCount?: number;
   compact?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
-const validRating = (rating?: number | null) =>
-  typeof rating === 'number' && Number.isFinite(rating) && rating > 0
-    ? Math.min(5, Math.max(0, rating))
-    : 0;
-
 export function TechnicianRating({
   rating,
-  reviewCount = 0,
+  ratingCount = 0,
   compact = false,
   style,
 }: TechnicianRatingProps) {
-  const value = validRating(rating);
-  const hasReviews = reviewCount > 0;
+  const value = clampRating(rating ?? 0);
+  const hasRating = value > 0;
 
   return (
     <View
       style={[styles.container, compact && styles.compactContainer, style]}
-      accessibilityLabel={
-        hasReviews
-          ? `${value.toFixed(1)} de 5, ${reviewCount} ${reviewCount === 1 ? 'reseña' : 'reseñas'}`
-          : 'Todavía no tiene reseñas'
-      }
+      accessibilityLabel={getRatingLabel(value, ratingCount)}
     >
       <Star
         aria-hidden
-        color={hasReviews ? DirectoryColors.amber : DirectoryColors.muted}
-        fill={hasReviews ? DirectoryColors.amber : 'transparent'}
+        color={hasRating ? DirectoryColors.amber : DirectoryColors.muted}
+        fill={hasRating ? DirectoryColors.amber : 'transparent'}
         size={compact ? 15 : 17}
         strokeWidth={2.2}
       />
-      {hasReviews ? (
+      {hasRating ? (
         <>
-          <Text style={[styles.rating, compact && styles.compactText]}>{value.toFixed(1)}</Text>
-          {!compact && (
-            <Text style={styles.reviews}>
-              ({reviewCount} {reviewCount === 1 ? 'reseña' : 'reseñas'})
+          <Text style={[styles.rating, compact && styles.compactText]}>{formatRating(value)}</Text>
+          {!compact && ratingCount > 0 && (
+            <Text style={styles.ratings}>
+              ({ratingCount} {ratingCount === 1 ? 'calificación' : 'calificaciones'})
             </Text>
           )}
         </>
       ) : (
-        <Text style={[styles.noReviews, compact && styles.compactText]}>Sin reseñas</Text>
+        <Text style={[styles.noRatings, compact && styles.compactText]}>Sin calificaciones</Text>
       )}
     </View>
   );
@@ -73,12 +66,12 @@ const styles = StyleSheet.create({
   compactText: {
     fontSize: 13,
   },
-  reviews: {
+  ratings: {
     color: DirectoryColors.muted,
     fontSize: 13,
     fontWeight: '500',
   },
-  noReviews: {
+  noRatings: {
     color: DirectoryColors.muted,
     fontSize: 13,
     fontWeight: '600',

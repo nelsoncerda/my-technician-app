@@ -53,6 +53,15 @@ test('account-deletion page provides a same-origin self-service deletion flow', 
   assert.match(body, /Escribe ELIMINAR/);
 });
 
+test('privacy policy discloses the 30-day residual database-backup window', async () => {
+  const response = await fetch(`${baseUrl}/privacy`);
+  const body = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.match(body, /16 de julio de 2026/);
+  assert.match(body, /respaldos[^<]+base de datos[^<]+se eliminan dentro de 30 días/);
+});
+
 test('password reset page escapes an untrusted token', async () => {
   const response = await fetch(`${baseUrl}/reset-password?token=${encodeURIComponent('"<script>bad()</script>')}`);
   assert.equal(response.status, 200);

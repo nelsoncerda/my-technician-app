@@ -6,7 +6,7 @@ import { clampRating, formatRating, getRatingLabel } from '@/lib/rating';
 
 export interface RatingProps extends ViewProps {
   value: number;
-  reviewCount?: number;
+  ratingCount?: number;
   size?: number;
   showValue?: boolean;
   color?: string;
@@ -14,7 +14,7 @@ export interface RatingProps extends ViewProps {
 
 export function Rating({
   value,
-  reviewCount,
+  ratingCount,
   size = 16,
   showValue = true,
   color = Colors.amber,
@@ -26,7 +26,7 @@ export function Rating({
 
   return (
     <View
-      accessibilityLabel={getRatingLabel(rating, reviewCount)}
+      accessibilityLabel={getRatingLabel(rating, ratingCount)}
       accessibilityRole="text"
       style={[styles.container, style]}
       {...viewProps}
@@ -43,8 +43,8 @@ export function Rating({
         ))}
       </View>
       {showValue ? <Text style={styles.value}>{formatRating(rating)}</Text> : null}
-      {reviewCount !== undefined ? (
-        <Text style={styles.count}>({reviewCount})</Text>
+      {ratingCount !== undefined ? (
+        <Text style={styles.count}>({ratingCount})</Text>
       ) : null}
     </View>
   );

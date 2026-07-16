@@ -16,16 +16,6 @@ export interface User {
   companyName?: string | null;
 }
 
-export interface Review {
-  id: string;
-  technicianId?: string;
-  author: string;
-  authorId?: string | null;
-  comment: string;
-  rating: number;
-  date: string;
-}
-
 export interface Technician {
   id: string;
   name: string;
@@ -37,8 +27,8 @@ export interface Technician {
   photoUrl?: string | null;
   companyName?: string | null;
   rating: number;
+  ratingCount: number;
   verified: boolean;
-  reviews: Review[];
 }
 
 export interface Settings {

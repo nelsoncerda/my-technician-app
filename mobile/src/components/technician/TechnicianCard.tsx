@@ -35,15 +35,6 @@ export const getSpecializations = (technician: Technician): string[] => {
   return Array.from(new Set(raw.map((service) => service.trim()).filter(Boolean)));
 };
 
-export const getEffectiveRating = (technician: Technician) => {
-  if (technician.rating > 0) return technician.rating;
-  if (!technician.reviews.length) return 0;
-  return (
-    technician.reviews.reduce((total, review) => total + review.rating, 0) /
-    technician.reviews.length
-  );
-};
-
 function TechnicianAvatar({ technician }: { technician: Technician }) {
   const source: ImageSourcePropType | undefined = technician.photoUrl
     ? { uri: technician.photoUrl }
@@ -75,12 +66,11 @@ export function TechnicianCard({ technician, onView, onBook }: TechnicianCardPro
   const services = getSpecializations(technician);
   const visibleServices = services.slice(0, 2);
   const remainingServices = services.length - visibleServices.length;
-  const rating = getEffectiveRating(technician);
 
   return (
     <View style={styles.card}>
       <Pressable
-        accessibilityHint="Abre el perfil y las reseñas"
+        accessibilityHint="Abre el perfil y sus calificaciones"
         accessibilityLabel={`Ver perfil de ${technician.name}`}
         accessibilityRole="button"
         onPress={() => onView(technician)}
@@ -101,8 +91,8 @@ export function TechnicianCard({ technician, onView, onBook }: TechnicianCardPro
               </Text>
             ) : null}
             <TechnicianRating
-              rating={rating}
-              reviewCount={technician.reviews.length}
+              rating={technician.rating}
+              ratingCount={technician.ratingCount}
               style={styles.rating}
             />
           </View>

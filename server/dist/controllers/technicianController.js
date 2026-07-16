@@ -21,6 +21,31 @@ class DuplicateReviewError extends Error {
 }
 const getTechnicians = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        if (req.query.view === 'ratings') {
+            const technicians = yield prisma_1.default.technician.findMany({
+                include: {
+                    user: {
+                        select: { name: true, photoUrl: true },
+                    },
+                    _count: {
+                        select: { reviews: true },
+                    },
+                },
+            });
+            const formattedTechnicians = technicians.map((tech) => ({
+                id: tech.id,
+                name: tech.user.name,
+                photoUrl: tech.user.photoUrl,
+                specialization: tech.specializations.join(', '),
+                specializations: tech.specializations,
+                location: tech.location,
+                companyName: tech.companyName || null,
+                rating: tech.rating,
+                ratingCount: tech._count.reviews,
+                verified: tech.verified,
+            }));
+            return res.json(formattedTechnicians);
+        }
         const technicians = yield prisma_1.default.technician.findMany({
             include: {
                 user: {

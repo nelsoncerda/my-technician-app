@@ -15,7 +15,7 @@ const sections: LegalSection[] = [
   },
   {
     title: '4. Conducta y contenido',
-    paragraphs: ['No puedes suplantar personas, publicar información falsa, acosar, defraudar, vulnerar sistemas, usar datos de otros fuera del servicio ni publicar reseñas engañosas. Podemos retirar contenido o limitar cuentas para proteger a usuarios y a la plataforma.'],
+    paragraphs: ['No puedes suplantar personas, publicar información falsa, acosar, defraudar, vulnerar sistemas, usar datos de otros fuera del servicio ni manipular calificaciones. Podemos retirar contenido o limitar cuentas para proteger a usuarios y a la plataforma.'],
   },
   {
     title: '5. Emergencias y seguridad',

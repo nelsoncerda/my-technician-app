@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 const router = Router();
 const EFFECTIVE_DATE = '15 de julio de 2026';
+const PRIVACY_EFFECTIVE_DATE = '16 de julio de 2026';
 
 function escapeHtml(value: string): string {
   return value
@@ -68,7 +69,7 @@ router.get('/privacy', (_req, res) => {
     'Política de privacidad',
     'Política de privacidad de la aplicación móvil Técnicos en RD.',
     `<h1>Política de privacidad</h1>
-    <p class="date">Vigente desde ${EFFECTIVE_DATE}</p>
+    <p class="date">Vigente desde ${PRIVACY_EFFECTIVE_DATE}</p>
     <p>Esta política explica cómo Técnicos en RD trata la información de clientes y profesionales dentro de la aplicación móvil.</p>
     <h2>1. Información que recopilamos</h2>
     <ul>
@@ -85,7 +86,7 @@ router.get('/privacy', (_req, res) => {
     <h2>4. Ubicación y sensores</h2>
     <p>El GPS es opcional, se usa en primer plano y sirve para sugerir una zona o completar una dirección. Puedes negar el permiso y escribir la ubicación manualmente. La aplicación no utiliza acelerómetro, cámara ni micrófono.</p>
     <h2>5. Conservación y seguridad</h2>
-    <p>Conservamos la información mientras la cuenta esté activa o sea necesaria para prestar el servicio, resolver disputas y cumplir la ley. Los registros técnicos de acceso, que pueden incluir dirección IP, ruta solicitada, fecha, agente de usuario y resultado HTTP, rotan diariamente y se conservan durante 14 días salvo que sean necesarios para investigar un incidente de seguridad o cumplir una obligación legal. Aplicamos controles de acceso, conexiones cifradas y almacenamiento seguro del token de sesión en el dispositivo.</p>
+    <p>Conservamos la información mientras la cuenta esté activa o sea necesaria para prestar el servicio, resolver disputas y cumplir la ley. Después de eliminar una cuenta, algunos datos pueden permanecer de forma residual en respaldos de acceso restringido de la base de datos; esos respaldos se eliminan dentro de 30 días y no se utilizan para operar normalmente el servicio. Los registros técnicos de acceso, que pueden incluir dirección IP, ruta solicitada, fecha, agente de usuario y resultado HTTP, rotan diariamente y se conservan durante 14 días salvo que sean necesarios para investigar un incidente de seguridad o cumplir una obligación legal. Aplicamos controles de acceso, conexiones cifradas y almacenamiento seguro del token de sesión en el dispositivo.</p>
     <h2>6. Tus opciones y derechos</h2>
     <p>Puedes cerrar sesión, negar el permiso de ubicación y eliminar permanentemente tu cuenta desde Cuenta → Eliminar cuenta. La eliminación borra el perfil y los datos asociados según lo permita la ley.</p>
     ${contactParagraph()}

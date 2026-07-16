@@ -64,6 +64,45 @@ backs up PostgreSQL, applies migrations, switches `technician-current` atomicall
 restarts PM2, and verifies SMTP and all mobile publication pages. It deliberately
 does **not** install or reload the repository’s historical main-domain Nginx file.
 
+### Database-backup retention
+
+After creating and validating the current release's PostgreSQL dump, the release
+workflow removes `database.dump` files older than 30 days from standard automated
+backup directories directly below `/home/bitnami/apps/backups`. The cleanup has
+strict path and filename guards. It does not remove backup directories, `server.env`,
+Nginx copies, release pointers, or manual/special recovery artifacts.
+
+Use `deploy/prune-database-backups.sh /home/bitnami/apps` for a guarded retention
+run outside a release. Do not replace it with a broad `find ... -delete` command.
+The helper intentionally refuses symbolic-link backup roots and paths outside the
+application-owned backup tree.
+
+Production also runs the helper daily through the systemd units in
+`deploy/systemd/` so the 30-day maximum does not depend on release frequency.
+The timer is persistent, runs the service as `bitnami`, and catches up after
+downtime. Both the timer and the release workflow use the same lock:
+
+```text
+/home/bitnami/apps/shared/database-backup-retention.lock
+```
+
+Install or update the units after deploying the release, then validate and enable
+the timer:
+
+```bash
+sudo install -m 0644 deploy/systemd/technician-backup-retention.service /etc/systemd/system/
+sudo install -m 0644 deploy/systemd/technician-backup-retention.timer /etc/systemd/system/
+sudo systemd-analyze verify /etc/systemd/system/technician-backup-retention.{service,timer}
+sudo systemctl daemon-reload
+sudo systemctl start technician-backup-retention.service
+sudo systemctl enable --now technician-backup-retention.timer
+systemctl list-timers technician-backup-retention.timer --no-pager
+```
+
+Keep the release-side `flock -x` call and the service-side `flock -w 300` call in
+place. The shared lock prevents a daily cleanup and a deployment from racing on
+the same dump.
+
 The public mobile pages expected after deployment are:
 
 - `/support`
@@ -76,5 +115,6 @@ The public mobile pages expected after deployment are:
 
 - Keep the confirmed monitored `SUPPORT_EMAIL` (`ncerda@hotmail.com`) in `server.env` for store review.
 - Decide whether Técnicos en RD should recover `tecnicosenrd.com` or use a new public website domain.
-- Keep automated database backups and verify restore archives regularly.
+- Verify recent database restore archives regularly; automated database dumps are
+  retained for no more than 30 days.
 - Confirm PM2 startup persists `technician-api` as online after instance reboot.

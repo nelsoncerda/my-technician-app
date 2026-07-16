@@ -2,6 +2,7 @@
   "configVersion": 0,
   "apple": {
     "version": "1.0",
+    "copyright": "2026 Nelson Cerda",
     "release": {
       "automaticRelease": false
     },
@@ -12,7 +13,7 @@
       "es-MX": {
         "title": "Técnicos en RD",
         "subtitle": "Servicios locales de confianza",
-        "description": "Resuelve lo de tu hogar con profesionales de tu zona.\n\nTécnicos en RD te permite buscar electricistas, plomeros, técnicos de aire acondicionado, carpinteros, pintores, personal de limpieza y otros especialistas en Santiago y el Cibao.\n\nCon la aplicación puedes:\n\n- Buscar por servicio, nombre o empresa con sugerencias mientras escribes.\n- Comparar especialidades, zonas, perfiles verificados, calificaciones y reseñas.\n- Consultar fechas y horarios disponibles antes de solicitar.\n- Completar la dirección manualmente o usar el GPS de forma opcional mientras utilizas la aplicación.\n- Revisar el estado y los detalles de cada reserva.\n- Contactar al profesional asignado y cancelar una solicitud pendiente o confirmada.\n- Administrar y eliminar permanentemente tu cuenta desde la aplicación.\n\nEl acceso a la ubicación es opcional. Técnicos en RD no rastrea tu ubicación en segundo plano.",
+        "description": "Resuelve lo de tu hogar con profesionales de tu zona.\n\nTécnicos en RD te permite buscar electricistas, plomeros, técnicos de aire acondicionado, carpinteros, pintores, personal de limpieza y otros especialistas en Santiago y el Cibao.\n\nCon la aplicación puedes:\n\n- Buscar por servicio, nombre o empresa con sugerencias mientras escribes.\n- Comparar especialidades, zonas, perfiles verificados y calificaciones.\n- Consultar fechas y horarios disponibles antes de solicitar.\n- Completar la dirección manualmente o usar el GPS de forma opcional mientras utilizas la aplicación.\n- Revisar el estado y los detalles de cada reserva.\n- Contactar al profesional asignado y cancelar una solicitud pendiente o confirmada.\n- Administrar y eliminar permanentemente tu cuenta desde la aplicación.\n\nEl acceso a la ubicación es opcional. Técnicos en RD no rastrea tu ubicación en segundo plano.",
         "keywords": [
           "técnicos",
           "electricista",
@@ -64,7 +65,7 @@
       "healthOrWellnessTopics": false,
       "messagingAndChat": false,
       "parentalControls": false,
-      "userGeneratedContent": true
+      "userGeneratedContent": false
     }
   }
 }
