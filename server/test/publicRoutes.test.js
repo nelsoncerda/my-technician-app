@@ -41,6 +41,18 @@ test('privacy, terms, and account-deletion pages are public Spanish HTML', async
   }
 });
 
+test('account-deletion page provides a same-origin self-service deletion flow', async () => {
+  const response = await fetch(`${baseUrl}/account-deletion`);
+  const body = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-security-policy') || '', /connect-src 'self'/);
+  assert.match(body, /id="delete-form"/);
+  assert.match(body, /fetch\('\/api\/auth\/login'/);
+  assert.match(body, /fetch\('\/api\/users\/'/);
+  assert.match(body, /Escribe ELIMINAR/);
+});
+
 test('password reset page escapes an untrusted token', async () => {
   const response = await fetch(`${baseUrl}/reset-password?token=${encodeURIComponent('"<script>bad()</script>')}`);
   assert.equal(response.status, 200);

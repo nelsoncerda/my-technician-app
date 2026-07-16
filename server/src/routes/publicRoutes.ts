@@ -144,6 +144,7 @@ router.get('/support', (_req, res) => {
 });
 
 router.get('/account-deletion', (_req, res) => {
+  res.setHeader('Content-Security-Policy', "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'self'");
   res.type('html').send(page(
     'Eliminación de cuenta',
     'Cómo eliminar una cuenta y sus datos de Técnicos en RD.',
@@ -159,8 +160,69 @@ router.get('/account-deletion', (_req, res) => {
     </ol>
     <h2>Datos eliminados</h2>
     <p>Se eliminan los datos del perfil, las reservas y las reseñas vinculadas a la cuenta, salvo información que debamos conservar temporalmente por obligaciones legales, prevención de fraude o resolución de disputas.</p>
+    <h2>Eliminar desde este sitio</h2>
+    <p>Si ya no tienes la aplicación, inicia sesión aquí para eliminar inmediatamente tu cuenta y los datos asociados. La contraseña se envía únicamente a nuestra API mediante una conexión cifrada y no se guarda en esta página.</p>
+    <form id="delete-form">
+      <label for="delete-email">Correo de la cuenta</label>
+      <input id="delete-email" type="email" autocomplete="email" required>
+      <label for="delete-password">Contraseña</label>
+      <input id="delete-password" type="password" autocomplete="current-password" required>
+      <label for="delete-confirmation">Escribe ELIMINAR para confirmar</label>
+      <input id="delete-confirmation" type="text" autocomplete="off" required>
+      <div class="form-row"><button class="button" id="delete-submit" type="submit">Eliminar mi cuenta</button></div>
+      <div class="message" id="delete-message" role="status" aria-live="polite"></div>
+    </form>
     <h2>Si no puedes entrar</h2>
-    ${contactParagraph()}`
+    <p>Restablece tu contraseña desde la opción “Olvidé mi contraseña” de la aplicación y vuelve a esta página. También puedes utilizar el canal siguiente para solicitar ayuda.</p>
+    ${contactParagraph()}
+    <script>
+      const deletionForm = document.getElementById('delete-form');
+      const deletionMessage = document.getElementById('delete-message');
+      const deletionSubmit = document.getElementById('delete-submit');
+      const showDeletionMessage = (text, kind) => {
+        deletionMessage.textContent = text;
+        deletionMessage.className = 'message ' + kind + ' show';
+      };
+      deletionForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        deletionMessage.className = 'message';
+        const email = document.getElementById('delete-email').value.trim();
+        const password = document.getElementById('delete-password').value;
+        const confirmation = document.getElementById('delete-confirmation').value.trim();
+        if (confirmation !== 'ELIMINAR') {
+          showDeletionMessage('Escribe ELIMINAR exactamente para confirmar.', 'error');
+          return;
+        }
+        deletionSubmit.disabled = true;
+        try {
+          const loginResponse = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password }),
+          });
+          const session = await loginResponse.json();
+          if (!loginResponse.ok || !session.token || !session.id) {
+            throw new Error(loginResponse.status === 401
+              ? 'El correo o la contraseña son incorrectos.'
+              : 'No pudimos verificar la cuenta.');
+          }
+          const deleteResponse = await fetch('/api/users/' + encodeURIComponent(session.id), {
+            method: 'DELETE',
+            headers: { Authorization: 'Bearer ' + session.token },
+          });
+          const result = await deleteResponse.json();
+          if (!deleteResponse.ok) {
+            throw new Error(result.message || 'No pudimos eliminar la cuenta.');
+          }
+          deletionForm.reset();
+          Array.from(deletionForm.elements).forEach((element) => { element.disabled = true; });
+          showDeletionMessage('Tu cuenta y los datos asociados fueron eliminados.', 'ok');
+        } catch (error) {
+          showDeletionMessage(error instanceof Error ? error.message : 'No pudimos eliminar la cuenta.', 'error');
+          deletionSubmit.disabled = false;
+        }
+      });
+    </script>`
   ));
 });
 
