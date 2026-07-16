@@ -65,6 +65,7 @@ test -f dist/index.js
 PG_DUMP_BIN=/usr/lib/postgresql/13/bin/pg_dump \
   node --env-file="$ENV_FILE" "$RELEASE/deploy/backup-database.cjs" \
   "$BACKUP/database.dump"
+chmod 600 "$BACKUP/database.dump"
 /usr/lib/postgresql/13/bin/pg_restore --list "$BACKUP/database.dump" >/dev/null
 
 npx prisma migrate deploy
