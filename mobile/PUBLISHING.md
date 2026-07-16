@@ -20,13 +20,13 @@ El dominio principal `tecnicosenrd.com` actualmente sirve otra aplicación. No l
 ### Builds de lanzamiento — 16 de julio de 2026
 
 - Proyecto Expo: `@nelsoncerda/tecnicos-en-rd`.
-- Android de prueba (APK): build `34583f85-b82a-4c5c-a9ce-82532c78a743`, finalizado.
-- Android de tienda (AAB, versión `1.0.0`, código `2`): build `e253c859-e937-4ecd-9c68-7269780b8c6e`, finalizado y validado.
-- iOS para simulador: build `ecee20e8-3801-4d5c-a177-78cdecc0d22b`, finalizado y probado.
-- iOS para TestFlight/App Store (IPA, versión `1.0.0`, build `3`): build `481ddb88-b876-4935-8028-3e74f88fe89f`, finalizado, firmado y validado.
+- Android de tienda (AAB, versión `1.0.0`, código `3`): build `99643332-00bd-4164-9eb2-c975b59f0cae`, finalizado y validado. Artefacto: <https://expo.dev/artifacts/eas/gla3aP0nWveWByE4ZgoncOl9zNzcdzzAfc1OBDHf_JQ.aab>.
+- iOS para simulador: build `c56f4643-0742-42c2-ab7d-30f2faa9996a`, finalizado y probado.
+- iOS para TestFlight/App Store (IPA, versión `1.0.0`, build `4`): build `0096cb8f-8bc9-42ab-b281-498a0111d4f3`, finalizado, firmado y validado. Artefacto: <https://expo.dev/artifacts/eas/35gWCOWplycSY9U7-owR1Bh_wD9rVKQaKuTm_WzXbnA.ipa>.
 - Ficha de App Store Connect: Apple ID `6791414260`, vinculada en `eas.json`.
-- Entrega a App Store Connect/TestFlight: submission `a0fb0e0f-a457-4965-8c2c-c4e033bfe1f6`, finalizada sin errores; procesamiento de Apple pendiente.
-- Metadatos reproducibles: `store.config.json`, validado con EAS Metadata e incluye la ficha en español, categoría Lifestyle, lanzamiento manual y las cuatro capturas de iPhone.
+- Entrega del build 4 a App Store Connect: submission `2204ab00-3edc-43d3-adb3-08f2a902354f`, finalizada sin errores. Apple todavía debe terminar de procesar y mostrar el build antes de asociarlo a la versión 1.0.
+- Metadatos reproducibles: `store.config.js`, validados y sincronizados con EAS Metadata. Incluyen la ficha en español, categoría Lifestyle, lanzamiento manual, las cuatro capturas de iPhone y la cuenta dedicada de revisión obtenida desde macOS Keychain.
+- App Privacy publicada en App Store Connect: nueve tipos de datos, usados para funcionalidad, vinculados a la identidad y sin rastreo.
 
 Los builds se consultan en `https://expo.dev/accounts/nelsoncerda/projects/tecnicos-en-rd/builds`.
 
@@ -114,6 +114,8 @@ Declaración funcional de ubicación: acceso preciso o aproximado, iniciado por 
 Proporciona al equipo de revisión una cuenta de demostración si las reservas autenticadas no pueden evaluarse sin credenciales.
 
 ## 7. Google Play Console
+
+Estado actual: el AAB de producción ya está listo. La creación de la ficha está bloqueada hasta que Google apruebe la verificación de identidad del titular. Después se debe verificar un dispositivo Android real con la app Play Console y completar la verificación telefónica.
 
 1. Crear la aplicación con package `com.tecnicosenrd.app`.
 2. Completar Data safety, App access, clasificación de contenido y eliminación de cuenta.
