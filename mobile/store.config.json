@@ -1,0 +1,70 @@
+{
+  "configVersion": 0,
+  "apple": {
+    "version": "1.0",
+    "release": {
+      "automaticRelease": false
+    },
+    "categories": [
+      "LIFESTYLE"
+    ],
+    "info": {
+      "es-MX": {
+        "title": "Técnicos en RD",
+        "subtitle": "Servicios locales de confianza",
+        "description": "Resuelve lo de tu hogar con profesionales de tu zona.\n\nTécnicos en RD te permite buscar electricistas, plomeros, técnicos de aire acondicionado, carpinteros, pintores, personal de limpieza y otros especialistas en Santiago y el Cibao.\n\nCon la aplicación puedes:\n\n- Buscar por servicio, nombre o empresa con sugerencias mientras escribes.\n- Comparar especialidades, zonas, perfiles verificados, calificaciones y reseñas.\n- Consultar fechas y horarios disponibles antes de solicitar.\n- Completar la dirección manualmente o usar el GPS de forma opcional mientras utilizas la aplicación.\n- Revisar el estado y los detalles de cada reserva.\n- Contactar al profesional asignado y cancelar una solicitud pendiente o confirmada.\n- Administrar y eliminar permanentemente tu cuenta desde la aplicación.\n\nEl acceso a la ubicación es opcional. Técnicos en RD no rastrea tu ubicación en segundo plano.",
+        "keywords": [
+          "técnicos",
+          "electricista",
+          "plomero",
+          "reparación",
+          "hogar",
+          "Santiago",
+          "Cibao",
+          "servicios",
+          "mantenimiento"
+        ],
+        "supportUrl": "https://api.tecnicosenrd.com/support",
+        "privacyPolicyUrl": "https://api.tecnicosenrd.com/privacy",
+        "privacyChoicesUrl": "https://api.tecnicosenrd.com/account-deletion",
+        "screenshots": {
+          "APP_IPHONE_61": [
+            "store/screenshots/ios-6.3/01-directory.jpg",
+            "store/screenshots/ios-6.3/02-technician-profile.jpg",
+            "store/screenshots/ios-6.3/03-filtered-search.jpg",
+            "store/screenshots/ios-6.3/04-account-and-privacy.jpg"
+          ]
+        }
+      }
+    },
+    "advisory": {
+      "ageRatingOverride": "NONE",
+      "alcoholTobaccoOrDrugUseOrReferences": "NONE",
+      "contests": "NONE",
+      "gambling": false,
+      "gamblingSimulated": "NONE",
+      "horrorOrFearThemes": "NONE",
+      "kidsAgeBand": null,
+      "koreaAgeRatingOverride": "NONE",
+      "lootBox": false,
+      "matureOrSuggestiveThemes": "NONE",
+      "medicalOrTreatmentInformation": "NONE",
+      "profanityOrCrudeHumor": "NONE",
+      "sexualContentGraphicAndNudity": "NONE",
+      "sexualContentOrNudity": "NONE",
+      "unrestrictedWebAccess": false,
+      "violenceCartoonOrFantasy": "NONE",
+      "violenceRealistic": "NONE",
+      "violenceRealisticProlongedGraphicOrSadistic": "NONE",
+      "advertising": false,
+      "ageAssurance": false,
+      "ageRatingOverrideV2": "NONE",
+      "developerAgeRatingInfoUrl": null,
+      "gunsOrOtherWeapons": "NONE",
+      "healthOrWellnessTopics": false,
+      "messagingAndChat": false,
+      "parentalControls": false,
+      "userGeneratedContent": false
+    }
+  }
+}

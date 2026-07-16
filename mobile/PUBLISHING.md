@@ -26,6 +26,7 @@ El dominio principal `tecnicosenrd.com` actualmente sirve otra aplicación. No l
 - iOS para TestFlight/App Store (IPA, versión `1.0.0`, build `3`): build `481ddb88-b876-4935-8028-3e74f88fe89f`, finalizado, firmado y validado.
 - Ficha de App Store Connect: Apple ID `6791414260`, vinculada en `eas.json`.
 - Entrega a App Store Connect/TestFlight: submission `a0fb0e0f-a457-4965-8c2c-c4e033bfe1f6`, finalizada sin errores; procesamiento de Apple pendiente.
+- Metadatos reproducibles: `store.config.json`, validado con EAS Metadata e incluye la ficha en español, categoría Lifestyle, lanzamiento manual y las cuatro capturas de iPhone.
 
 Los builds se consultan en `https://expo.dev/accounts/nelsoncerda/projects/tecnicos-en-rd/builds`.
 
@@ -101,7 +102,14 @@ Declaración funcional de ubicación: acceso preciso o aproximado, iniciado por 
    npx eas-cli@latest submit --profile production --platform ios
    ```
 
-5. Probar con TestFlight antes de solicitar revisión pública.
+5. Cuando Apple termine de procesar el binario, sincronizar la ficha y las capturas:
+
+   ```bash
+   npx eas-cli@latest metadata:lint
+   npx eas-cli@latest metadata:push --profile production
+   ```
+
+6. Probar con TestFlight antes de solicitar revisión pública.
 
 Proporciona al equipo de revisión una cuenta de demostración si las reservas autenticadas no pueden evaluarse sin credenciales.
 
