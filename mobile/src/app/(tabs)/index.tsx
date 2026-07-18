@@ -1,5 +1,11 @@
 import { useRouter } from 'expo-router';
-import { ShieldCheck, SlidersHorizontal, X } from 'lucide-react-native';
+import {
+  List as ListIcon,
+  Map as MapIcon,
+  ShieldCheck,
+  SlidersHorizontal,
+  X,
+} from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
@@ -19,13 +25,16 @@ import {
   DirectoryRadius,
   DirectorySpacing,
   TechnicianCard,
+  TechnicianMap,
 } from '@/components/technician';
 import { api } from '@/lib/api';
+import { createTechnicianMapMarkers, resolveSelectedMarkerId } from '@/lib/map';
 import { filterTechnicians, getTechnicianSpecializations, normalizeSearchValue } from '@/lib/search';
 import { useForegroundLocation } from '@/lib/use-foreground-location';
 import type { Settings, Technician } from '@/types/api';
 
 const EMPTY_SETTINGS: Settings = { locations: [], specializations: [] };
+type DirectoryViewMode = 'list' | 'map';
 
 const uniqueSorted = (values: string[]) =>
   Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))).sort((a, b) =>
@@ -42,6 +51,8 @@ export default function DirectoryScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<DirectoryViewMode>('list');
+  const [selectedTechnicianId, setSelectedTechnicianId] = useState<string | null>(null);
   const location = useForegroundLocation();
 
   const loadDirectory = useCallback(async (refresh = false) => {
@@ -103,6 +114,16 @@ export default function DirectoryScreen() {
         location: selectedLocation,
       }),
     [query, selectedLocation, selectedService, technicians]
+  );
+
+  const mapMarkers = useMemo(
+    () => createTechnicianMapMarkers(filteredTechnicians),
+    [filteredTechnicians]
+  );
+
+  const activeMapTechnicianId = useMemo(
+    () => resolveSelectedMarkerId(mapMarkers, selectedTechnicianId),
+    [mapMarkers, selectedTechnicianId]
   );
 
   const hasFilters = Boolean(query.trim() || selectedService || selectedLocation);
@@ -186,6 +207,7 @@ export default function DirectoryScreen() {
             enabled={Boolean(location.coordinates)}
             loading={location.isLoading}
             message={locationMessage}
+            messageTone={location.error ? 'error' : 'info'}
             onPress={() => void handleUseCurrentLocation()}
           />
         </View>
@@ -230,23 +252,54 @@ export default function DirectoryScreen() {
             </Text>
           ) : null}
         </View>
-        {hasFilters ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={resetFilters}
-            style={({ pressed }) => [styles.resetButton, pressed && styles.resetPressed]}
-          >
-            <Text style={styles.resetText}>Limpiar</Text>
-          </Pressable>
-        ) : null}
+        <View style={styles.resultsActions}>
+          {hasFilters ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={resetFilters}
+              style={({ pressed }) => [styles.resetButton, pressed && styles.resetPressed]}
+            >
+              <Text style={styles.resetText}>Limpiar</Text>
+            </Pressable>
+          ) : null}
+          <View accessibilityLabel="Vista de resultados" style={styles.viewToggle}>
+            <ViewToggleButton
+              active={viewMode === 'list'}
+              icon="list"
+              label="Lista"
+              onPress={() => setViewMode('list')}
+            />
+            <ViewToggleButton
+              active={viewMode === 'map'}
+              icon="map"
+              label="Mapa"
+              onPress={() => setViewMode('map')}
+            />
+          </View>
+        </View>
       </View>
+
+      {!loading && !error && viewMode === 'map' ? (
+        <TechnicianMap
+          isLocating={location.isLoading}
+          locationMessage={locationMessage}
+          onBookTechnician={openBooking}
+          onOpenTechnician={openTechnician}
+          onRequestLocation={() => void location.requestLocation()}
+          onSelectTechnician={setSelectedTechnicianId}
+          onSwitchToList={() => setViewMode('list')}
+          selectedTechnicianId={activeMapTechnicianId}
+          technicians={filteredTechnicians}
+          userCoordinates={location.coordinates}
+        />
+      ) : null}
     </View>
   );
 
   return (
     <FlatList
       contentContainerStyle={styles.content}
-      data={loading || error ? [] : filteredTechnicians}
+      data={loading || error || viewMode === 'map' ? [] : filteredTechnicians}
       ItemSeparatorComponent={() => <View style={styles.separator} />}
       keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="handled"
@@ -256,7 +309,7 @@ export default function DirectoryScreen() {
           <DirectoryLoading />
         ) : error ? (
           <DirectoryError onRetry={() => void loadDirectory()} />
-        ) : (
+        ) : viewMode === 'map' ? null : (
           <DirectoryEmpty hasFilters={hasFilters} onReset={resetFilters} />
         )
       }
@@ -277,6 +330,33 @@ export default function DirectoryScreen() {
       showsVerticalScrollIndicator={false}
       style={styles.screen}
     />
+  );
+}
+
+interface ViewToggleButtonProps {
+  active: boolean;
+  icon: 'list' | 'map';
+  label: string;
+  onPress: () => void;
+}
+
+function ViewToggleButton({ active, icon, label, onPress }: ViewToggleButtonProps) {
+  const Icon = icon === 'list' ? ListIcon : MapIcon;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.viewToggleButton,
+        active && styles.viewToggleButtonActive,
+        pressed && styles.viewToggleButtonPressed,
+      ]}
+    >
+      <Icon color={active ? DirectoryColors.white : DirectoryColors.oceanDark} size={16} />
+      <Text style={[styles.viewToggleText, active && styles.viewToggleTextActive]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -382,9 +462,8 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   resultsHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: DirectorySpacing.md,
     paddingBottom: DirectorySpacing.md,
     paddingHorizontal: DirectorySpacing.lg,
     paddingTop: DirectorySpacing.section,
@@ -414,6 +493,46 @@ const styles = StyleSheet.create({
     color: DirectoryColors.clayDark,
     fontSize: 13,
     fontWeight: '900',
+  },
+  resultsActions: {
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    gap: DirectorySpacing.sm,
+    justifyContent: 'space-between',
+  },
+  viewToggle: {
+    alignItems: 'center',
+    backgroundColor: DirectoryColors.oceanSoft,
+    borderColor: '#CEE3EE',
+    borderRadius: DirectoryRadius.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    marginLeft: 'auto',
+    padding: 3,
+  },
+  viewToggleButton: {
+    alignItems: 'center',
+    borderRadius: DirectoryRadius.pill,
+    flexDirection: 'row',
+    gap: 5,
+    justifyContent: 'center',
+    minHeight: 38,
+    paddingHorizontal: DirectorySpacing.md,
+  },
+  viewToggleButtonActive: {
+    backgroundColor: DirectoryColors.ocean,
+  },
+  viewToggleButtonPressed: {
+    opacity: 0.78,
+  },
+  viewToggleText: {
+    color: DirectoryColors.oceanDark,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  viewToggleTextActive: {
+    color: DirectoryColors.white,
   },
   separator: {
     height: DirectorySpacing.md,

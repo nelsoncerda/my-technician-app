@@ -68,7 +68,11 @@ export function useForegroundLocation(): ForegroundLocationState {
       const permission = await Location.requestForegroundPermissionsAsync();
       setPermissionStatus(permission.status);
       if (!permission.granted) {
-        setError('Activa el permiso de ubicación para usar tu posición actual.');
+        setError(
+          permission.canAskAgain
+            ? 'No compartiste tu ubicación. Puedes seguir buscando por servicio o zona.'
+            : 'La ubicación está desactivada. Puedes seguir buscando o activarla luego en Ajustes.'
+        );
         return null;
       }
 
@@ -86,12 +90,8 @@ export function useForegroundLocation(): ForegroundLocationState {
       setCoordinates(nextCoordinates);
       setAddress(nextAddress);
       return { coordinates: nextCoordinates, address: nextAddress };
-    } catch (caught: unknown) {
-      setError(
-        caught instanceof Error && caught.message
-          ? caught.message
-          : 'No pudimos obtener tu ubicación. Inténtalo nuevamente.'
-      );
+    } catch {
+      setError('No pudimos obtener tu ubicación. Puedes seguir buscando e intentarlo más tarde.');
       return null;
     } finally {
       setIsLoading(false);

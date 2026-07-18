@@ -69,15 +69,19 @@ model ProfileChangeHistory {
 }
 
 model Technician {
-  id              String   @id @default(uuid())
-  userId          String   @unique
-  user            User     @relation(fields: [userId], references: [id])
-  specializations String[] // Array of specializations/services the technician provides
-  location        String
-  companyName     String?  // Optional company name for the technician
-  rating          Float    @default(0)
-  verified        Boolean  @default(false)
-  reviews         Review[]
+  id                   String   @id @default(uuid())
+  userId               String   @unique
+  user                 User     @relation(fields: [userId], references: [id])
+  specializations      String[] // Array of specializations/services the technician provides
+  location             String   // Public service-area label, never a booking/customer address
+  companyName          String?  // Optional company name for the technician
+  serviceAreaLatitude  Float?   // Deliberately rounded; never store an exact home location
+  serviceAreaLongitude Float?
+  serviceAreaRadiusKm  Float    @default(5)
+  mapVisible           Boolean  @default(true)
+  rating               Float    @default(0)
+  verified             Boolean  @default(false)
+  reviews              Review[]
 
   // Booking relations
   bookings          Booking[]

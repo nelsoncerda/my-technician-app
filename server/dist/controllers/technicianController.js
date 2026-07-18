@@ -12,9 +12,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.addTechnicianReview = exports.deleteTechnician = exports.verifyTechnician = exports.registerTechnician = exports.getTechnicians = void 0;
+exports.addTechnicianReview = exports.deleteTechnician = exports.verifyTechnician = exports.updateTechnicianServiceArea = exports.registerTechnician = exports.getTechnicians = void 0;
 const client_1 = require("@prisma/client");
 const prisma_1 = __importDefault(require("../prisma"));
+const serviceArea_1 = require("../utils/serviceArea");
 class ReviewAuthorizationError extends Error {
 }
 class DuplicateReviewError extends Error {
@@ -43,6 +44,7 @@ const getTechnicians = (req, res) => __awaiter(void 0, void 0, void 0, function*
                 rating: tech.rating,
                 ratingCount: tech._count.reviews,
                 verified: tech.verified,
+                mapLocation: (0, serviceArea_1.toPublicMapLocation)(tech),
             }));
             return res.json(formattedTechnicians);
         }
@@ -68,6 +70,7 @@ const getTechnicians = (req, res) => __awaiter(void 0, void 0, void 0, function*
             rating: tech.rating,
             verified: tech.verified,
             reviews: tech.reviews,
+            mapLocation: (0, serviceArea_1.toPublicMapLocation)(tech),
         }));
         res.json(formattedTechnicians);
     }
@@ -78,7 +81,7 @@ const getTechnicians = (req, res) => __awaiter(void 0, void 0, void 0, function*
 exports.getTechnicians = getTechnicians;
 const registerTechnician = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { specializations, location, phone, companyName } = req.body;
+        const { specializations, location, phone, companyName, serviceArea, mapVisible } = req.body;
         const userId = req.auth.userId;
         const normalizedSpecializations = Array.isArray(specializations)
             ? specializations
@@ -89,10 +92,17 @@ const registerTechnician = (req, res) => __awaiter(void 0, void 0, void 0, funct
         if (normalizedSpecializations.length === 0 || normalizedSpecializations.length > 10) {
             return res.status(400).json({ message: 'Selecciona entre 1 y 10 especialidades' });
         }
-        if (typeof location !== 'string' || !location.trim()) {
+        if (typeof location !== 'string' || !location.trim() || location.trim().length > 160) {
             return res.status(400).json({ message: 'La ubicación es requerida' });
         }
+        if (mapVisible !== undefined && typeof mapVisible !== 'boolean') {
+            return res.status(400).json({ message: 'La visibilidad en el mapa no es válida' });
+        }
+        const normalizedServiceArea = serviceArea === undefined
+            ? undefined
+            : (0, serviceArea_1.normalizeServiceAreaInput)(serviceArea);
         const technician = yield prisma_1.default.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
+            var _a, _b, _c;
             if (typeof phone === 'string' && phone.trim()) {
                 yield tx.user.update({
                     where: { id: userId },
@@ -100,12 +110,11 @@ const registerTechnician = (req, res) => __awaiter(void 0, void 0, void 0, funct
                 });
             }
             const createdTechnician = yield tx.technician.create({
-                data: {
-                    userId,
-                    specializations: normalizedSpecializations,
-                    location: location.trim(),
-                    companyName: typeof companyName === 'string' && companyName.trim() ? companyName.trim() : null,
-                },
+                data: Object.assign(Object.assign({ userId, specializations: normalizedSpecializations, location: location.trim(), companyName: typeof companyName === 'string' && companyName.trim() ? companyName.trim() : null }, (normalizedServiceArea !== undefined && {
+                    serviceAreaLatitude: (_a = normalizedServiceArea === null || normalizedServiceArea === void 0 ? void 0 : normalizedServiceArea.latitude) !== null && _a !== void 0 ? _a : null,
+                    serviceAreaLongitude: (_b = normalizedServiceArea === null || normalizedServiceArea === void 0 ? void 0 : normalizedServiceArea.longitude) !== null && _b !== void 0 ? _b : null,
+                    serviceAreaRadiusKm: (_c = normalizedServiceArea === null || normalizedServiceArea === void 0 ? void 0 : normalizedServiceArea.radiusKm) !== null && _c !== void 0 ? _c : 5,
+                })), (mapVisible !== undefined && { mapVisible })),
             });
             yield tx.user.update({
                 where: { id: userId },
@@ -113,9 +122,12 @@ const registerTechnician = (req, res) => __awaiter(void 0, void 0, void 0, funct
             });
             return createdTechnician;
         }));
-        res.status(201).json(technician);
+        res.status(201).json(Object.assign(Object.assign({}, technician), { mapLocation: (0, serviceArea_1.toPublicMapLocation)(technician) }));
     }
     catch (error) {
+        if (error instanceof serviceArea_1.ServiceAreaValidationError) {
+            return res.status(400).json({ message: error.message });
+        }
         if (error instanceof client_1.Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
             return res.status(409).json({ message: 'Este usuario ya tiene un perfil técnico' });
         }
@@ -123,6 +135,52 @@ const registerTechnician = (req, res) => __awaiter(void 0, void 0, void 0, funct
     }
 });
 exports.registerTechnician = registerTechnician;
+const updateTechnicianServiceArea = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c;
+    try {
+        const hasServiceArea = Object.prototype.hasOwnProperty.call(req.body, 'serviceArea');
+        const hasMapVisible = Object.prototype.hasOwnProperty.call(req.body, 'mapVisible');
+        const hasLocation = Object.prototype.hasOwnProperty.call(req.body, 'location');
+        if (!hasServiceArea && !hasMapVisible && !hasLocation) {
+            return res.status(400).json({ message: 'Indica un área de servicio o la visibilidad del mapa' });
+        }
+        if (hasMapVisible && typeof req.body.mapVisible !== 'boolean') {
+            return res.status(400).json({ message: 'La visibilidad en el mapa no es válida' });
+        }
+        if (hasLocation &&
+            (typeof req.body.location !== 'string' || !req.body.location.trim() || req.body.location.trim().length > 160)) {
+            return res.status(400).json({ message: 'La ubicación no es válida' });
+        }
+        const normalizedServiceArea = hasServiceArea
+            ? (0, serviceArea_1.normalizeServiceAreaInput)(req.body.serviceArea)
+            : undefined;
+        const technician = yield prisma_1.default.technician.update({
+            where: { id: req.params.id },
+            data: Object.assign(Object.assign(Object.assign({}, (hasLocation && { location: req.body.location.trim() })), (hasMapVisible && { mapVisible: req.body.mapVisible })), (normalizedServiceArea !== undefined && {
+                serviceAreaLatitude: (_a = normalizedServiceArea === null || normalizedServiceArea === void 0 ? void 0 : normalizedServiceArea.latitude) !== null && _a !== void 0 ? _a : null,
+                serviceAreaLongitude: (_b = normalizedServiceArea === null || normalizedServiceArea === void 0 ? void 0 : normalizedServiceArea.longitude) !== null && _b !== void 0 ? _b : null,
+                serviceAreaRadiusKm: (_c = normalizedServiceArea === null || normalizedServiceArea === void 0 ? void 0 : normalizedServiceArea.radiusKm) !== null && _c !== void 0 ? _c : 5,
+            })),
+        });
+        res.json({
+            id: technician.id,
+            location: technician.location,
+            mapVisible: technician.mapVisible,
+            mapLocation: (0, serviceArea_1.toPublicMapLocation)(technician),
+        });
+    }
+    catch (error) {
+        if (error instanceof serviceArea_1.ServiceAreaValidationError) {
+            return res.status(400).json({ message: error.message });
+        }
+        if (error instanceof client_1.Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+            return res.status(404).json({ message: 'Técnico no encontrado' });
+        }
+        console.error('Error updating technician service area:', error);
+        res.status(500).json({ message: 'Error al actualizar el área de servicio' });
+    }
+});
+exports.updateTechnicianServiceArea = updateTechnicianServiceArea;
 const verifyTechnician = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;

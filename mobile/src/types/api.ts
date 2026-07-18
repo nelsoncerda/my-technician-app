@@ -29,6 +29,18 @@ export interface Technician {
   rating: number;
   ratingCount: number;
   verified: boolean;
+  /**
+   * Coarse public service-area position. The API rounds these coordinates and
+   * never sends a technician's street address to the public directory.
+   */
+  mapLocation?: TechnicianMapLocation | null;
+}
+
+export interface TechnicianMapLocation {
+  latitude: number;
+  longitude: number;
+  radiusKm: number;
+  precision: 'approximate';
 }
 
 export interface Settings {

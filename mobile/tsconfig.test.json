@@ -16,6 +16,7 @@
   },
   "include": [
     "src/lib/rating.ts",
+    "src/lib/map.ts",
     "src/lib/technician.ts",
     "src/types/api.ts",
     "test/**/*.ts"

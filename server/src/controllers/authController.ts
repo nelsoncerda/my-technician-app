@@ -5,12 +5,29 @@ import crypto from 'crypto';
 import { hashPassword, verifyPassword } from '../security/password';
 import { createAuthToken, normalizeAuthRole } from '../security/token';
 import { safeUserSelect } from '../utils/safeUser';
+import {
+    normalizeServiceAreaInput,
+    ServiceAreaValidationError,
+    toPublicMapLocation,
+} from '../utils/serviceArea';
 
 const APP_URL = process.env.APP_URL || 'https://api.tecnicosenrd.com';
 
 export const register = async (req: Request, res: Response) => {
     try {
-        const { name, email, password, phone, accountType, specializations, location, photoBase64, companyName } = req.body;
+        const {
+            name,
+            email,
+            password,
+            phone,
+            accountType,
+            specializations,
+            location,
+            photoBase64,
+            companyName,
+            serviceArea,
+            mapVisible,
+        } = req.body;
 
         if (
             typeof name !== 'string' || !name.trim() ||
@@ -39,12 +56,22 @@ export const register = async (req: Request, res: Response) => {
         if (accountType === 'technician' && (normalizedSpecializations.length === 0 || !normalizedLocation)) {
             return res.status(400).json({ message: 'Los técnicos deben indicar especialidades y ubicación' });
         }
+        if (normalizedLocation.length > 160) {
+            return res.status(400).json({ message: 'La ubicación no es válida' });
+        }
         if (normalizedSpecializations.length > 10) {
             return res.status(400).json({ message: 'Puedes seleccionar hasta 10 especialidades' });
+        }
+        if (mapVisible !== undefined && typeof mapVisible !== 'boolean') {
+            return res.status(400).json({ message: 'La visibilidad en el mapa no es válida' });
         }
         if (photoBase64 && (typeof photoBase64 !== 'string' || photoBase64.length > 2.8 * 1024 * 1024)) {
             return res.status(400).json({ message: 'La foto de perfil es demasiado grande' });
         }
+
+        const normalizedServiceArea = serviceArea === undefined
+            ? undefined
+            : normalizeServiceAreaInput(serviceArea);
 
         // Check if user exists
         const existingUser = await prisma.user.findFirst({
@@ -88,6 +115,12 @@ export const register = async (req: Request, res: Response) => {
                         specializations: normalizedSpecializations,
                         location: normalizedLocation,
                         companyName: typeof companyName === 'string' && companyName.trim() ? companyName.trim() : null,
+                        ...(normalizedServiceArea !== undefined && {
+                            serviceAreaLatitude: normalizedServiceArea?.latitude ?? null,
+                            serviceAreaLongitude: normalizedServiceArea?.longitude ?? null,
+                            serviceAreaRadiusKm: normalizedServiceArea?.radiusKm ?? 5,
+                        }),
+                        ...(mapVisible !== undefined && { mapVisible }),
                         verified: false,
                     },
                 });
@@ -112,6 +145,9 @@ export const register = async (req: Request, res: Response) => {
 
         res.status(201).json(result);
     } catch (error) {
+        if (error instanceof ServiceAreaValidationError) {
+            return res.status(400).json({ message: error.message });
+        }
         console.error('Registration error:', error);
         res.status(500).json({ message: 'Error registering user' });
     }
@@ -397,6 +433,8 @@ export const login = async (req: Request, res: Response) => {
                 specializations: user.technician.specializations,
                 location: user.technician.location,
                 companyName: user.technician.companyName,
+                mapVisible: user.technician.mapVisible,
+                mapLocation: toPublicMapLocation(user.technician),
             }),
             token,
         };

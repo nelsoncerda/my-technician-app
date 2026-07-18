@@ -19,10 +19,11 @@ const crypto_1 = __importDefault(require("crypto"));
 const password_1 = require("../security/password");
 const token_1 = require("../security/token");
 const safeUser_1 = require("../utils/safeUser");
+const serviceArea_1 = require("../utils/serviceArea");
 const APP_URL = process.env.APP_URL || 'https://api.tecnicosenrd.com';
 const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { name, email, password, phone, accountType, specializations, location, photoBase64, companyName } = req.body;
+        const { name, email, password, phone, accountType, specializations, location, photoBase64, companyName, serviceArea, mapVisible, } = req.body;
         if (typeof name !== 'string' || !name.trim() ||
             typeof email !== 'string' || !email.trim() ||
             typeof password !== 'string' || password.length < 8) {
@@ -45,12 +46,21 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         if (accountType === 'technician' && (normalizedSpecializations.length === 0 || !normalizedLocation)) {
             return res.status(400).json({ message: 'Los técnicos deben indicar especialidades y ubicación' });
         }
+        if (normalizedLocation.length > 160) {
+            return res.status(400).json({ message: 'La ubicación no es válida' });
+        }
         if (normalizedSpecializations.length > 10) {
             return res.status(400).json({ message: 'Puedes seleccionar hasta 10 especialidades' });
+        }
+        if (mapVisible !== undefined && typeof mapVisible !== 'boolean') {
+            return res.status(400).json({ message: 'La visibilidad en el mapa no es válida' });
         }
         if (photoBase64 && (typeof photoBase64 !== 'string' || photoBase64.length > 2.8 * 1024 * 1024)) {
             return res.status(400).json({ message: 'La foto de perfil es demasiado grande' });
         }
+        const normalizedServiceArea = serviceArea === undefined
+            ? undefined
+            : (0, serviceArea_1.normalizeServiceAreaInput)(serviceArea);
         // Check if user exists
         const existingUser = yield prisma_1.default.user.findFirst({
             where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
@@ -66,6 +76,7 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         const role = accountType === 'technician' ? 'technician' : 'user';
         // Create user with transaction to also create technician if needed
         const result = yield prisma_1.default.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
+            var _a, _b, _c;
             // Create user
             const user = yield tx.user.create({
                 data: {
@@ -84,13 +95,11 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             // Technicians are also users, so they can book services from other technicians
             if (accountType === 'technician') {
                 yield tx.technician.create({
-                    data: {
-                        userId: user.id,
-                        specializations: normalizedSpecializations,
-                        location: normalizedLocation,
-                        companyName: typeof companyName === 'string' && companyName.trim() ? companyName.trim() : null,
-                        verified: false,
-                    },
+                    data: Object.assign(Object.assign(Object.assign({ userId: user.id, specializations: normalizedSpecializations, location: normalizedLocation, companyName: typeof companyName === 'string' && companyName.trim() ? companyName.trim() : null }, (normalizedServiceArea !== undefined && {
+                        serviceAreaLatitude: (_a = normalizedServiceArea === null || normalizedServiceArea === void 0 ? void 0 : normalizedServiceArea.latitude) !== null && _a !== void 0 ? _a : null,
+                        serviceAreaLongitude: (_b = normalizedServiceArea === null || normalizedServiceArea === void 0 ? void 0 : normalizedServiceArea.longitude) !== null && _b !== void 0 ? _b : null,
+                        serviceAreaRadiusKm: (_c = normalizedServiceArea === null || normalizedServiceArea === void 0 ? void 0 : normalizedServiceArea.radiusKm) !== null && _c !== void 0 ? _c : 5,
+                    })), (mapVisible !== undefined && { mapVisible })), { verified: false }),
                 });
             }
             // Initialize gamification points for the new user
@@ -110,6 +119,9 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         res.status(201).json(result);
     }
     catch (error) {
+        if (error instanceof serviceArea_1.ServiceAreaValidationError) {
+            return res.status(400).json({ message: error.message });
+        }
         console.error('Registration error:', error);
         res.status(500).json({ message: 'Error registering user' });
     }
@@ -346,6 +358,8 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             specializations: user.technician.specializations,
             location: user.technician.location,
             companyName: user.technician.companyName,
+            mapVisible: user.technician.mapVisible,
+            mapLocation: (0, serviceArea_1.toPublicMapLocation)(user.technician),
         })), { token });
         res.json(responseData);
     }

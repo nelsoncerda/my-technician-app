@@ -2,7 +2,7 @@ import { Router } from 'express';
 
 const router = Router();
 const EFFECTIVE_DATE = '15 de julio de 2026';
-const PRIVACY_EFFECTIVE_DATE = '16 de julio de 2026';
+const PRIVACY_EFFECTIVE_DATE = '17 de julio de 2026';
 
 function escapeHtml(value: string): string {
   return value
@@ -76,15 +76,16 @@ router.get('/privacy', (_req, res) => {
       <li>Nombre, correo electrónico, teléfono y credenciales protegidas de la cuenta.</li>
       <li>Dirección, ciudad, fecha, hora y descripción que proporcionas al solicitar un servicio.</li>
       <li>Perfiles profesionales, especialidades, fotos opcionales, reservas y reseñas.</li>
-      <li>Procesamiento temporal de la ubicación solo cuando pulsas “Usar mi ubicación”. Las coordenadas no se guardan en nuestra API y no usamos ubicación en segundo plano.</li>
+      <li>La ubicación GPS del cliente se procesa temporalmente solo cuando pulsa “Usar mi ubicación”. Esas coordenadas no se guardan en nuestra API y no usamos ubicación en segundo plano.</li>
+      <li>Si un técnico decide aparecer en el mapa, guardamos un marcador aproximado del área donde presta servicio. Redondeamos sus coordenadas antes de almacenarlas y nunca publicamos una dirección residencial ni una ubicación en vivo.</li>
       <li>Datos técnicos básicos necesarios para seguridad, diagnóstico y prevención de abuso.</li>
     </ul>
     <h2>2. Cómo usamos la información</h2>
-    <p>Usamos estos datos para operar la aplicación, conectar clientes con técnicos, gestionar reservas, enviar avisos del servicio, mantener la seguridad y cumplir obligaciones legales. No vendemos información personal.</p>
+    <p>Usamos estos datos para operar la aplicación, permitir búsquedas por área, conectar clientes con técnicos, gestionar reservas, enviar avisos del servicio, mantener la seguridad y cumplir obligaciones legales. No vendemos información personal.</p>
     <h2>3. Cuándo compartimos datos</h2>
     <p>Compartimos los detalles necesarios de una reserva entre el cliente y el técnico seleccionado. Amazon Web Services aloja la aplicación y la base de datos en Lightsail y procesa el correo transaccional mediante Amazon Simple Email Service (SES). Estos proveedores tratan la información únicamente para operar el servicio y están sujetos a obligaciones de confidencialidad y seguridad.</p>
     <h2>4. Ubicación y sensores</h2>
-    <p>El GPS es opcional, se usa en primer plano y sirve para sugerir una zona o completar una dirección. Puedes negar el permiso y escribir la ubicación manualmente. La aplicación no utiliza acelerómetro, cámara ni micrófono.</p>
+    <p>Para clientes, el GPS es opcional, se usa en primer plano y sirve para sugerir una zona o completar una dirección; puedes negar el permiso y escribirla manualmente. Para técnicos, publicar un marcador también es opcional: representa un área de servicio, se redondea aproximadamente a nivel de sector y puede ocultarse desde el perfil. El marcador no representa el domicilio exacto ni sigue al técnico. La aplicación no utiliza acelerómetro, cámara ni micrófono.</p>
     <h2>5. Conservación y seguridad</h2>
     <p>Conservamos la información mientras la cuenta esté activa o sea necesaria para prestar el servicio, resolver disputas y cumplir la ley. Después de eliminar una cuenta, algunos datos pueden permanecer de forma residual en respaldos de acceso restringido de la base de datos; esos respaldos se eliminan dentro de 30 días y no se utilizan para operar normalmente el servicio. Los registros técnicos de acceso, que pueden incluir dirección IP, ruta solicitada, fecha, agente de usuario y resultado HTTP, rotan diariamente y se conservan durante 14 días salvo que sean necesarios para investigar un incidente de seguridad o cumplir una obligación legal. Aplicamos controles de acceso, conexiones cifradas y almacenamiento seguro del token de sesión en el dispositivo.</p>
     <h2>6. Tus opciones y derechos</h2>
@@ -136,7 +137,7 @@ router.get('/support', (_req, res) => {
     <h2>Problemas con una reserva</h2>
     <p>Abre Reservas → selecciona la reserva para revisar el estado, la dirección y el contacto. Las solicitudes pendientes o confirmadas pueden cancelarse desde el detalle.</p>
     <h2>Permiso de ubicación</h2>
-    <p>El GPS es opcional. Si no deseas utilizarlo o el permiso fue rechazado, escribe la ciudad y la dirección manualmente.</p>
+    <p>El GPS es opcional. Si no deseas utilizarlo o el permiso fue rechazado, escribe la ciudad y la dirección manualmente. Los técnicos pueden publicar u ocultar por separado un marcador aproximado de su área de servicio; ese marcador nunca muestra una dirección residencial exacta ni una ubicación en vivo.</p>
     <h2>Eliminar una cuenta</h2>
     <p>Consulta las <a href="/account-deletion">instrucciones de eliminación</a>. La opción está disponible dentro de Cuenta → Zona de cuidado.</p>
     <h2>Contactar soporte</h2>

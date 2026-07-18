@@ -1,6 +1,11 @@
 import { Prisma } from '@prisma/client';
 import { Request, Response } from 'express';
 import prisma from '../prisma';
+import {
+    normalizeServiceAreaInput,
+    ServiceAreaValidationError,
+    toPublicMapLocation,
+} from '../utils/serviceArea';
 
 class ReviewAuthorizationError extends Error {}
 class DuplicateReviewError extends Error {}
@@ -30,6 +35,7 @@ export const getTechnicians = async (req: Request, res: Response) => {
                 rating: tech.rating,
                 ratingCount: tech._count.reviews,
                 verified: tech.verified,
+                mapLocation: toPublicMapLocation(tech),
             }));
 
             return res.json(formattedTechnicians);
@@ -58,6 +64,7 @@ export const getTechnicians = async (req: Request, res: Response) => {
                 rating: tech.rating,
                 verified: tech.verified,
                 reviews: tech.reviews,
+                mapLocation: toPublicMapLocation(tech),
             }));
 
         res.json(formattedTechnicians);
@@ -68,7 +75,7 @@ export const getTechnicians = async (req: Request, res: Response) => {
 
 export const registerTechnician = async (req: Request, res: Response) => {
     try {
-        const { specializations, location, phone, companyName } = req.body;
+        const { specializations, location, phone, companyName, serviceArea, mapVisible } = req.body;
         const userId = req.auth!.userId;
 
         const normalizedSpecializations = Array.isArray(specializations)
@@ -81,9 +88,16 @@ export const registerTechnician = async (req: Request, res: Response) => {
         if (normalizedSpecializations.length === 0 || normalizedSpecializations.length > 10) {
             return res.status(400).json({ message: 'Selecciona entre 1 y 10 especialidades' });
         }
-        if (typeof location !== 'string' || !location.trim()) {
+        if (typeof location !== 'string' || !location.trim() || location.trim().length > 160) {
             return res.status(400).json({ message: 'La ubicación es requerida' });
         }
+        if (mapVisible !== undefined && typeof mapVisible !== 'boolean') {
+            return res.status(400).json({ message: 'La visibilidad en el mapa no es válida' });
+        }
+
+        const normalizedServiceArea = serviceArea === undefined
+            ? undefined
+            : normalizeServiceAreaInput(serviceArea);
 
         const technician = await prisma.$transaction(async (tx) => {
             if (typeof phone === 'string' && phone.trim()) {
@@ -99,6 +113,12 @@ export const registerTechnician = async (req: Request, res: Response) => {
                     specializations: normalizedSpecializations,
                     location: location.trim(),
                     companyName: typeof companyName === 'string' && companyName.trim() ? companyName.trim() : null,
+                    ...(normalizedServiceArea !== undefined && {
+                        serviceAreaLatitude: normalizedServiceArea?.latitude ?? null,
+                        serviceAreaLongitude: normalizedServiceArea?.longitude ?? null,
+                        serviceAreaRadiusKm: normalizedServiceArea?.radiusKm ?? 5,
+                    }),
+                    ...(mapVisible !== undefined && { mapVisible }),
                 },
             });
 
@@ -110,12 +130,72 @@ export const registerTechnician = async (req: Request, res: Response) => {
             return createdTechnician;
         });
 
-        res.status(201).json(technician);
+        res.status(201).json({
+            ...technician,
+            mapLocation: toPublicMapLocation(technician),
+        });
     } catch (error) {
+        if (error instanceof ServiceAreaValidationError) {
+            return res.status(400).json({ message: error.message });
+        }
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
             return res.status(409).json({ message: 'Este usuario ya tiene un perfil técnico' });
         }
         res.status(500).json({ message: 'Error registering technician', error });
+    }
+};
+
+export const updateTechnicianServiceArea = async (req: Request, res: Response) => {
+    try {
+        const hasServiceArea = Object.prototype.hasOwnProperty.call(req.body, 'serviceArea');
+        const hasMapVisible = Object.prototype.hasOwnProperty.call(req.body, 'mapVisible');
+        const hasLocation = Object.prototype.hasOwnProperty.call(req.body, 'location');
+
+        if (!hasServiceArea && !hasMapVisible && !hasLocation) {
+            return res.status(400).json({ message: 'Indica un área de servicio o la visibilidad del mapa' });
+        }
+        if (hasMapVisible && typeof req.body.mapVisible !== 'boolean') {
+            return res.status(400).json({ message: 'La visibilidad en el mapa no es válida' });
+        }
+        if (
+            hasLocation &&
+            (typeof req.body.location !== 'string' || !req.body.location.trim() || req.body.location.trim().length > 160)
+        ) {
+            return res.status(400).json({ message: 'La ubicación no es válida' });
+        }
+
+        const normalizedServiceArea = hasServiceArea
+            ? normalizeServiceAreaInput(req.body.serviceArea)
+            : undefined;
+
+        const technician = await prisma.technician.update({
+            where: { id: req.params.id },
+            data: {
+                ...(hasLocation && { location: req.body.location.trim() }),
+                ...(hasMapVisible && { mapVisible: req.body.mapVisible }),
+                ...(normalizedServiceArea !== undefined && {
+                    serviceAreaLatitude: normalizedServiceArea?.latitude ?? null,
+                    serviceAreaLongitude: normalizedServiceArea?.longitude ?? null,
+                    serviceAreaRadiusKm: normalizedServiceArea?.radiusKm ?? 5,
+                }),
+            },
+        });
+
+        res.json({
+            id: technician.id,
+            location: technician.location,
+            mapVisible: technician.mapVisible,
+            mapLocation: toPublicMapLocation(technician),
+        });
+    } catch (error) {
+        if (error instanceof ServiceAreaValidationError) {
+            return res.status(400).json({ message: error.message });
+        }
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+            return res.status(404).json({ message: 'Técnico no encontrado' });
+        }
+        console.error('Error updating technician service area:', error);
+        res.status(500).json({ message: 'Error al actualizar el área de servicio' });
     }
 };
 

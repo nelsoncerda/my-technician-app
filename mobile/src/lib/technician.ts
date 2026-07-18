@@ -1,9 +1,13 @@
-import type { Technician } from '@/types/api';
+import type { Technician, TechnicianMapLocation } from '@/types/api';
 
-export type TechnicianApiPayload = Omit<Technician, 'rating' | 'ratingCount'> & {
+export type TechnicianApiPayload = Omit<
+  Technician,
+  'rating' | 'ratingCount' | 'mapLocation'
+> & {
   rating?: unknown;
   ratingCount?: unknown;
   reviews?: unknown;
+  mapLocation?: unknown;
 };
 
 function toRating(value: unknown): number | null {
@@ -26,6 +30,32 @@ function getIndividualRatings(reviews: unknown): number[] {
   });
 }
 
+function toMapLocation(value: unknown): TechnicianMapLocation | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const candidate = value as Record<string, unknown>;
+  const { latitude, longitude, radiusKm, precision } = candidate;
+
+  if (
+    precision !== 'approximate' ||
+    typeof latitude !== 'number' ||
+    !Number.isFinite(latitude) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    typeof longitude !== 'number' ||
+    !Number.isFinite(longitude) ||
+    longitude < -180 ||
+    longitude > 180 ||
+    typeof radiusKm !== 'number' ||
+    !Number.isFinite(radiusKm) ||
+    radiusKm < 1 ||
+    radiusKm > 100
+  ) {
+    return null;
+  }
+
+  return { latitude, longitude, radiusKm, precision };
+}
+
 /**
  * Converts the legacy technician response into the ratings-only mobile model.
  * Written review fields are intentionally discarded at the API boundary.
@@ -42,6 +72,7 @@ export function normalizeTechnician(payload: TechnicianApiPayload): Technician {
     rating: _legacyRating,
     ratingCount: _legacyRatingCount,
     reviews: _writtenReviews,
+    mapLocation: rawMapLocation,
     ...technician
   } = payload;
 
@@ -49,5 +80,6 @@ export function normalizeTechnician(payload: TechnicianApiPayload): Technician {
     ...technician,
     rating: suppliedRating ?? fallbackRating,
     ratingCount: suppliedCount ?? individualRatings.length,
+    mapLocation: toMapLocation(rawMapLocation),
   };
 }

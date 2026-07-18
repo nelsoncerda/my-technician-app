@@ -5,6 +5,7 @@ Aplicación nativa para clientes, creada con Expo SDK 57 y React Native. Consume
 ## Alcance de la versión 1
 
 - Directorio de técnicos con autocompletado, filtros, perfiles y calificaciones.
+- Vista de mapa con zonas aproximadas de servicio y acceso rápido al perfil o reserva.
 - GPS opcional en primer plano para reconocer la zona y completar una dirección.
 - Solicitud de servicios con fecha, horarios disponibles y dirección manual o detectada.
 - Lista y detalle de reservas, contacto y cancelación.
@@ -30,6 +31,12 @@ La API de producción predeterminada es `https://api.tecnicosenrd.com`. Para usa
 ```dotenv
 EXPO_PUBLIC_API_URL=https://api.ejemplo.com
 ```
+
+El mapa nativo usa `react-native-maps`. Expo Go ya incluye lo necesario para
+probarlo, pero un build Android independiente necesita la variable de entorno
+`GOOGLE_MAPS_ANDROID_API_KEY`. Configúrala en el entorno de producción de EAS,
+sin guardarla en Git. En Google Cloud, habilita Maps SDK for Android y restringe
+la clave al package `com.tecnicosenrd.app` y al SHA-1 de firma de Google Play.
 
 Comprobaciones antes de cada build:
 

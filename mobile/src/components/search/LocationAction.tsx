@@ -11,10 +11,17 @@ interface LocationActionProps {
   enabled: boolean;
   loading: boolean;
   message?: string | null;
+  messageTone?: 'error' | 'info';
   onPress: () => void;
 }
 
-export function LocationAction({ enabled, loading, message, onPress }: LocationActionProps) {
+export function LocationAction({
+  enabled,
+  loading,
+  message,
+  messageTone = 'error',
+  onPress,
+}: LocationActionProps) {
   return (
     <View>
       <Pressable
@@ -47,7 +54,14 @@ export function LocationAction({ enabled, loading, message, onPress }: LocationA
           </Text>
         </View>
       </Pressable>
-      {message ? <Text style={styles.message}>{message}</Text> : null}
+      {message ? (
+        <Text
+          accessibilityLiveRegion="polite"
+          style={[styles.message, messageTone === 'info' && styles.infoMessage]}
+        >
+          {message}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -105,5 +119,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
     marginTop: 6,
+  },
+  infoMessage: {
+    color: DirectoryColors.tealDark,
   },
 });

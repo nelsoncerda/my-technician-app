@@ -15,6 +15,10 @@ test('ratings view returns aggregates without loading written reviews', async ()
         specializations: ['Electricidad'],
         location: 'Santiago',
         companyName: null,
+        serviceAreaLatitude: 19.456789,
+        serviceAreaLongitude: -70.696789,
+        serviceAreaRadiusKm: 5.04,
+        mapVisible: true,
         rating: 4.8,
         verified: true,
         _count: { reviews: 12 },
@@ -58,6 +62,12 @@ test('ratings view returns aggregates without loading written reviews', async ()
       rating: 4.8,
       ratingCount: 12,
       verified: true,
+      mapLocation: {
+        latitude: 19.46,
+        longitude: -70.7,
+        radiusKm: 5,
+        precision: 'approximate',
+      },
     },
   ]);
   assert.equal(JSON.stringify(body).includes('comment'), false);

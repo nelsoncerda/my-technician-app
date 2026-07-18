@@ -15,6 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getAdminStats = exports.updateUserRole = exports.deleteUser = exports.uploadProfilePhoto = exports.getUserProfileHistory = exports.updateUserProfile = exports.updateUser = exports.getUsers = void 0;
 const prisma_1 = __importDefault(require("../prisma"));
 const safeUser_1 = require("../utils/safeUser");
+const serviceArea_1 = require("../utils/serviceArea");
 const getUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const users = yield prisma_1.default.user.findMany({ select: safeUser_1.safeUserSelect });
@@ -49,10 +50,11 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
 exports.updateUser = updateUser;
 // Update user profile with history tracking
 const updateUserProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
     try {
         const { id } = req.params;
-        const { name, phone, photoUrl, specializations } = req.body;
+        const { name, phone, photoUrl, specializations, location, companyName, serviceArea, mapVisible, } = req.body;
+        const hasServiceArea = Object.prototype.hasOwnProperty.call(req.body, 'serviceArea');
         const ipAddress = req.ip || ((_a = req.headers['x-forwarded-for']) === null || _a === void 0 ? void 0 : _a.toString()) || 'unknown';
         if (name !== undefined && (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 100)) {
             return res.status(400).json({ message: 'El nombre no es válido' });
@@ -69,10 +71,28 @@ const updateUserProfile = (req, res) => __awaiter(void 0, void 0, void 0, functi
             specializations.some((value) => typeof value !== 'string' || !value.trim()))) {
             return res.status(400).json({ message: 'Las especialidades no son válidas' });
         }
+        if (location !== undefined && (typeof location !== 'string' || !location.trim() || location.trim().length > 160)) {
+            return res.status(400).json({ message: 'La ubicación no es válida' });
+        }
+        if (companyName !== undefined && companyName !== null && (typeof companyName !== 'string' || companyName.trim().length > 120)) {
+            return res.status(400).json({ message: 'El nombre de la empresa no es válido' });
+        }
+        if (mapVisible !== undefined && typeof mapVisible !== 'boolean') {
+            return res.status(400).json({ message: 'La visibilidad en el mapa no es válida' });
+        }
         const normalizedName = typeof name === 'string' ? name.trim() : undefined;
         const normalizedPhone = typeof phone === 'string' ? phone.trim() || null : undefined;
         const normalizedSpecializations = Array.isArray(specializations)
             ? specializations.map((value) => value.trim())
+            : undefined;
+        const normalizedLocation = typeof location === 'string' ? location.trim() : undefined;
+        const normalizedCompanyName = companyName === null
+            ? null
+            : typeof companyName === 'string'
+                ? companyName.trim() || null
+                : undefined;
+        const normalizedServiceArea = hasServiceArea
+            ? (0, serviceArea_1.normalizeServiceAreaInput)(serviceArea)
             : undefined;
         // Get current user data with technician info
         const currentUser = yield prisma_1.default.user.findUnique({
@@ -81,6 +101,14 @@ const updateUserProfile = (req, res) => __awaiter(void 0, void 0, void 0, functi
         });
         if (!currentUser) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
+        }
+        if (!currentUser.technician &&
+            (normalizedSpecializations !== undefined ||
+                normalizedLocation !== undefined ||
+                normalizedCompanyName !== undefined ||
+                normalizedServiceArea !== undefined ||
+                mapVisible !== undefined)) {
+            return res.status(400).json({ message: 'Este usuario no tiene un perfil técnico' });
         }
         // Track changes
         const changes = [];
@@ -101,12 +129,51 @@ const updateUserProfile = (req, res) => __awaiter(void 0, void 0, void 0, functi
                 changes.push({ fieldName: 'specializations', oldValue: oldSpecs, newValue: newSpecs });
             }
         }
+        if (normalizedLocation !== undefined && currentUser.technician && normalizedLocation !== currentUser.technician.location) {
+            changes.push({
+                fieldName: 'location',
+                oldValue: currentUser.technician.location,
+                newValue: normalizedLocation,
+            });
+        }
+        if (normalizedCompanyName !== undefined &&
+            currentUser.technician &&
+            normalizedCompanyName !== currentUser.technician.companyName) {
+            changes.push({
+                fieldName: 'companyName',
+                oldValue: currentUser.technician.companyName,
+                newValue: normalizedCompanyName,
+            });
+        }
+        if (mapVisible !== undefined && currentUser.technician && mapVisible !== currentUser.technician.mapVisible) {
+            changes.push({
+                fieldName: 'mapVisible',
+                oldValue: String(currentUser.technician.mapVisible),
+                newValue: String(mapVisible),
+            });
+        }
+        if (normalizedServiceArea !== undefined && currentUser.technician) {
+            const oldArea = currentUser.technician.serviceAreaLatitude === null
+                ? null
+                : JSON.stringify({
+                    latitude: currentUser.technician.serviceAreaLatitude,
+                    longitude: currentUser.technician.serviceAreaLongitude,
+                    radiusKm: currentUser.technician.serviceAreaRadiusKm,
+                });
+            const newArea = normalizedServiceArea === null ? null : JSON.stringify(normalizedServiceArea);
+            if (oldArea !== newArea) {
+                changes.push({ fieldName: 'serviceArea', oldValue: oldArea, newValue: newArea });
+            }
+        }
         // If no changes, return current user with technician data
         if (changes.length === 0) {
-            return res.json(Object.assign(Object.assign({}, currentUser), { technicianId: (_b = currentUser.technician) === null || _b === void 0 ? void 0 : _b.id, specializations: (_c = currentUser.technician) === null || _c === void 0 ? void 0 : _c.specializations, location: (_d = currentUser.technician) === null || _d === void 0 ? void 0 : _d.location, companyName: (_e = currentUser.technician) === null || _e === void 0 ? void 0 : _e.companyName }));
+            return res.json(Object.assign(Object.assign({}, currentUser), { technicianId: (_b = currentUser.technician) === null || _b === void 0 ? void 0 : _b.id, specializations: (_c = currentUser.technician) === null || _c === void 0 ? void 0 : _c.specializations, location: (_d = currentUser.technician) === null || _d === void 0 ? void 0 : _d.location, companyName: (_e = currentUser.technician) === null || _e === void 0 ? void 0 : _e.companyName, mapVisible: (_f = currentUser.technician) === null || _f === void 0 ? void 0 : _f.mapVisible, mapLocation: currentUser.technician
+                    ? (0, serviceArea_1.toPublicMapLocation)(currentUser.technician)
+                    : undefined }));
         }
         // Update user and create history records in a transaction
         const result = yield prisma_1.default.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
+            var _a, _b, _c;
             // Create history records for each change
             yield tx.profileChangeHistory.createMany({
                 data: changes.map(change => ({
@@ -124,20 +191,33 @@ const updateUserProfile = (req, res) => __awaiter(void 0, void 0, void 0, functi
                 data: Object.assign(Object.assign(Object.assign({}, (normalizedName !== undefined && { name: normalizedName })), (normalizedPhone !== undefined && { phone: normalizedPhone })), (photoUrl !== undefined && { photoUrl })),
                 select: safeUser_1.safeUserSelect,
             });
-            // Update technician specializations if applicable
+            // Update technician profile fields if applicable
             let technician = currentUser.technician;
-            if (normalizedSpecializations !== undefined && technician) {
+            if (technician && (normalizedSpecializations !== undefined ||
+                normalizedLocation !== undefined ||
+                normalizedCompanyName !== undefined ||
+                normalizedServiceArea !== undefined ||
+                mapVisible !== undefined)) {
                 technician = yield tx.technician.update({
                     where: { userId: id },
-                    data: { specializations: normalizedSpecializations },
+                    data: Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (normalizedSpecializations !== undefined && { specializations: normalizedSpecializations })), (normalizedLocation !== undefined && { location: normalizedLocation })), (normalizedCompanyName !== undefined && { companyName: normalizedCompanyName })), (mapVisible !== undefined && { mapVisible })), (normalizedServiceArea !== undefined && {
+                        serviceAreaLatitude: (_a = normalizedServiceArea === null || normalizedServiceArea === void 0 ? void 0 : normalizedServiceArea.latitude) !== null && _a !== void 0 ? _a : null,
+                        serviceAreaLongitude: (_b = normalizedServiceArea === null || normalizedServiceArea === void 0 ? void 0 : normalizedServiceArea.longitude) !== null && _b !== void 0 ? _b : null,
+                        serviceAreaRadiusKm: (_c = normalizedServiceArea === null || normalizedServiceArea === void 0 ? void 0 : normalizedServiceArea.radiusKm) !== null && _c !== void 0 ? _c : 5,
+                    })),
                 });
             }
             return { updatedUser, technician };
         }));
         // Return combined user + technician data
-        res.json(Object.assign(Object.assign({}, result.updatedUser), { technicianId: (_f = result.technician) === null || _f === void 0 ? void 0 : _f.id, specializations: (_g = result.technician) === null || _g === void 0 ? void 0 : _g.specializations, location: (_h = result.technician) === null || _h === void 0 ? void 0 : _h.location, companyName: (_j = result.technician) === null || _j === void 0 ? void 0 : _j.companyName }));
+        res.json(Object.assign(Object.assign({}, result.updatedUser), { technicianId: (_g = result.technician) === null || _g === void 0 ? void 0 : _g.id, specializations: (_h = result.technician) === null || _h === void 0 ? void 0 : _h.specializations, location: (_j = result.technician) === null || _j === void 0 ? void 0 : _j.location, companyName: (_k = result.technician) === null || _k === void 0 ? void 0 : _k.companyName, mapVisible: (_l = result.technician) === null || _l === void 0 ? void 0 : _l.mapVisible, mapLocation: result.technician
+                ? (0, serviceArea_1.toPublicMapLocation)(result.technician)
+                : undefined }));
     }
     catch (error) {
+        if (error instanceof serviceArea_1.ServiceAreaValidationError) {
+            return res.status(400).json({ message: error.message });
+        }
         console.error('Error updating user profile:', error);
         res.status(500).json({ message: 'Error updating user profile', error });
     }

@@ -58,8 +58,19 @@ test('privacy policy discloses the 30-day residual database-backup window', asyn
   const body = await response.text();
 
   assert.equal(response.status, 200);
-  assert.match(body, /16 de julio de 2026/);
+  assert.match(body, /17 de julio de 2026/);
   assert.match(body, /respaldos[^<]+base de datos[^<]+se eliminan dentro de 30 días/);
+});
+
+test('privacy policy distinguishes transient customer GPS from public technician service areas', async () => {
+  const response = await fetch(`${baseUrl}/privacy`);
+  const body = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.match(body, /ubicación GPS del cliente[^<]+temporalmente/);
+  assert.match(body, /Esas coordenadas no se guardan en nuestra API/);
+  assert.match(body, /marcador aproximado[^<]+área[^<]+servicio/);
+  assert.match(body, /nunca publicamos una dirección residencial ni una ubicación en vivo/);
 });
 
 test('password reset page escapes an untrusted token', async () => {

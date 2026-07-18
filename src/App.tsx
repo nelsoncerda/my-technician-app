@@ -66,6 +66,12 @@ interface Technician {
     reviews: Review[];
     verified: boolean;
     companyName?: string;
+    mapLocation?: {
+        latitude: number;
+        longitude: number;
+        radiusKm: number;
+        precision: 'approximate';
+    } | null;
 }
 
 interface User {
@@ -81,6 +87,7 @@ interface User {
     specializations?: string[];
     location?: string;
     companyName?: string;
+    mapVisible?: boolean;
 }
 
 interface ProfileChangeHistory {
@@ -204,6 +211,7 @@ const SantiagoTechRDApp = () => {
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
     const [savingProfile, setSavingProfile] = useState(false);
     const [editingSpecializations, setEditingSpecializations] = useState<string[]>([]);
+    const [editingMapVisible, setEditingMapVisible] = useState(true);
 
     // Availability state for technicians
     const [profileTab, setProfileTab] = useState<'info' | 'history' | 'availability'>('info');
@@ -1157,8 +1165,18 @@ const SantiagoTechRDApp = () => {
             const requestBody: Record<string, unknown> = { name, phone };
 
             // If user is a technician, include specializations
-            if (currentUser.role === 'technician' && editingSpecializations.length > 0) {
-                requestBody.specializations = editingSpecializations;
+            if (currentUser.role === 'technician') {
+                if (editingSpecializations.length > 0) {
+                    requestBody.specializations = editingSpecializations;
+                }
+                const locationField = form.elements.namedItem('location') as HTMLSelectElement | null;
+                if (locationField?.value) {
+                    requestBody.location = locationField.value;
+                    if (locationField.value !== currentUser.location) {
+                        requestBody.serviceArea = null;
+                    }
+                }
+                requestBody.mapVisible = editingMapVisible;
             }
 
             const response = await apiFetch(`${API_BASE_URL}/api/users/${currentUser.id}/profile`, {
@@ -3799,6 +3817,7 @@ const SantiagoTechRDApp = () => {
                                                 </div>
                                                 {/* Specializations editor for technicians */}
                                                 {currentUser.role === 'technician' && (
+                                                    <>
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                                             Servicios que Ofreces
@@ -3837,6 +3856,43 @@ const SantiagoTechRDApp = () => {
                                                             <p className="text-xs text-red-500 mt-1">Debes seleccionar al menos un servicio</p>
                                                         )}
                                                     </div>
+                                                    <div>
+                                                        <label htmlFor="profile-service-location" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                            Zona de servicio
+                                                        </label>
+                                                        <select
+                                                            id="profile-service-location"
+                                                            name="location"
+                                                            defaultValue={currentUser.location || ''}
+                                                            required
+                                                            className="h-11 w-full rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                                                        >
+                                                            <option value="" disabled>Selecciona una zona</option>
+                                                            {locations.map((location) => (
+                                                                <option key={location} value={location}>{location}</option>
+                                                            ))}
+                                                        </select>
+                                                        <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
+                                                            El mapa usa el centro general de esta zona, no una dirección específica.
+                                                        </p>
+                                                    </div>
+                                                    <label className="flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={editingMapVisible}
+                                                            onChange={(event) => setEditingMapVisible(event.target.checked)}
+                                                            className="mt-0.5 h-4 w-4 rounded text-blue-600 focus:ring-blue-500"
+                                                        />
+                                                        <span>
+                                                            <span className="block text-sm font-medium text-gray-800 dark:text-white">
+                                                                Mostrar mi zona en el mapa
+                                                            </span>
+                                                            <span className="mt-1 block text-xs leading-5 text-gray-500 dark:text-gray-400">
+                                                                Se muestra un área aproximada basada en tu zona pública, nunca tu domicilio ni una ubicación en vivo.
+                                                            </span>
+                                                        </span>
+                                                    </label>
+                                                    </>
                                                 )}
                                                 <div className="flex gap-2 pt-4">
                                                     <Button
@@ -3850,7 +3906,10 @@ const SantiagoTechRDApp = () => {
                                                     <Button
                                                         type="submit"
                                                         className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                                                        disabled={savingProfile}
+                                                        disabled={
+                                                            savingProfile ||
+                                                            (currentUser.role === 'technician' && editingSpecializations.length === 0)
+                                                        }
                                                     >
                                                         {savingProfile ? (
                                                             <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -3905,11 +3964,32 @@ const SantiagoTechRDApp = () => {
                                                         </div>
                                                     </div>
                                                 )}
+                                                {currentUser.role === 'technician' && currentUser.location && (
+                                                    <div className="flex items-start gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50">
+                                                        <MapPin className="mt-0.5 h-5 w-5 text-gray-400" />
+                                                        <div>
+                                                            <p className="text-xs text-gray-500 dark:text-gray-400">Zona de servicio</p>
+                                                            <p className="font-medium text-gray-800 dark:text-white">{currentUser.location}</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {currentUser.role === 'technician' && (
+                                                    <div className="flex items-start gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50">
+                                                        <MapPin className="mt-0.5 h-5 w-5 text-gray-400" />
+                                                        <div>
+                                                            <p className="text-xs text-gray-500 dark:text-gray-400">Visibilidad en el mapa</p>
+                                                            <p className="font-medium text-gray-800 dark:text-white">
+                                                                {currentUser.mapVisible === false ? 'Zona oculta' : 'Zona aproximada visible'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                )}
                                                 <Button
                                                     onClick={() => {
                                                         // Initialize specializations when entering edit mode
-                                                        if (currentUser.role === 'technician' && currentUser.specializations) {
-                                                            setEditingSpecializations(currentUser.specializations);
+                                                        if (currentUser.role === 'technician') {
+                                                            setEditingSpecializations(currentUser.specializations || []);
+                                                            setEditingMapVisible(currentUser.mapVisible !== false);
                                                         }
                                                         setIsEditingProfile(true);
                                                     }}

@@ -8,13 +8,14 @@ const sections: LegalSection[] = [
       'Nombre, correo electrónico, teléfono y credenciales protegidas de la cuenta.',
       'Dirección, ciudad, fecha, hora y descripción que proporcionas al solicitar un servicio.',
       'Perfiles profesionales, especialidades, fotos opcionales, reservas y calificaciones.',
-      'Procesamiento temporal de la ubicación solo cuando pulsas “Usar mi ubicación”. Las coordenadas no se guardan en nuestra API y no usamos ubicación en segundo plano.',
+      'La ubicación GPS del cliente se procesa temporalmente solo cuando pulsa “Usar mi ubicación”. Esas coordenadas no se guardan en nuestra API y no usamos ubicación en segundo plano.',
+      'Si un técnico decide aparecer en el mapa, guardamos un marcador aproximado del área donde presta servicio. Redondeamos sus coordenadas y nunca publicamos una dirección residencial ni una ubicación en vivo.',
       'Datos técnicos básicos necesarios para seguridad, diagnóstico y prevención de abuso.',
     ],
   },
   {
     title: '2. Cómo usamos la información',
-    paragraphs: ['Usamos estos datos para operar la aplicación, conectar clientes con técnicos, gestionar reservas, enviar avisos del servicio, mantener la seguridad y cumplir obligaciones legales. No vendemos información personal.'],
+    paragraphs: ['Usamos estos datos para operar la aplicación, permitir búsquedas por área, conectar clientes con técnicos, gestionar reservas, enviar avisos del servicio, mantener la seguridad y cumplir obligaciones legales. No vendemos información personal.'],
   },
   {
     title: '3. Cuándo compartimos datos',
@@ -22,7 +23,7 @@ const sections: LegalSection[] = [
   },
   {
     title: '4. Ubicación y sensores',
-    paragraphs: ['El acceso al GPS es opcional, ocurre en primer plano y sirve para sugerir una zona o completar una dirección. Puedes negar el permiso y escribir la ubicación manualmente. La aplicación no utiliza acelerómetro, cámara ni micrófono.'],
+    paragraphs: ['Para clientes, el acceso al GPS es opcional, ocurre en primer plano y sirve para sugerir una zona o completar una dirección; puedes negar el permiso y escribirla manualmente. Para técnicos, el marcador representa un área de servicio aproximada, puede ocultarse desde el perfil y no muestra el domicilio exacto ni sigue al técnico. La aplicación no utiliza acelerómetro, cámara ni micrófono.'],
   },
   {
     title: '5. Conservación y seguridad',
@@ -41,7 +42,7 @@ const sections: LegalSection[] = [
 export default function PrivacyScreen() {
   return (
     <LegalScreen
-      effectiveDate="15 de julio de 2026"
+      effectiveDate="17 de julio de 2026"
       intro="Esta política explica cómo Técnicos en RD trata la información de clientes y profesionales dentro de la aplicación móvil."
       sections={sections}
       title="Política de privacidad"

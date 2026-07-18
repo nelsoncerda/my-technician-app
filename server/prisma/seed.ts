@@ -95,6 +95,18 @@ async function main() {
   }
   console.log(`Created ${REWARDS.length} rewards`);
 
+  // Preserve existing public location labels while initializing the default
+  // service radius. The API converts known labels into coarse area centroids;
+  // no home or booking address is copied into these map fields.
+  const mapDefaults = await prisma.technician.updateMany({
+    where: {
+      serviceAreaLatitude: null,
+      serviceAreaLongitude: null,
+    },
+    data: { serviceAreaRadiusKm: 5 },
+  });
+  console.log(`Initialized map defaults for ${mapDefaults.count} technicians`);
+
   // Create default availability slots for existing technicians
   console.log('Creating default availability for technicians...');
   const technicians = await prisma.technician.findMany();

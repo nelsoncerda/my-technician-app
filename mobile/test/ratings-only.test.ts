@@ -4,6 +4,10 @@ import test from 'node:test';
 
 import { getRatingLabel } from '../src/lib/rating';
 import {
+  createTechnicianMapMarkers,
+  resolveSelectedMarkerId,
+} from '../src/lib/map';
+import {
   normalizeTechnician,
   type TechnicianApiPayload,
 } from '../src/lib/technician';
@@ -53,6 +57,111 @@ test('preserves an aggregate rating even when individual rating records are omit
 
   assert.equal(technician.rating, 4.9);
   assert.equal(technician.ratingCount, 18);
+});
+
+test('normalizes only privacy-safe approximate map locations', () => {
+  const technician = normalizeTechnician({
+    ...baseTechnician,
+    email: 'private@example.com',
+    phone: '+18095550101',
+    mapLocation: {
+      latitude: 19.45,
+      longitude: -70.7,
+      radiusKm: 4,
+      precision: 'approximate',
+    },
+  });
+
+  assert.deepEqual(technician.mapLocation, {
+    latitude: 19.45,
+    longitude: -70.7,
+    radiusKm: 4,
+    precision: 'approximate',
+  });
+
+  const [marker] = createTechnicianMapMarkers([technician]);
+  assert.equal(marker.id, technician.id);
+  assert.equal(marker.precision, 'approximate');
+  assert.equal('email' in marker, false);
+  assert.equal('phone' in marker, false);
+  assert.equal(JSON.stringify(marker).includes('private@example.com'), false);
+});
+
+test('drops invalid or non-approximate public map locations', () => {
+  const technician = normalizeTechnician({
+    ...baseTechnician,
+    mapLocation: {
+      latitude: 19.4512345,
+      longitude: -70.7012345,
+      radiusKm: 0,
+      precision: 'exact',
+    },
+  });
+
+  assert.equal(technician.mapLocation, null);
+  assert.deepEqual(createTechnicianMapMarkers([technician]), []);
+});
+
+test('map view selection follows visible markers across list/map toggles and filters', () => {
+  const first = normalizeTechnician({
+    ...baseTechnician,
+    id: 'tech-1',
+    mapLocation: {
+      latitude: 19.45,
+      longitude: -70.7,
+      radiusKm: 4,
+      precision: 'approximate',
+    },
+  });
+  const second = normalizeTechnician({
+    ...baseTechnician,
+    id: 'tech-2',
+    mapLocation: {
+      latitude: 19.48,
+      longitude: -70.65,
+      radiusKm: 3,
+      precision: 'approximate',
+    },
+  });
+  const allMarkers = createTechnicianMapMarkers([first, second]);
+
+  assert.equal(resolveSelectedMarkerId(allMarkers, null), 'tech-1');
+  assert.equal(resolveSelectedMarkerId(allMarkers, 'tech-2'), 'tech-2');
+  assert.equal(resolveSelectedMarkerId(allMarkers.slice(0, 1), 'tech-2'), 'tech-1');
+  assert.equal(resolveSelectedMarkerId([], 'tech-1'), null);
+});
+
+test('overlapping approximate service areas remain independently selectable', () => {
+  const mapLocation = {
+    latitude: 19.45,
+    longitude: -70.7,
+    radiusKm: 4,
+    precision: 'approximate' as const,
+  };
+  const first = normalizeTechnician({ ...baseTechnician, id: 'tech-1', mapLocation });
+  const second = normalizeTechnician({ ...baseTechnician, id: 'tech-2', mapLocation });
+  const markers = createTechnicianMapMarkers([first, second]);
+
+  assert.equal(markers.length, 2);
+  assert.notDeepEqual(markers[0].coordinate, markers[1].coordinate);
+  assert.deepEqual(markers[0].serviceAreaCenter, markers[1].serviceAreaCenter);
+});
+
+test('the Android Maps key is environment-backed and the web fallback is native-module free', () => {
+  const appConfigSource = readFileSync('app.config.js', 'utf8');
+  const webMapSource = readFileSync(
+    'src/components/technician/TechnicianMap.tsx',
+    'utf8'
+  );
+  const nativeMapSource = readFileSync(
+    'src/components/technician/TechnicianMap.native.tsx',
+    'utf8'
+  );
+
+  assert.match(appConfigSource, /process\.env\.GOOGLE_MAPS_ANDROID_API_KEY/);
+  assert.doesNotMatch(appConfigSource, /AIza[0-9A-Za-z_-]{20,}/);
+  assert.doesNotMatch(webMapSource, /from ['"]react-native-maps['"]/);
+  assert.match(nativeMapSource, /from ['"]react-native-maps['"]/);
 });
 
 test('rating accessibility labels use ratings-only language', () => {

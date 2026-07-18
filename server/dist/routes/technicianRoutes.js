@@ -7,6 +7,7 @@ const router = (0, express_1.Router)();
 router.get('/', technicianController_1.getTechnicians);
 router.post('/', auth_1.requireAuth, (0, auth_1.requireRole)('user', 'technician'), technicianController_1.registerTechnician);
 router.post('/:id/reviews', auth_1.requireAuth, technicianController_1.addTechnicianReview);
+router.put('/:id/service-area', auth_1.requireAuth, (0, auth_1.requireTechnicianOwnerOrAdmin)('id'), technicianController_1.updateTechnicianServiceArea);
 router.put('/:id/verify', auth_1.requireAuth, auth_1.requireAdmin, technicianController_1.verifyTechnician);
 router.delete('/:id', auth_1.requireAuth, (0, auth_1.requireTechnicianOwnerOrAdmin)('id'), technicianController_1.deleteTechnician);
 exports.default = router;

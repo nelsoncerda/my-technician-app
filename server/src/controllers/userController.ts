@@ -1,6 +1,11 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma';
 import { safeUserSelect } from '../utils/safeUser';
+import {
+    normalizeServiceAreaInput,
+    ServiceAreaValidationError,
+    toPublicMapLocation,
+} from '../utils/serviceArea';
 
 export const getUsers = async (req: Request, res: Response) => {
     try {
@@ -39,7 +44,17 @@ export const updateUser = async (req: Request, res: Response) => {
 export const updateUserProfile = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        const { name, phone, photoUrl, specializations } = req.body;
+        const {
+            name,
+            phone,
+            photoUrl,
+            specializations,
+            location,
+            companyName,
+            serviceArea,
+            mapVisible,
+        } = req.body;
+        const hasServiceArea = Object.prototype.hasOwnProperty.call(req.body, 'serviceArea');
         const ipAddress = req.ip || req.headers['x-forwarded-for']?.toString() || 'unknown';
 
         if (name !== undefined && (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 100)) {
@@ -59,11 +74,33 @@ export const updateUserProfile = async (req: Request, res: Response) => {
         )) {
             return res.status(400).json({ message: 'Las especialidades no son válidas' });
         }
+        if (location !== undefined && (
+            typeof location !== 'string' || !location.trim() || location.trim().length > 160
+        )) {
+            return res.status(400).json({ message: 'La ubicación no es válida' });
+        }
+        if (companyName !== undefined && companyName !== null && (
+            typeof companyName !== 'string' || companyName.trim().length > 120
+        )) {
+            return res.status(400).json({ message: 'El nombre de la empresa no es válido' });
+        }
+        if (mapVisible !== undefined && typeof mapVisible !== 'boolean') {
+            return res.status(400).json({ message: 'La visibilidad en el mapa no es válida' });
+        }
 
         const normalizedName = typeof name === 'string' ? name.trim() : undefined;
         const normalizedPhone = typeof phone === 'string' ? phone.trim() || null : undefined;
         const normalizedSpecializations = Array.isArray(specializations)
             ? specializations.map((value: string) => value.trim())
+            : undefined;
+        const normalizedLocation = typeof location === 'string' ? location.trim() : undefined;
+        const normalizedCompanyName = companyName === null
+            ? null
+            : typeof companyName === 'string'
+                ? companyName.trim() || null
+                : undefined;
+        const normalizedServiceArea = hasServiceArea
+            ? normalizeServiceAreaInput(serviceArea)
             : undefined;
 
         // Get current user data with technician info
@@ -76,6 +113,18 @@ export const updateUserProfile = async (req: Request, res: Response) => {
         });
         if (!currentUser) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
+        }
+        if (
+            !currentUser.technician &&
+            (
+                normalizedSpecializations !== undefined ||
+                normalizedLocation !== undefined ||
+                normalizedCompanyName !== undefined ||
+                normalizedServiceArea !== undefined ||
+                mapVisible !== undefined
+            )
+        ) {
+            return res.status(400).json({ message: 'Este usuario no tiene un perfil técnico' });
         }
 
         // Track changes
@@ -99,6 +148,44 @@ export const updateUserProfile = async (req: Request, res: Response) => {
                 changes.push({ fieldName: 'specializations', oldValue: oldSpecs, newValue: newSpecs });
             }
         }
+        if (normalizedLocation !== undefined && currentUser.technician && normalizedLocation !== currentUser.technician.location) {
+            changes.push({
+                fieldName: 'location',
+                oldValue: currentUser.technician.location,
+                newValue: normalizedLocation,
+            });
+        }
+        if (
+            normalizedCompanyName !== undefined &&
+            currentUser.technician &&
+            normalizedCompanyName !== currentUser.technician.companyName
+        ) {
+            changes.push({
+                fieldName: 'companyName',
+                oldValue: currentUser.technician.companyName,
+                newValue: normalizedCompanyName,
+            });
+        }
+        if (mapVisible !== undefined && currentUser.technician && mapVisible !== currentUser.technician.mapVisible) {
+            changes.push({
+                fieldName: 'mapVisible',
+                oldValue: String(currentUser.technician.mapVisible),
+                newValue: String(mapVisible),
+            });
+        }
+        if (normalizedServiceArea !== undefined && currentUser.technician) {
+            const oldArea = currentUser.technician.serviceAreaLatitude === null
+                ? null
+                : JSON.stringify({
+                    latitude: currentUser.technician.serviceAreaLatitude,
+                    longitude: currentUser.technician.serviceAreaLongitude,
+                    radiusKm: currentUser.technician.serviceAreaRadiusKm,
+                });
+            const newArea = normalizedServiceArea === null ? null : JSON.stringify(normalizedServiceArea);
+            if (oldArea !== newArea) {
+                changes.push({ fieldName: 'serviceArea', oldValue: oldArea, newValue: newArea });
+            }
+        }
 
         // If no changes, return current user with technician data
         if (changes.length === 0) {
@@ -108,6 +195,10 @@ export const updateUserProfile = async (req: Request, res: Response) => {
                 specializations: currentUser.technician?.specializations,
                 location: currentUser.technician?.location,
                 companyName: currentUser.technician?.companyName,
+                mapVisible: currentUser.technician?.mapVisible,
+                mapLocation: currentUser.technician
+                    ? toPublicMapLocation(currentUser.technician)
+                    : undefined,
             });
         }
 
@@ -136,12 +227,28 @@ export const updateUserProfile = async (req: Request, res: Response) => {
                 select: safeUserSelect,
             });
 
-            // Update technician specializations if applicable
+            // Update technician profile fields if applicable
             let technician = currentUser.technician;
-            if (normalizedSpecializations !== undefined && technician) {
+            if (technician && (
+                normalizedSpecializations !== undefined ||
+                normalizedLocation !== undefined ||
+                normalizedCompanyName !== undefined ||
+                normalizedServiceArea !== undefined ||
+                mapVisible !== undefined
+            )) {
                 technician = await tx.technician.update({
                     where: { userId: id },
-                    data: { specializations: normalizedSpecializations },
+                    data: {
+                        ...(normalizedSpecializations !== undefined && { specializations: normalizedSpecializations }),
+                        ...(normalizedLocation !== undefined && { location: normalizedLocation }),
+                        ...(normalizedCompanyName !== undefined && { companyName: normalizedCompanyName }),
+                        ...(mapVisible !== undefined && { mapVisible }),
+                        ...(normalizedServiceArea !== undefined && {
+                            serviceAreaLatitude: normalizedServiceArea?.latitude ?? null,
+                            serviceAreaLongitude: normalizedServiceArea?.longitude ?? null,
+                            serviceAreaRadiusKm: normalizedServiceArea?.radiusKm ?? 5,
+                        }),
+                    },
                 });
             }
 
@@ -155,8 +262,15 @@ export const updateUserProfile = async (req: Request, res: Response) => {
             specializations: result.technician?.specializations,
             location: result.technician?.location,
             companyName: result.technician?.companyName,
+            mapVisible: result.technician?.mapVisible,
+            mapLocation: result.technician
+                ? toPublicMapLocation(result.technician)
+                : undefined,
         });
     } catch (error) {
+        if (error instanceof ServiceAreaValidationError) {
+            return res.status(400).json({ message: error.message });
+        }
         console.error('Error updating user profile:', error);
         res.status(500).json({ message: 'Error updating user profile', error });
     }

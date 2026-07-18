@@ -31,7 +31,7 @@ El dominio principal `tecnicosenrd.com` actualmente sirve otra aplicación. No l
 - Capturas: cuatro imágenes para iPhone de 6.3 pulgadas y cuatro para el grupo obligatorio de 6.5 pulgadas (`1242 × 2688`).
 - Clasificación de edad: 4+; las preguntas nuevas de redes sociales y acceso social para menores de 13 se respondieron `No`.
 - EAS Metadata v0 todavía no representa esas dos preguntas sociales; después de futuras sincronizaciones de metadatos, verificarlas manualmente en App Information antes de enviar otra versión.
-- App Privacy publicada en App Store Connect: nueve tipos de datos, usados para funcionalidad, vinculados a la identidad y sin rastreo.
+- App Privacy publicada para el build anterior: nueve tipos de datos, usados para funcionalidad, vinculados a la identidad y sin rastreo. Antes de enviar la versión con mapa, añadir `Ubicación aproximada` para las zonas de servicio publicadas por técnicos.
 
 Los builds se consultan en `https://expo.dev/accounts/nelsoncerda/projects/tecnicos-en-rd/builds`.
 
@@ -89,7 +89,7 @@ Preparar para ambas tiendas:
 - Correo y URL de soporte.
 - Declaraciones de recopilación de datos coherentes con la aplicación.
 
-Declaración funcional de ubicación: acceso preciso o aproximado, iniciado por el usuario, solo mientras usa la aplicación; se utiliza para sugerir zona y completar dirección. No hay rastreo ni ubicación en segundo plano.
+Declaración funcional de ubicación: el GPS del cliente es iniciado por el usuario, solo mientras usa la aplicación, y sirve para sugerir zona y completar dirección. Además, un técnico puede publicar una zona de servicio aproximada vinculada a su perfil para aparecer en el mapa. No hay rastreo, ubicación en segundo plano ni publicación de domicilios exactos.
 
 ## 6. App Store Connect
 
@@ -120,19 +120,24 @@ Proporciona al equipo de revisión una cuenta de demostración si las reservas a
 
 ## 7. Google Play Console
 
-Estado actual: el AAB de producción ya está listo. La creación de la ficha está bloqueada hasta que Google apruebe la verificación de identidad del titular. Después se debe verificar un dispositivo Android real con la app Play Console y completar la verificación telefónica.
+Estado actual: la cuenta de Play Console ya está verificada, la ficha está creada y el AAB con código `3` está disponible en la prueba interna. Ese build es anterior al mapa y debe reemplazarse por un AAB nuevo después de configurar Google Maps.
 
 1. Crear la aplicación con package `com.tecnicosenrd.app`.
-2. Completar Data safety, App access, clasificación de contenido y eliminación de cuenta.
-3. Generar el Android App Bundle:
+2. En Google Cloud, habilitar Maps SDK for Android y crear una clave restringida
+   al package `com.tecnicosenrd.app` y al SHA-1 de App Signing de Google Play.
+   Guardarla como variable sensible `GOOGLE_MAPS_ANDROID_API_KEY` en el entorno
+   de producción de EAS; no copiar la clave a `app.json` ni guardarla en Git.
+3. Completar Data safety, App access, clasificación de contenido y eliminación de cuenta.
+4. Generar un Android App Bundle nuevo después de configurar la clave. El AAB
+   con código `3` es anterior al mapa y no debe publicarse como esta versión:
 
    ```bash
    npx eas-cli@latest build --profile production --platform android
    ```
 
-4. En cuentas nuevas, el primer `.aab` puede requerir carga manual antes de utilizar envíos automatizados.
-5. Completar las pruebas cerradas que Google exija para el tipo y antigüedad de la cuenta.
-6. Después de la primera carga, los siguientes builds pueden enviarse con:
+5. En cuentas nuevas, el primer `.aab` puede requerir carga manual antes de utilizar envíos automatizados.
+6. Completar las pruebas cerradas que Google exija para el tipo y antigüedad de la cuenta.
+7. Después de la primera carga, los siguientes builds pueden enviarse con:
 
    ```bash
    npx eas-cli@latest submit --profile production --platform android

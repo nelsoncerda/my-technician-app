@@ -8,7 +8,9 @@ import {
   Droplets,
   Hammer,
   KeyRound,
+  List,
   LockKeyhole,
+  Map as MapIcon,
   MapPin,
   Paintbrush,
   RefreshCw,
@@ -34,6 +36,7 @@ import {
 } from '../ui/select';
 import { getTechnicianSpecializations } from '../../lib/search';
 import SearchAutocomplete from './SearchAutocomplete';
+import TechnicianMap, { isValidTechnicianMapLocation } from './TechnicianMap';
 import TechnicianRating from './TechnicianRating';
 
 export interface HomeTechnicianReview {
@@ -42,6 +45,13 @@ export interface HomeTechnicianReview {
   comment: string;
   rating: number;
   date: string;
+}
+
+export interface HomeTechnicianMapLocation {
+  latitude: number;
+  longitude: number;
+  radiusKm: number;
+  precision: 'approximate';
 }
 
 export interface HomeTechnician {
@@ -55,6 +65,7 @@ export interface HomeTechnician {
   reviews: HomeTechnicianReview[];
   verified: boolean;
   companyName?: string;
+  mapLocation?: HomeTechnicianMapLocation | null;
 }
 
 export interface HomeUser {
@@ -116,6 +127,8 @@ interface TechnicianCardProps {
   onBook: (technician: HomeTechnician) => void;
   onReview: (technicianId: string) => void;
   canReview: boolean;
+  isMapActive: boolean;
+  onShowOnMap: (technicianId: string) => void;
 }
 
 const TechnicianCard: React.FC<TechnicianCardProps> = ({
@@ -125,6 +138,8 @@ const TechnicianCard: React.FC<TechnicianCardProps> = ({
   onBook,
   onReview,
   canReview,
+  isMapActive,
+  onShowOnMap,
 }) => {
   const technicianSpecializations = getTechnicianSpecializations(technician);
   const visibleSpecializations = technicianSpecializations.slice(0, 2);
@@ -139,7 +154,15 @@ const TechnicianCard: React.FC<TechnicianCardProps> = ({
   };
 
   return (
-    <article className="group flex h-full min-w-0 flex-col rounded-2xl border border-brand-border bg-brand-cream p-5 shadow-sm transition-shadow hover:shadow-soft focus-within:ring-2 focus-within:ring-brand-ocean-500 focus-within:ring-offset-2">
+    <article
+      id={`technician-card-${technician.id}`}
+      tabIndex={-1}
+      className={`group flex h-full min-w-0 flex-col rounded-2xl border bg-brand-cream p-5 shadow-sm transition-all hover:shadow-soft focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500 focus-visible:ring-offset-2 focus-within:ring-2 focus-within:ring-brand-ocean-500 focus-within:ring-offset-2 ${
+        isMapActive
+          ? 'border-brand-ocean-500 ring-2 ring-brand-ocean-100'
+          : 'border-brand-border'
+      }`}
+    >
       <div className="flex items-start gap-4">
         <div className="relative h-16 w-16 flex-none overflow-hidden rounded-2xl bg-brand-ocean-100 ring-1 ring-brand-ocean-100">
           {technician.photoUrl ? (
@@ -188,10 +211,22 @@ const TechnicianCard: React.FC<TechnicianCardProps> = ({
               technician={technician}
               className="rounded-full bg-amber-50 px-2.5 py-1"
             />
-            <span className="inline-flex min-w-0 items-center gap-1 text-brand-muted">
-              <MapPin className="h-4 w-4 flex-none text-brand-ocean-600" aria-hidden="true" />
-              <span className="truncate">{technician.location}</span>
-            </span>
+            {isValidTechnicianMapLocation(technician.mapLocation) ? (
+              <button
+                type="button"
+                onClick={() => onShowOnMap(technician.id)}
+                className="inline-flex min-h-8 min-w-0 items-center gap-1 rounded-lg px-1.5 text-brand-ocean-700 transition-colors hover:bg-brand-ocean-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500"
+                aria-label={`Ver a ${technician.name} en el mapa`}
+              >
+                <MapPin className="h-4 w-4 flex-none" aria-hidden="true" />
+                <span className="truncate">{technician.location}</span>
+              </button>
+            ) : (
+              <span className="inline-flex min-w-0 items-center gap-1 text-brand-muted">
+                <MapPin className="h-4 w-4 flex-none text-brand-ocean-600" aria-hidden="true" />
+                <span className="truncate">{technician.location}</span>
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -283,6 +318,8 @@ const HomeView: React.FC<HomeViewProps> = ({
   onResetFilters,
 }) => {
   const [showMobileFilters, setShowMobileFilters] = React.useState(false);
+  const [resultsView, setResultsView] = React.useState<'list' | 'map'>('list');
+  const [activeMapTechnicianId, setActiveMapTechnicianId] = React.useState<string | null>(null);
   const coveredLocations = new Set(
     technicians.map((technician) => technician.location).filter(Boolean)
   ).size;
@@ -303,6 +340,35 @@ const HomeView: React.FC<HomeViewProps> = ({
       focusResults();
     }
   };
+
+  React.useEffect(() => {
+    if (
+      activeMapTechnicianId &&
+      !filteredTechnicians.some((technician) => technician.id === activeMapTechnicianId)
+    ) {
+      setActiveMapTechnicianId(null);
+    }
+  }, [activeMapTechnicianId, filteredTechnicians]);
+
+  const showTechnicianOnMap = React.useCallback((technicianId: string) => {
+    setActiveMapTechnicianId(technicianId);
+    setResultsView('map');
+    window.requestAnimationFrame?.(() => {
+      document.getElementById('technician-map-panel')?.focus({ preventScroll: true });
+    });
+  }, []);
+
+  const showTechnicianInList = React.useCallback((technicianId: string) => {
+    setActiveMapTechnicianId(technicianId);
+    setResultsView('list');
+    window.requestAnimationFrame?.(() => {
+      window.requestAnimationFrame?.(() => {
+        const card = document.getElementById(`technician-card-${technicianId}`);
+        card?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+        card?.focus({ preventScroll: true });
+      });
+    });
+  }, []);
 
   return (
     <main className="bg-brand-sand text-brand-charcoal">
@@ -525,6 +591,40 @@ const HomeView: React.FC<HomeViewProps> = ({
             </div>
 
             <div className="flex flex-col items-start gap-2 sm:items-end">
+              {!loading && !error && filteredTechnicians.length > 0 && (
+                <div
+                  role="group"
+                  aria-label="Vista de resultados"
+                  className="inline-flex rounded-xl border border-brand-border bg-brand-cream p-1 shadow-sm lg:hidden"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setResultsView('list')}
+                    aria-pressed={resultsView === 'list'}
+                    className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-4 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500 ${
+                      resultsView === 'list'
+                        ? 'bg-brand-ink text-white'
+                        : 'text-brand-charcoal hover:bg-brand-sand'
+                    }`}
+                  >
+                    <List className="h-4 w-4" aria-hidden="true" />
+                    Lista
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setResultsView('map')}
+                    aria-pressed={resultsView === 'map'}
+                    className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-4 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500 ${
+                      resultsView === 'map'
+                        ? 'bg-brand-ink text-white'
+                        : 'text-brand-charcoal hover:bg-brand-sand'
+                    }`}
+                  >
+                    <MapIcon className="h-4 w-4" aria-hidden="true" />
+                    Mapa
+                  </button>
+                </div>
+              )}
               <p className="inline-flex items-center gap-2 text-sm text-brand-charcoal">
                 <LockKeyhole className="h-4 w-4 text-brand-teal-700" aria-hidden="true" />
                 El contacto se comparte solo dentro de una reserva.
@@ -545,10 +645,15 @@ const HomeView: React.FC<HomeViewProps> = ({
           {loading ? (
             <div className="mt-7" role="status" aria-live="polite" aria-busy="true">
               <span className="sr-only">Cargando técnicos disponibles</span>
-              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                {Array.from({ length: 6 }, (_, index) => (
-                  <TechnicianSkeleton key={index} />
-                ))}
+              <div className="lg:grid lg:grid-cols-[minmax(0,0.98fr)_minmax(380px,1.02fr)] lg:gap-6">
+                <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-1">
+                  {Array.from({ length: 4 }, (_, index) => (
+                    <TechnicianSkeleton key={index} />
+                  ))}
+                </div>
+                <div className="hidden min-h-[42rem] animate-pulse rounded-3xl border border-brand-border bg-brand-ocean-50 motion-reduce:animate-none lg:block" aria-hidden="true">
+                  <div className="h-20 border-b border-brand-border bg-brand-cream/70" />
+                </div>
               </div>
             </div>
           ) : error ? (
@@ -594,18 +699,37 @@ const HomeView: React.FC<HomeViewProps> = ({
               )}
             </div>
           ) : (
-            <div className="mt-7 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {filteredTechnicians.map((technician) => (
-                <TechnicianCard
-                  key={technician.id}
-                  technician={technician}
-                  currentUser={currentUser}
-                  onLoginRequired={onLoginRequired}
-                  onBook={onBook}
-                  onReview={onReview}
-                  canReview={hasCompletedBooking(technician.id)}
+            <div className="mt-7 lg:grid lg:grid-cols-[minmax(0,0.98fr)_minmax(380px,1.02fr)] lg:items-start lg:gap-6">
+              <div
+                id="technician-list-panel"
+                className={`${resultsView === 'list' ? 'grid' : 'hidden'} gap-5 md:grid-cols-2 lg:grid lg:grid-cols-1`}
+              >
+                {filteredTechnicians.map((technician) => (
+                  <TechnicianCard
+                    key={technician.id}
+                    technician={technician}
+                    currentUser={currentUser}
+                    onLoginRequired={onLoginRequired}
+                    onBook={onBook}
+                    onReview={onReview}
+                    canReview={hasCompletedBooking(technician.id)}
+                    isMapActive={activeMapTechnicianId === technician.id}
+                    onShowOnMap={showTechnicianOnMap}
+                  />
+                ))}
+              </div>
+              <div
+                className={`${resultsView === 'map' ? 'block' : 'hidden'} lg:sticky lg:top-24 lg:block`}
+              >
+                <TechnicianMap
+                  technicians={filteredTechnicians}
+                  activeTechnicianId={activeMapTechnicianId}
+                  isVisible={resultsView === 'map'}
+                  onTechnicianSelect={setActiveMapTechnicianId}
+                  onShowInList={showTechnicianInList}
+                  onShowList={() => setResultsView('list')}
                 />
-              ))}
+              </div>
             </div>
           )}
         </div>

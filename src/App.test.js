@@ -33,6 +33,12 @@ const technicians = [
     location: 'Santiago de los Caballeros',
     rating: 4.9,
     verified: true,
+    mapLocation: {
+      latitude: 19.4517,
+      longitude: -70.697,
+      radiusKm: 2,
+      precision: 'approximate',
+    },
     reviews: [
       {
         id: 'review-1',
@@ -51,6 +57,7 @@ const technicians = [
     location: 'Tamboril',
     rating: 0,
     verified: true,
+    mapLocation: null,
     reviews: [],
   },
 ];
@@ -184,6 +191,31 @@ test('shows a rating or a clear no-reviews state on every result', async () => {
   expect(joseCard).not.toBeNull();
   expect(within(mariaCard).getByLabelText('4.9 de 5, 1 reseña')).toBeInTheDocument();
   expect(within(joseCard).getByLabelText('Sin reseñas')).toBeInTheDocument();
+});
+
+test('switches between list and map while keeping exact addresses private', async () => {
+  render(<App />);
+  const mariaName = await screen.findByText('María Rodríguez');
+  const mariaCard = mariaName.closest('article');
+
+  expect(mariaCard).not.toBeNull();
+  expect(screen.getByText('1 técnico con zona aproximada')).toBeInTheDocument();
+  expect(
+    screen.getByText('1 perfil aún no tiene zona aproximada y aparece solo en la lista.')
+  ).toBeInTheDocument();
+  expect(screen.getByText('No es dirección exacta')).toBeInTheDocument();
+
+  fireEvent.click(
+    within(mariaCard).getByRole('button', { name: 'Ver a María Rodríguez en el mapa' })
+  );
+
+  expect(screen.getByRole('button', { name: 'Mapa' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('button', { name: 'Lista' })).toHaveAttribute('aria-pressed', 'false');
+  expect(screen.getByRole('button', { name: 'Ver perfil' })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Ver perfil' }));
+  expect(screen.getByRole('button', { name: 'Lista' })).toHaveAttribute('aria-pressed', 'true');
+  await waitFor(() => expect(mariaCard).toHaveFocus());
 });
 
 test('search ignores accents in technician names', async () => {
