@@ -62,15 +62,32 @@ test('privacy policy discloses the 30-day residual database-backup window', asyn
   assert.match(body, /respaldos[^<]+base de datos[^<]+se eliminan dentro de 30 días/);
 });
 
-test('privacy policy distinguishes transient customer GPS from public technician service areas', async () => {
+test('privacy policy distinguishes optional customer GPS from public technician service areas', async () => {
   const response = await fetch(`${baseUrl}/privacy`);
   const body = await response.text();
 
   assert.equal(response.status, 200);
-  assert.match(body, /ubicación GPS del cliente[^<]+temporalmente/);
-  assert.match(body, /Esas coordenadas no se guardan en nuestra API/);
+  assert.match(body, /ubicación GPS del cliente[^<]+“Usar mi ubicación”/);
+  assert.match(body, /servicios de ubicación y geocodificación[^<]+procesarla/);
+  assert.match(body, /no guarda la latitud o longitud del cliente en su API/);
   assert.match(body, /marcador aproximado[^<]+área[^<]+servicio/);
   assert.match(body, /nunca publicamos una dirección residencial ni una ubicación en vivo/);
+});
+
+test('privacy policy discloses Google Maps SDK telemetry and third-party processing', async () => {
+  const response = await fetch(`${baseUrl}/privacy`);
+  const body = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.match(body, /Google Maps SDK/);
+  assert.match(body, /metadatos de la solicitud y del dispositivo/);
+  assert.match(body, /dirección IP/);
+  assert.match(body, /identificador seudónimo propio del SDK/);
+  assert.match(body, /métricas y trazas de fallos/);
+  assert.match(body, /interacciones con el mapa[^<]+zoom/);
+  assert.match(body, /transmite a Google[^<]+prestar, proteger, mantener y mejorar/);
+  assert.match(body, /https:\/\/policies\.google\.com\/privacy/);
+  assert.match(body, /no enviamos a Google tu nombre, correo, teléfono ni los detalles de tus reservas/i);
 });
 
 test('password reset page escapes an untrusted token', async () => {
