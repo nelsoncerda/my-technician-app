@@ -102,3 +102,11 @@ test('release cleanup uses the shared retention lock', async () => {
   );
   assert.match(serviceSource, /User=bitnami/);
 });
+
+test('backend-only releases preserve the deployed web build', async () => {
+  const releaseSource = await readFile(releaseScript, 'utf8');
+
+  assert.match(releaseSource, /technician-current\/build\/index\.html/);
+  assert.match(releaseSource, /cp -a .*technician-current\/build.*RELEASE\/build/);
+  assert.match(releaseSource, /test -f .*RELEASE\/build\/index\.html/);
+});

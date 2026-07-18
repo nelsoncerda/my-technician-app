@@ -4,14 +4,15 @@ Last verified: 2026-07-15.
 
 ## Current topology
 
-- `tecnicosenrd.com` and `www.tecnicosenrd.com` currently serve DriveForm on port 3002.
-- `api.tecnicosenrd.com` proxies to the Técnicos en RD API on `127.0.0.1:3001`.
+- `tecnicosenrd.com` and `www.tecnicosenrd.com` serve the Técnicos en RD React build from `/home/bitnami/apps/technician-current/build`.
+- Same-origin `/api/` requests and `api.tecnicosenrd.com` proxy to the Técnicos en RD API on `127.0.0.1:3001`.
 - PM2 process: `technician-api`.
 - Application symlink: `/home/bitnami/apps/technician-current`.
 - Shared environment: `/home/bitnami/apps/shared/server.env`.
 - PostgreSQL cluster: 13/main on port 5433.
+- The stopped `driveform` and `driveform-accounts` PM2 entries and their files are preserved until DriveForm receives its replacement domain.
 
-Do not install `deploy/nginx/tecnicosenrd.com.conf` on the shared instance while DriveForm owns the main virtual host. That historical configuration would replace the other application. Preserve the combined active Nginx file and update only the `api.tecnicosenrd.com` server block until domain ownership is decided.
+The versioned `deploy/nginx/tecnicosenrd.com.conf` is the active virtual-host source of truth. Back up the installed file before changing domain ownership.
 
 ## Health checks
 
@@ -52,17 +53,17 @@ Never restore a dump over a populated production database without an approved ma
 
 ## Backend-only release
 
-Until the main-domain conflict is resolved, a mobile API release must preserve the active combined Nginx configuration:
+Backend-only releases must preserve the active main-domain Nginx configuration:
 
 1. Build and test the server locally.
 2. Transfer or fetch the committed revision into `/home/bitnami/apps/release-source`.
 3. Run `deploy/release-mobile-api.sh <revision>` as `bitnami`.
 4. Verify the external API and public pages after the command completes.
 
-The release script creates an immutable release, preserves the shared environment,
-backs up PostgreSQL, applies migrations, switches `technician-current` atomically,
-restarts PM2, and verifies SMTP and all mobile publication pages. It deliberately
-does **not** install or reload the repository’s historical main-domain Nginx file.
+The release script creates an immutable release, preserves the shared environment
+and the currently deployed React build, backs up PostgreSQL, applies migrations,
+switches `technician-current` atomically, restarts PM2, and verifies SMTP and all
+mobile publication pages. It deliberately does **not** install or reload Nginx.
 
 ### Database-backup retention
 
@@ -114,7 +115,7 @@ The public mobile pages expected after deployment are:
 ## Required operations follow-up
 
 - Keep the confirmed monitored `SUPPORT_EMAIL` (`ncerda@hotmail.com`) in `server.env` for store review.
-- Decide whether Técnicos en RD should recover `tecnicosenrd.com` or use a new public website domain.
+- Assign DriveForm its replacement public domain before restarting its preserved PM2 processes.
 - Verify recent database restore archives regularly; automated database dumps are
   retained for no more than 30 days.
 - Confirm PM2 startup persists `technician-api` as online after instance reboot.

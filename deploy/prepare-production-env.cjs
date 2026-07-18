@@ -27,7 +27,10 @@ const requiredValues = new Map([
   ['AUTH_SECRET', authSecret],
   ['APP_URL', 'https://api.tecnicosenrd.com'],
   ['API_URL', 'https://api.tecnicosenrd.com'],
-  ['CORS_ORIGIN', 'https://api.tecnicosenrd.com'],
+  [
+    'CORS_ORIGIN',
+    'https://api.tecnicosenrd.com,https://tecnicosenrd.com,https://www.tecnicosenrd.com',
+  ],
 ]);
 
 const originalLines = fs.readFileSync(envFile, 'utf8').split(/\r?\n/);

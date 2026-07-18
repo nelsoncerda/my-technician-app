@@ -54,6 +54,14 @@ if [[ -L "$APP_ROOT/technician-current" ]]; then
   printf '%s\n' "$PREVIOUS" > "$BACKUP/previous-release"
 fi
 
+# The main domain may serve the React build from technician-current. Preserve
+# that validated static artifact when making a backend-only release so an API
+# update cannot take the website offline.
+if [[ -f "$APP_ROOT/technician-current/build/index.html" ]]; then
+  cp -a "$APP_ROOT/technician-current/build" "$RELEASE/build"
+  test -f "$RELEASE/build/index.html"
+fi
+
 ln -s "$ENV_FILE" "$RELEASE/server/.env"
 node "$RELEASE/deploy/prepare-production-env.cjs" "$ENV_FILE"
 
