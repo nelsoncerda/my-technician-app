@@ -1,6 +1,6 @@
 # Mobile API operations
 
-Last verified: 2026-07-15.
+Last verified: 2026-07-18.
 
 ## Current topology
 
@@ -10,16 +10,26 @@ Last verified: 2026-07-15.
 - Application symlink: `/home/bitnami/apps/technician-current`.
 - Shared environment: `/home/bitnami/apps/shared/server.env`.
 - PostgreSQL cluster: 13/main on port 5433.
-- The stopped `driveform` and `driveform-accounts` PM2 entries and their files are preserved until DriveForm receives its replacement domain.
+- `spacetimefly.com` serves DriveForm from `127.0.0.1:3002`; `www.spacetimefly.com` redirects to the apex domain.
+- DriveForm account requests under `/api/account/` proxy to `127.0.0.1:3004`.
+- PM2 processes `driveform` and `driveform-accounts` run from `/home/bitnami/apps/driveform/current`.
+- DriveForm account and PDF data remains outside releases in `/home/bitnami/apps/driveform-data`.
+- The account service uses `PUBLIC_ORIGIN=https://spacetimefly.com`, and the matching Google OAuth web client authorizes that JavaScript origin.
 
-The versioned `deploy/nginx/tecnicosenrd.com.conf` is the active virtual-host source of truth. Back up the installed file before changing domain ownership.
+The versioned files `deploy/nginx/tecnicosenrd.com.conf` and
+`deploy/nginx/spacetimefly.com.conf` are the active virtual-host sources of
+truth. The bootstrap DriveForm vhost is only for certificate provisioning or a
+safe disabled state. Back up the installed files before changing domain
+ownership.
 
 ## Health checks
 
 ```bash
 curl -fsS https://api.tecnicosenrd.com/health
 curl -fsS https://api.tecnicosenrd.com/api/settings
-ssh bitnami 'pm2 status technician-api; pg_lsclusters; sudo nginx -t'
+curl -fsS https://spacetimefly.com/api/account/health
+curl -fsS https://spacetimefly.com/
+ssh bitnami 'pm2 status; pg_lsclusters; sudo nginx -t'
 ```
 
 Expected health response:
@@ -40,6 +50,9 @@ pg_lsclusters
 pm2 status technician-api
 curl -fsS http://127.0.0.1:3001/health
 curl -fsS https://api.tecnicosenrd.com/health
+pm2 status driveform driveform-accounts
+curl -fsS http://127.0.0.1:3004/api/account/health
+curl -fsS https://spacetimefly.com/
 ```
 
 If PostgreSQL is down, inspect its unit and log before changing state:
@@ -115,7 +128,11 @@ The public mobile pages expected after deployment are:
 ## Required operations follow-up
 
 - Keep the confirmed monitored `SUPPORT_EMAIL` (`ncerda@hotmail.com`) in `server.env` for store review.
-- Assign DriveForm its replacement public domain before restarting its preserved PM2 processes.
+- Confirm automatic certificate renewal continues to cover `spacetimefly.com`
+  and `www.spacetimefly.com`.
+- Keep `https://spacetimefly.com` in the DriveForm Google OAuth client's
+  authorized JavaScript origins.
 - Verify recent database restore archives regularly; automated database dumps are
   retained for no more than 30 days.
-- Confirm PM2 startup persists `technician-api` as online after instance reboot.
+- Confirm PM2 startup persists `technician-api`, `driveform`, and
+  `driveform-accounts` as online after instance reboot.
