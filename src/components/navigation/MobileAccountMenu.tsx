@@ -134,10 +134,10 @@ const MobileAccountMenu = ({
                             aria-current={currentView === 'gamification' ? 'page' : undefined}
                             className={cn(
                                 menuItemClassName,
-                                currentView === 'gamification' && 'bg-brand-sand text-brand-clay-600'
+                                currentView === 'gamification' && 'bg-brand-ocean-50 text-brand-ocean-700'
                             )}
                         >
-                            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-sand text-brand-clay-600">
+                            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-ocean-50 text-brand-ocean-700">
                                 <Trophy className="h-5 w-5" aria-hidden="true" />
                             </span>
                             Puntos y recompensas
@@ -150,10 +150,10 @@ const MobileAccountMenu = ({
                                 aria-current={currentView === 'admin' ? 'page' : undefined}
                                 className={cn(
                                     menuItemClassName,
-                                    currentView === 'admin' && 'bg-brand-ocean-50 text-brand-ocean-500'
+                                    currentView === 'admin' && 'bg-brand-ocean-50 text-brand-ocean-700'
                                 )}
                             >
-                                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-ocean-50 text-brand-ocean-500">
+                                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-ocean-50 text-brand-ocean-700">
                                     <Shield className="h-5 w-5" aria-hidden="true" />
                                 </span>
                                 Administración
@@ -176,9 +176,9 @@ const MobileAccountMenu = ({
                         <button
                             type="button"
                             onClick={() => closeAndRun(onLogout)}
-                            className={cn(menuItemClassName, 'text-red-700 hover:bg-red-50')}
+                            className={cn(menuItemClassName, 'text-brand-danger-700 hover:bg-brand-danger-50')}
                         >
-                            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-red-700">
+                            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-danger-50 text-brand-danger-700">
                                 <LogOut className="h-5 w-5" aria-hidden="true" />
                             </span>
                             Cerrar sesión
@@ -213,13 +213,13 @@ const MobileAccountMenu = ({
                         restoreFocusRef.current = true;
                         setIsOpen(true);
                     }}
-                    className="flex h-11 items-center gap-1.5 rounded-xl border border-brand-border bg-brand-cream px-2.5 text-sm font-bold text-brand-ink transition-colors hover:bg-brand-sand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500 focus-visible:ring-offset-2 focus-visible:ring-offset-brand-cream"
+                    className="flex h-11 items-center gap-1.5 rounded-xl border border-brand-control bg-brand-cream px-2.5 text-sm font-bold text-brand-ink transition-colors hover:bg-brand-sand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500 focus-visible:ring-offset-2 focus-visible:ring-offset-brand-cream"
                     aria-label="Abrir menú de cuenta"
                     aria-haspopup="dialog"
                     aria-expanded={isOpen}
                     aria-controls={dialogId}
                 >
-                    <UserIcon className="hidden h-5 w-5 text-brand-clay-600 min-[360px]:block" aria-hidden="true" />
+                    <UserIcon className="hidden h-5 w-5 text-brand-ocean-700 min-[360px]:block" aria-hidden="true" />
                     <span>Cuenta</span>
                     <ChevronDown className="hidden h-4 w-4 text-brand-muted sm:block" aria-hidden="true" />
                 </button>

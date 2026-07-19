@@ -25,10 +25,10 @@ const categoryIcons: Record<string, React.ReactNode> = {
 };
 
 const categoryColors: Record<string, string> = {
-  DISCOUNT: 'from-emerald-400 to-teal-500',
+  DISCOUNT: 'from-brand-teal-700 to-brand-teal-700',
   FEATURE: 'from-purple-400 to-violet-500',
   PHYSICAL: 'from-amber-400 to-orange-500',
-  EXPERIENCE: 'from-sky-400 to-blue-500',
+  EXPERIENCE: 'from-sky-400 to-brand-ocean-500',
 };
 
 const categoryLabels: Record<string, string> = {
@@ -69,9 +69,9 @@ const RewardCard: React.FC<RewardCardProps> = ({
       whileTap={{ scale: 0.98 }}
       className={`bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden border-2 transition-all ${
         isRedeemed
-          ? 'border-emerald-300 dark:border-emerald-700'
+          ? 'border-brand-teal-600 dark:border-brand-teal-700'
           : canAfford
-          ? 'border-emerald-400 dark:border-emerald-600 hover:shadow-xl'
+          ? 'border-brand-teal-700 dark:border-brand-teal-700 hover:shadow-xl'
           : 'border-gray-200 dark:border-gray-700 opacity-90'
       }`}
     >
@@ -107,8 +107,8 @@ const RewardCard: React.FC<RewardCardProps> = ({
 
         {/* Status / Action */}
         {isRedeemed ? (
-          <div className="flex items-center justify-between bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-xl">
-            <span className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-medium">
+          <div className="flex items-center justify-between bg-brand-teal-50 dark:bg-brand-teal-800/20 p-3 rounded-xl">
+            <span className="flex items-center gap-2 text-brand-teal-700 dark:text-brand-teal-100 font-medium">
               <Check className="w-5 h-5" />
               ¡Canjeado! 🎉
             </span>
@@ -123,7 +123,7 @@ const RewardCard: React.FC<RewardCardProps> = ({
           <div className="flex items-center justify-between">
             <div>
               {canAfford ? (
-                <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
+                <span className="text-sm text-brand-teal-700 dark:text-brand-teal-100 font-medium">
                   ¡Tá' ready pa' ti! ⚡
                 </span>
               ) : (
@@ -139,7 +139,7 @@ const RewardCard: React.FC<RewardCardProps> = ({
               disabled={!canAfford}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition-all ${
                 canAfford
-                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600 shadow-lg hover:shadow-xl'
+                  ? 'bg-gradient-to-r from-brand-teal-700 to-brand-teal-700 text-white hover:from-brand-teal-700 hover:to-brand-teal-700 shadow-lg hover:shadow-xl'
                   : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
               }`}
             >

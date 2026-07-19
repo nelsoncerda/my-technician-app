@@ -205,8 +205,8 @@ const TechnicianMap: React.FC<TechnicianMapProps> = ({
     circlesRef.current.forEach((circle, technicianId) => {
       const active = technicianId === activeTechnicianId;
       circle.setStyle({
-        color: active ? '#B94A35' : '#2A6F97',
-        fillColor: active ? '#B94A35' : '#2A6F97',
+        color: active ? '#E86F2D' : '#2F6FED',
+        fillColor: active ? '#E86F2D' : '#2F6FED',
         fillOpacity: active ? 0.16 : 0.1,
         opacity: active ? 0.7 : 0.45,
         weight: active ? 2 : 1.5,
@@ -287,9 +287,9 @@ const TechnicianMap: React.FC<TechnicianMapProps> = ({
             Los círculos representan áreas generales de servicio para proteger la privacidad.
           </p>
           {mapStatus === 'error' && (
-            <div className="absolute inset-x-3 bottom-8 z-[500] rounded-2xl border border-rose-200 bg-brand-cream p-3 shadow-soft" role="alert">
+            <div className="absolute inset-x-3 bottom-8 z-[500] rounded-2xl border border-brand-danger-200 bg-brand-cream p-3 shadow-soft" role="alert">
               <div className="flex items-start gap-3">
-                <WifiOff className="mt-0.5 h-5 w-5 flex-none text-rose-700" aria-hidden="true" />
+                <WifiOff className="mt-0.5 h-5 w-5 flex-none text-brand-danger-700" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-extrabold text-brand-ink">No cargó el mapa base</p>
                   <p className="mt-0.5 text-xs leading-5 text-brand-charcoal">
@@ -323,7 +323,7 @@ const TechnicianMap: React.FC<TechnicianMapProps> = ({
             <button
               type="button"
               onClick={() => onShowInList(selectedTechnician.id)}
-              className="inline-flex min-h-11 flex-none items-center rounded-xl bg-brand-clay-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-brand-clay-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500 focus-visible:ring-offset-2"
+              className="inline-flex min-h-11 flex-none items-center rounded-xl bg-brand-ocean-500 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-brand-ocean-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500 focus-visible:ring-offset-2"
             >
               Ver perfil
             </button>

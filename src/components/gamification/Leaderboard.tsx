@@ -72,7 +72,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
 
   const getRankBackground = (rank: number, isCurrentUser: boolean) => {
     if (isCurrentUser) {
-      return 'bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/30 dark:to-teal-900/30 border-emerald-300 dark:border-emerald-800';
+      return 'bg-gradient-to-r from-brand-teal-50 to-brand-teal-50 dark:from-brand-teal-800/30 dark:to-brand-teal-800/30 border-brand-teal-600 dark:border-brand-teal-800';
     }
     switch (rank) {
       case 1:
@@ -88,7 +88,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
 
   const getLevelBadge = (level: number) => {
     const colors = [
-      'bg-emerald-100 text-emerald-700',
+      'bg-brand-teal-100 text-brand-teal-700',
       'bg-sky-100 text-sky-700',
       'bg-amber-100 text-amber-700',
       'bg-purple-100 text-purple-700',
@@ -99,9 +99,9 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border border-emerald-100 dark:border-gray-700">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border border-brand-teal-100 dark:border-gray-700">
       {/* Header with tropical gradient */}
-      <div className="bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 p-5 relative overflow-hidden">
+      <div className="bg-gradient-to-r from-brand-teal-700 via-brand-teal-700 to-sky-500 p-5 relative overflow-hidden">
         {/* Decorative elements */}
         <div className="absolute top-1 right-2 text-3xl opacity-20">🏆</div>
         <div className="absolute bottom-1 left-2 text-2xl opacity-20">🌴</div>
@@ -121,7 +121,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
               onClick={() => onPeriodChange(p)}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                 period === p
-                  ? 'bg-white text-emerald-700 shadow-lg'
+                  ? 'bg-white text-brand-teal-700 shadow-lg'
                   : 'bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm'
               }`}
             >
@@ -135,7 +135,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
       <div className="p-4">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+            <Loader2 className="w-8 h-8 animate-spin text-brand-teal-700" />
             <p className="text-sm text-gray-500 mt-2">Cargando los tígueres...</p>
           </div>
         ) : entries.length === 0 ? (
@@ -171,10 +171,10 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className={`font-semibold truncate ${
-                          isCurrentUser ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-900 dark:text-white'
+                          isCurrentUser ? 'text-brand-teal-700 dark:text-brand-teal-100' : 'text-gray-900 dark:text-white'
                         }`}>
                           {entry.userName}
-                          {isCurrentUser && <span className="text-xs ml-1 bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full">(Tú 🔥)</span>}
+                          {isCurrentUser && <span className="text-xs ml-1 bg-brand-teal-100 text-brand-teal-700 px-1.5 py-0.5 rounded-full">(Tú 🔥)</span>}
                         </span>
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getLevelBadge(entry.level)}`}>
                           {getLevelEmoji(entry.level)} Nv. {entry.level}
@@ -200,8 +200,8 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
 
                     {/* Points */}
                     <div className="flex-shrink-0 text-right">
-                      <div className="flex items-center gap-1 text-lg font-bold text-emerald-600 dark:text-emerald-400">
-                        <TrendingUp className="w-4 h-4 text-emerald-500" />
+                      <div className="flex items-center gap-1 text-lg font-bold text-brand-teal-700 dark:text-brand-teal-100">
+                        <TrendingUp className="w-4 h-4 text-brand-teal-700" />
                         {entry.points.toLocaleString()}
                       </div>
                       <span className="text-xs text-gray-500 dark:text-gray-400">⚡ puntos</span>

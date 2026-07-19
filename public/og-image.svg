@@ -1,6 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
-  <rect width="1200" height="630" fill="#2563eb"/>
-  <text x="600" y="280" font-family="Arial, sans-serif" font-size="120" font-weight="bold" fill="white" text-anchor="middle">Técnicos en RD</text>
-  <text x="600" y="400" font-family="Arial, sans-serif" font-size="48" fill="#93c5fd" text-anchor="middle">Encuentra técnicos profesionales en Santiago</text>
-  <text x="600" y="520" font-family="Arial, sans-serif" font-size="80" text-anchor="middle">🔧🌴</text>
+  <defs>
+    <linearGradient id="brand-background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#172B4D"/>
+      <stop offset="1" stop-color="#173C83"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#brand-background)"/>
+  <rect x="120" y="113" width="92" height="12" rx="6" fill="#E86F2D"/>
+  <text x="120" y="280" font-family="Arial, sans-serif" font-size="112" font-weight="bold" fill="#FFFFFF">Técnicos en RD</text>
+  <text x="120" y="385" font-family="Arial, sans-serif" font-size="47" fill="#DCE8FF">Servicios locales, perfiles claros.</text>
+  <rect x="120" y="448" width="550" height="76" rx="38" fill="#E86F2D"/>
+  <text x="395" y="499" font-family="Arial, sans-serif" font-size="34" font-weight="bold" fill="#172B4D" text-anchor="middle">Encuentra ayuda cerca de ti</text>
+  <circle cx="1012" cy="315" r="118" fill="#FFFFFF" fill-opacity="0.08"/>
+  <text x="1012" y="352" font-family="Arial, sans-serif" font-size="108" font-weight="bold" fill="#FFFFFF" text-anchor="middle">TR</text>
 </svg>

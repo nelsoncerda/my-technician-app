@@ -96,7 +96,7 @@ const ReportDialog = ({ target, onClose }: ReportDialogProps) => {
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-rose-50 text-rose-700">
+            <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-brand-danger-50 text-brand-danger-700">
               <Flag className="h-5 w-5" aria-hidden="true" />
             </span>
             <h2 id={titleId} className="text-xl font-extrabold text-brand-ink">
@@ -117,7 +117,7 @@ const ReportDialog = ({ target, onClose }: ReportDialogProps) => {
 
         {sent ? (
           <div className="mt-6" role="status">
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+            <div className="rounded-xl border border-brand-teal-100 bg-brand-teal-50 p-4 text-sm text-brand-teal-700">
               Recibimos tu reporte. El equipo de moderación lo revisará y mantendrá privada tu identidad.
             </div>
             <button type="button" onClick={onClose} className="mt-5 min-h-11 w-full rounded-xl bg-brand-ink px-4 font-bold text-white">
@@ -134,7 +134,7 @@ const ReportDialog = ({ target, onClose }: ReportDialogProps) => {
                 id="moderation-reason"
                 value={reason}
                 onChange={(event) => setReason(event.target.value as ReportReason)}
-                className="min-h-12 w-full rounded-xl border border-brand-border bg-white px-3 text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-ocean-500"
+                className="min-h-12 w-full rounded-xl border border-brand-control bg-white px-3 text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-ocean-500"
               >
                 <option value="">Selecciona un motivo</option>
                 {REASONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
@@ -151,15 +151,15 @@ const ReportDialog = ({ target, onClose }: ReportDialogProps) => {
                 maxLength={500}
                 rows={4}
                 placeholder="Describe brevemente lo ocurrido, sin incluir información sensible."
-                className="w-full rounded-xl border border-brand-border bg-white p-3 text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-ocean-500"
+                className="w-full rounded-xl border border-brand-control bg-white p-3 text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-ocean-500"
               />
               <p className="mt-1 text-right text-xs text-brand-muted">{details.length}/500</p>
             </div>
-            {error && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
+            {error && <p role="alert" className="rounded-lg bg-brand-danger-50 p-3 text-sm text-brand-danger-800">{error}</p>}
             <button
               type="submit"
               disabled={submitting}
-              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-rose-700 px-4 font-bold text-white hover:bg-rose-800 disabled:opacity-60"
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand-danger-700 px-4 font-bold text-white hover:bg-brand-danger-800 disabled:opacity-60"
             >
               {submitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
               Enviar reporte

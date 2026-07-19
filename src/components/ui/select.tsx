@@ -306,7 +306,7 @@ const SelectTrigger = React.forwardRef<HTMLButtonElement, SelectTriggerProps>(({
             onClick={handleClick}
             onKeyDown={handleKeyDown}
             className={cn(
-                "flex min-h-11 w-full items-center justify-between gap-2 rounded-md border border-brand-border bg-brand-cream px-3 py-2 text-left text-sm text-brand-charcoal shadow-sm transition-colors focus-visible:border-brand-ocean-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-brand-sand disabled:text-brand-muted disabled:opacity-70 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:focus-visible:border-blue-300 dark:focus-visible:ring-blue-300 dark:focus-visible:ring-offset-gray-950 dark:disabled:bg-gray-800 dark:disabled:text-gray-500",
+                "flex min-h-11 w-full items-center justify-between gap-2 rounded-md border border-brand-control bg-brand-cream px-3 py-2 text-left text-sm text-brand-charcoal shadow-sm transition-colors focus-visible:border-brand-ocean-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-brand-sand disabled:text-brand-muted disabled:opacity-70 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:focus-visible:border-brand-ocean-500 dark:focus-visible:ring-brand-ocean-500 dark:focus-visible:ring-offset-gray-950 dark:disabled:bg-gray-800 dark:disabled:text-gray-500",
                 className
             )}
         >
@@ -443,7 +443,7 @@ const SelectContent = ({ children, className, style, ...props }: SelectContentPr
             hidden={!open}
             data-state={open ? "open" : "closed"}
             className={cn(
-                "fixed z-[9999] overscroll-contain overflow-y-auto rounded-xl border border-brand-border bg-brand-cream p-1 text-brand-charcoal shadow-xl outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100",
+                "fixed z-[9999] overscroll-contain overflow-y-auto rounded-xl border border-brand-control bg-brand-cream p-1 text-brand-charcoal shadow-xl outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100",
                 className
             )}
             style={{
@@ -535,7 +535,7 @@ const SelectItem = ({
             onPointerDown={handlePointerDown}
             className={cn(
                 "relative flex min-h-11 w-full cursor-default select-none items-center rounded-lg px-3 py-2 text-sm outline-none transition-colors",
-                isActive && !isDisabled && "bg-brand-clay-50 text-brand-charcoal dark:bg-gray-700 dark:text-white",
+                isActive && !isDisabled && "bg-brand-ocean-50 text-brand-ocean-800 ring-2 ring-inset ring-brand-ocean-500 dark:bg-gray-700 dark:text-white",
                 isSelected && "font-semibold",
                 isDisabled && "cursor-not-allowed opacity-45",
                 className

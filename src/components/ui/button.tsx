@@ -7,12 +7,12 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
-    default: "bg-brand-clay-600 text-white shadow-sm hover:bg-brand-clay-700 active:bg-brand-clay-700",
-    destructive: "bg-red-600 text-white shadow-sm hover:bg-red-700 active:bg-red-800",
+    default: "bg-brand-ocean-500 text-white shadow-sm hover:bg-brand-ocean-600 active:bg-brand-ocean-700",
+    destructive: "bg-brand-danger-600 text-white shadow-sm hover:bg-brand-danger-700 active:bg-brand-danger-800",
     outline: "border border-brand-border bg-brand-cream text-brand-charcoal shadow-sm hover:bg-brand-sand dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800",
     secondary: "bg-brand-sand text-brand-charcoal shadow-sm hover:bg-brand-border dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600",
     ghost: "bg-transparent text-brand-charcoal hover:bg-brand-sand dark:text-gray-100 dark:hover:bg-gray-800",
-    link: "bg-transparent text-brand-ocean-700 underline-offset-4 hover:underline dark:text-blue-300",
+    link: "bg-transparent text-brand-ocean-700 underline-offset-4 hover:underline dark:text-brand-ocean-100",
 }
 
 const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
@@ -31,7 +31,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
     <button
         ref={ref}
         className={cn(
-            "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500 focus-visible:ring-offset-2 focus-visible:ring-offset-brand-cream disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-blue-300 dark:focus-visible:ring-offset-gray-950",
+            "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500 focus-visible:ring-offset-2 focus-visible:ring-offset-brand-cream disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-brand-ocean-500 dark:focus-visible:ring-offset-gray-950",
             variantClasses[variant],
             sizeClasses[size],
             className

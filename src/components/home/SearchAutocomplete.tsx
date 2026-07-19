@@ -300,7 +300,7 @@ const SearchAutocomplete: React.FC<SearchAutocompleteProps> = ({
           aria-controls={listboxVisible ? listboxId : undefined}
           aria-activedescendant={activeOptionId}
           aria-describedby={statusId}
-          className="h-12 scroll-my-24 border-brand-border bg-brand-cream pl-10 text-base text-brand-charcoal placeholder:text-brand-muted focus-visible:ring-brand-clay-600"
+          className="h-12 scroll-my-24 border-brand-control bg-brand-cream pl-10 text-base text-brand-charcoal placeholder:text-brand-muted focus-visible:ring-brand-ocean-500"
         />
 
         <span id={statusId} role="status" aria-live="polite" aria-atomic="true" className="sr-only">
@@ -336,7 +336,7 @@ const SearchAutocomplete: React.FC<SearchAutocompleteProps> = ({
                     onMouseEnter={() => setActiveIndex(index)}
                     onClick={() => selectSuggestion(suggestion)}
                     className={`flex w-full touch-manipulation items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none ${
-                      isActive ? 'bg-brand-clay-50' : 'hover:bg-brand-sand'
+                      isActive ? 'bg-brand-ocean-50 ring-2 ring-inset ring-brand-ocean-500' : 'hover:bg-brand-sand'
                     }`}
                   >
                     <span className={`flex h-9 w-9 flex-none items-center justify-center rounded-xl ${

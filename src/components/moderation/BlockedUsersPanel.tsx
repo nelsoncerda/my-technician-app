@@ -20,7 +20,7 @@ const BlockedUsersPanel = ({
 }: BlockedUsersPanelProps) => (
   <section className="mt-6 border-t border-gray-200 pt-6 dark:border-gray-700" aria-labelledby="blocked-users-title">
     <div className="flex items-start gap-3">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-700">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-danger-50 text-brand-danger-700">
         <Ban className="h-5 w-5" aria-hidden="true" />
       </span>
       <div>
@@ -36,7 +36,7 @@ const BlockedUsersPanel = ({
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Cargando bloqueos…
       </p>
     ) : error ? (
-      <div className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-800" role="alert">
+      <div className="mt-4 rounded-xl bg-brand-danger-50 p-3 text-sm text-brand-danger-800" role="alert">
         <p>{error}</p>
         <button type="button" onClick={onRetry} className="mt-2 font-bold underline">Intentar de nuevo</button>
       </div>

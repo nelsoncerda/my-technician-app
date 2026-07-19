@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#2563eb"/>
+  <rect width="512" height="512" rx="96" fill="#172B4D"/>
+  <circle cx="419" cy="419" r="61" fill="#E86F2D"/>
   <text x="256" y="330" font-family="Arial, sans-serif" font-size="200" font-weight="bold" fill="white" text-anchor="middle">TR</text>
 </svg>

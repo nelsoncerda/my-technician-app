@@ -122,7 +122,7 @@ const BookingList: React.FC<BookingListProps> = ({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-brand-ocean-500" />
       </div>
     );
   }
@@ -138,7 +138,7 @@ const BookingList: React.FC<BookingListProps> = ({
             onClick={() => setStatusFilter(filter.value)}
             className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
               statusFilter === filter.value
-                ? 'bg-blue-600 text-white'
+                ? 'bg-brand-clay-600 text-white'
                 : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
             }`}
           >

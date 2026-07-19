@@ -1802,7 +1802,7 @@ const SantiagoTechRDApp = () => {
                         className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500 focus-visible:ring-offset-2 sm:gap-3"
                         aria-label="Ir al inicio"
                     >
-                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-clay-600 text-white shadow-sm">
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-clay-500 text-brand-ink shadow-sm">
                             <Wrench className="h-5 w-5" aria-hidden="true" />
                         </span>
                         <span className="min-w-0">
@@ -1825,7 +1825,7 @@ const SantiagoTechRDApp = () => {
                                 aria-current={currentView === 'home' ? 'page' : undefined}
                                 className={cn(
                                     'text-brand-ink hover:bg-brand-sand',
-                                    currentView === 'home' && 'bg-brand-sand text-brand-clay-600'
+                                    currentView === 'home' && 'bg-brand-ocean-50 text-brand-ocean-700'
                                 )}
                             >
                                 Inicio
@@ -1837,7 +1837,7 @@ const SantiagoTechRDApp = () => {
                                 aria-current={currentView === 'about' ? 'page' : undefined}
                                 className={cn(
                                     'text-brand-ink hover:bg-brand-sand',
-                                    currentView === 'about' && 'bg-brand-sand text-brand-clay-600'
+                                    currentView === 'about' && 'bg-brand-ocean-50 text-brand-ocean-700'
                                 )}
                             >
                                 Cómo funciona
@@ -1886,7 +1886,7 @@ const SantiagoTechRDApp = () => {
                                         aria-current={currentView === 'gamification' ? 'page' : undefined}
                                         className={cn(
                                             'h-11 w-11 text-brand-ink hover:bg-brand-sand',
-                                            currentView === 'gamification' && 'bg-brand-clay-50 text-brand-clay-600'
+                                            currentView === 'gamification' && 'bg-brand-ocean-50 text-brand-ocean-700'
                                         )}
                                     >
                                         <Trophy className="h-5 w-5" aria-hidden="true" />
@@ -1901,7 +1901,7 @@ const SantiagoTechRDApp = () => {
                                             aria-current={currentView === 'admin' ? 'page' : undefined}
                                             className={cn(
                                                 'h-11 w-11 text-brand-ink hover:bg-brand-sand',
-                                                currentView === 'admin' && 'bg-brand-ocean-50 text-brand-ocean-500'
+                                                currentView === 'admin' && 'bg-brand-ocean-50 text-brand-ocean-700'
                                             )}
                                         >
                                             <Shield className="h-5 w-5" aria-hidden="true" />
@@ -1923,7 +1923,7 @@ const SantiagoTechRDApp = () => {
                                         size="icon"
                                         aria-label="Cerrar sesión"
                                         title="Cerrar sesión"
-                                        className="h-11 w-11 text-brand-muted hover:bg-red-50 hover:text-red-700"
+                                        className="h-11 w-11 text-brand-muted hover:bg-brand-danger-50 hover:text-brand-danger-700"
                                     >
                                         <LogOut className="h-5 w-5" aria-hidden="true" />
                                     </Button>
@@ -1944,7 +1944,7 @@ const SantiagoTechRDApp = () => {
                                 <Button
                                     onClick={() => setShowUserRegisterForm(true)}
                                     size="sm"
-                                    className="h-11 bg-brand-clay-600 px-3 text-white hover:bg-brand-clay-700 active:bg-brand-clay-700"
+                                    className="h-11 bg-brand-ocean-500 px-3 text-white hover:bg-brand-ocean-600 active:bg-brand-ocean-700"
                                 >
                                     <PlusCircle className="hidden h-4 w-4 md:block" aria-hidden="true" />
                                     <span className="md:hidden">Registro</span>
@@ -1961,7 +1961,7 @@ const SantiagoTechRDApp = () => {
                 <motion.div
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
-                    className="bg-gradient-to-r from-amber-500 to-orange-500 shadow-md"
+                    className="bg-gradient-to-r from-brand-clay-600 to-brand-clay-700 shadow-md"
                 >
                     <div className="container mx-auto px-4 py-3">
                         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -1982,7 +1982,7 @@ const SantiagoTechRDApp = () => {
                                         onClick={handleResendVerification}
                                         disabled={resendingVerification}
                                         size="sm"
-                                        className="bg-white text-orange-600 hover:bg-orange-50 font-medium"
+                                        className="bg-white text-brand-clay-700 hover:bg-brand-clay-50 font-medium"
                                     >
                                         {resendingVerification ? (
                                             <>
@@ -2007,17 +2007,17 @@ const SantiagoTechRDApp = () => {
             {currentView === 'bookings' && currentUser && (
                 <main className="mx-auto min-h-[70vh] max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
                     <div className="mb-8">
-                        <p className="mb-2 text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700">Tu agenda</p>
-                        <h2 className="text-3xl font-bold tracking-tight text-slate-950 dark:text-white">Reservas y trabajos</h2>
-                        <p className="mt-2 text-slate-600 dark:text-gray-300">Consulta el estado de tus servicios y administra las próximas visitas.</p>
+                        <p className="mb-2 text-sm font-semibold uppercase tracking-[0.18em] text-brand-teal-700">Tu agenda</p>
+                        <h2 className="text-3xl font-bold tracking-tight text-brand-ink dark:text-white">Reservas y trabajos</h2>
+                        <p className="mt-2 text-brand-muted dark:text-gray-300">Consulta el estado de tus servicios y administra las próximas visitas.</p>
                     </div>
 
                     {currentUser.role === 'technician' && currentUser.technicianId ? (
                         <div className="space-y-10">
                             <section aria-labelledby="received-jobs-heading">
                                 <div className="mb-4 flex items-center justify-between gap-3">
-                                    <h3 id="received-jobs-heading" className="text-xl font-bold text-slate-900 dark:text-white">Trabajos recibidos</h3>
-                                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">
+                                    <h3 id="received-jobs-heading" className="text-xl font-bold text-brand-ink dark:text-white">Trabajos recibidos</h3>
+                                    <span className="rounded-full bg-brand-teal-50 px-3 py-1 text-sm font-semibold text-brand-teal-700">
                                         {userBookings.filter((booking: any) => booking.technicianId === currentUser.technicianId).length}
                                     </span>
                                 </div>
@@ -2067,10 +2067,10 @@ const SantiagoTechRDApp = () => {
                                 />
                             </section>
 
-                            <section aria-labelledby="hired-services-heading" className="border-t border-slate-200 pt-8 dark:border-gray-800">
+                            <section aria-labelledby="hired-services-heading" className="border-t border-brand-border pt-8 dark:border-gray-800">
                                 <div className="mb-4 flex items-center justify-between gap-3">
-                                    <h3 id="hired-services-heading" className="text-xl font-bold text-slate-900 dark:text-white">Servicios contratados</h3>
-                                    <span className="rounded-full bg-sky-50 px-3 py-1 text-sm font-semibold text-sky-700">
+                                    <h3 id="hired-services-heading" className="text-xl font-bold text-brand-ink dark:text-white">Servicios contratados</h3>
+                                    <span className="rounded-full bg-brand-ocean-50 px-3 py-1 text-sm font-semibold text-brand-ocean-700">
                                         {userBookings.filter((booking: any) => booking.customerId === currentUser.id).length}
                                     </span>
                                 </div>
@@ -2201,7 +2201,7 @@ const SantiagoTechRDApp = () => {
 
                     {loadingGamification ? (
                         <div className="flex justify-center items-center h-48">
-                            <Loader2 className="animate-spin text-4xl text-blue-500" />
+                            <Loader2 className="animate-spin text-4xl text-brand-ocean-500" />
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -2307,7 +2307,7 @@ const SantiagoTechRDApp = () => {
                         <h2 className="text-3xl font-bold text-gray-800 dark:text-white flex items-center gap-3">
                             <span className="text-4xl">🛡️</span>
                             Panel de Administración
-                            <span className="text-sm font-normal text-purple-600 bg-purple-100 px-3 py-1 rounded-full">
+                            <span className="text-sm font-normal text-brand-ocean-700 bg-brand-ocean-100 px-3 py-1 rounded-full">
                                 Admin Mode
                             </span>
                         </h2>
@@ -2315,7 +2315,7 @@ const SantiagoTechRDApp = () => {
                             <Button
                                 onClick={() => setCurrentView('home')}
                                 variant="outline"
-                                className="border-purple-500 text-purple-600 hover:bg-purple-50"
+                                className="border-brand-ocean-500 text-brand-ocean-700 hover:bg-brand-ocean-50"
                             >
                                 🏠 Pa'l inicio
                             </Button>
@@ -2323,31 +2323,27 @@ const SantiagoTechRDApp = () => {
                     </div>
 
                     {/* Tab Navigation */}
-                    <div className="flex flex-wrap gap-2 mb-6 bg-white dark:bg-gray-800 p-2 rounded-xl shadow-md">
+                    <div role="tablist" aria-label="Secciones de administración" className="flex flex-wrap gap-2 mb-6 bg-white dark:bg-gray-800 p-2 rounded-xl shadow-md">
                         {[
-                            { id: 'technicians', label: 'Técnicos', icon: Wrench, color: 'amber' },
-                            { id: 'users', label: 'Usuarios', icon: Users, color: 'blue' },
-                            { id: 'bookings', label: 'Reservas', icon: Calendar, color: 'emerald' },
-                            { id: 'reports', label: 'Reportes', icon: BarChart3, color: 'purple' },
-                            { id: 'moderation', label: 'Moderación', icon: Shield, color: 'red' },
-                            { id: 'settings', label: 'Configuración', icon: Settings, color: 'gray' },
+                            { id: 'technicians', label: 'Técnicos', icon: Wrench, activeColor: '#B9470F' },
+                            { id: 'users', label: 'Usuarios', icon: Users, activeColor: '#2F6FED' },
+                            { id: 'bookings', label: 'Reservas', icon: Calendar, activeColor: '#106B59' },
+                            { id: 'reports', label: 'Reportes', icon: BarChart3, activeColor: '#172B4D' },
+                            { id: 'moderation', label: 'Moderación', icon: Shield, activeColor: '#C43D3D' },
+                            { id: 'settings', label: 'Configuración', icon: Settings, activeColor: '#667085' },
                         ].map((tab) => (
                             <button
                                 key={tab.id}
+                                role="tab"
+                                aria-selected={adminTab === tab.id}
                                 onClick={() => setAdminTab(tab.id as any)}
                                 className={cn(
-                                    "flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all",
+                                    "flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500 focus-visible:ring-offset-2",
                                     adminTab === tab.id
-                                        ? `bg-${tab.color}-500 text-white shadow-lg`
+                                        ? 'text-white shadow-lg'
                                         : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                                 )}
-                                style={adminTab === tab.id ? {
-                                    backgroundColor: tab.color === 'amber' ? '#f59e0b' :
-                                            tab.color === 'blue' ? '#3b82f6' :
-                                                tab.color === 'emerald' ? '#10b981' :
-                                                    tab.color === 'red' ? '#b91c1c' :
-                                                tab.color === 'gray' ? '#6b7280' : '#8b5cf6'
-                                } : {}}
+                                style={adminTab === tab.id ? { backgroundColor: tab.activeColor } : {}}
                             >
                                 <tab.icon className="w-4 h-4" />
                                 {tab.label}
@@ -2366,7 +2362,7 @@ const SantiagoTechRDApp = () => {
                                 exit={{ opacity: 0, y: -10 }}
                             >
                                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
-                                    <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-4">
+                                    <div className="bg-gradient-to-r from-brand-clay-600 to-brand-clay-700 p-4">
                                         <h3 className="text-xl font-bold text-white flex items-center gap-2">
                                             <Wrench className="w-5 h-5" />
                                             Gestión de Técnicos ({technicians.length})
@@ -2400,11 +2396,11 @@ const SantiagoTechRDApp = () => {
                                                                     <img
                                                                         src={tech.photoUrl}
                                                                         alt={tech.name}
-                                                                        className="w-10 h-10 rounded-full object-cover border-2 border-amber-300"
+                                                                        className="w-10 h-10 rounded-full object-cover border-2 border-brand-clay-500"
                                                                     />
                                                                 ) : (
-                                                                    <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
-                                                                        <Wrench className="w-5 h-5 text-amber-600" />
+                                                                    <div className="w-10 h-10 bg-brand-clay-100 rounded-full flex items-center justify-center">
+                                                                        <Wrench className="w-5 h-5 text-brand-clay-700" />
                                                                     </div>
                                                                 )}
                                                                 <div>
@@ -2428,12 +2424,12 @@ const SantiagoTechRDApp = () => {
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap">
                                                             {tech.verified ? (
-                                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-brand-teal-100 text-brand-teal-800">
                                                                     <CheckCircle className="w-3 h-3" />
                                                                     Verificado
                                                                 </span>
                                                             ) : (
-                                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
+                                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-brand-clay-100 text-brand-clay-700">
                                                                     <Clock className="w-3 h-3" />
                                                                     Pendiente
                                                                 </span>
@@ -2445,7 +2441,7 @@ const SantiagoTechRDApp = () => {
                                                                     <Button
                                                                         size="sm"
                                                                         onClick={() => handleVerifyTechnician(tech.id)}
-                                                                        className="bg-green-500 hover:bg-green-600 text-white text-xs"
+                                                                        className="bg-brand-teal-700 hover:bg-brand-teal-800 text-white text-xs"
                                                                     >
                                                                         <UserCheck className="w-3 h-3 mr-1" />
                                                                         Verificar
@@ -2480,7 +2476,7 @@ const SantiagoTechRDApp = () => {
                                 exit={{ opacity: 0, y: -10 }}
                             >
                                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
-                                    <div className="bg-gradient-to-r from-blue-500 to-indigo-500 p-4">
+                                    <div className="bg-gradient-to-r from-brand-ink to-brand-ocean-700 p-4">
                                         <h3 className="text-xl font-bold text-white flex items-center gap-2">
                                             <Users className="w-5 h-5" />
                                             Gestión de Usuarios ({users.length})
@@ -2512,12 +2508,12 @@ const SantiagoTechRDApp = () => {
                                                             <div className="flex items-center gap-3">
                                                                 <div className={cn(
                                                                     "w-10 h-10 rounded-full flex items-center justify-center",
-                                                                    user.role === 'admin' ? "bg-purple-100" :
-                                                                        user.role === 'technician' ? "bg-amber-100" : "bg-blue-100"
+                                                                    user.role === 'admin' ? "bg-brand-ink/10" :
+                                                                        user.role === 'technician' ? "bg-brand-clay-100" : "bg-brand-ocean-100"
                                                                 )}>
-                                                                    {user.role === 'admin' ? <Shield className="w-5 h-5 text-purple-600" /> :
-                                                                        user.role === 'technician' ? <Wrench className="w-5 h-5 text-amber-600" /> :
-                                                                            <UserIcon className="w-5 h-5 text-blue-600" />}
+                                                                    {user.role === 'admin' ? <Shield className="w-5 h-5 text-brand-ink" /> :
+                                                                        user.role === 'technician' ? <Wrench className="w-5 h-5 text-brand-clay-700" /> :
+                                                                            <UserIcon className="w-5 h-5 text-brand-ocean-700" />}
                                                                 </div>
                                                                 <p className="font-medium text-gray-900 dark:text-white">{user.name}</p>
                                                             </div>
@@ -2544,16 +2540,16 @@ const SantiagoTechRDApp = () => {
                                                                 <span className={cn(
                                                                     'inline-flex rounded-full px-2.5 py-1 text-xs font-bold',
                                                                     user.accountModerationStatus === 'SUSPENDED'
-                                                                        ? 'bg-rose-100 text-rose-800'
-                                                                        : 'bg-emerald-100 text-emerald-800'
+                                                                        ? 'bg-brand-danger-100 text-brand-danger-800'
+                                                                        : 'bg-brand-teal-100 text-brand-teal-800'
                                                                 )}>
                                                                     Cuenta {user.accountModerationStatus === 'SUSPENDED' ? 'suspendida' : 'activa'}
                                                                 </span>
                                                                 {user.technicianModerationStatus && (
                                                                     <span className={cn(
                                                                         'block w-fit rounded-full px-2.5 py-1 text-xs font-bold',
-                                                                        user.technicianModerationStatus === 'APPROVED' ? 'bg-blue-100 text-blue-800' :
-                                                                            user.technicianModerationStatus === 'PENDING' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                                                                        user.technicianModerationStatus === 'APPROVED' ? 'bg-brand-ocean-100 text-brand-ocean-800' :
+                                                                            user.technicianModerationStatus === 'PENDING' ? 'bg-brand-clay-100 text-brand-clay-700' : 'bg-brand-danger-100 text-brand-danger-800'
                                                                     )}>
                                                                         Perfil {user.technicianModerationStatus === 'APPROVED' ? 'aprobado' :
                                                                             user.technicianModerationStatus === 'PENDING' ? 'pendiente' :
@@ -2582,8 +2578,8 @@ const SantiagoTechRDApp = () => {
                                                                             className={cn(
                                                                                 'text-xs text-white',
                                                                                 user.accountModerationStatus === 'SUSPENDED'
-                                                                                    ? 'bg-emerald-700 hover:bg-emerald-800'
-                                                                                    : 'bg-rose-700 hover:bg-rose-800'
+                                                                                    ? 'bg-brand-teal-700 hover:bg-brand-teal-800'
+                                                                                    : 'bg-brand-danger-700 hover:bg-brand-danger-800'
                                                                             )}
                                                                         >
                                                                             {moderatingUserId === user.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
@@ -2619,7 +2615,7 @@ const SantiagoTechRDApp = () => {
                                                                             size="sm"
                                                                             onClick={() => handleRestoreTechnicianProfile(user)}
                                                                             disabled={moderatingTechnicianId === user.technicianId || !technicianModerationReasons[user.id]?.trim()}
-                                                                            className="mt-2 bg-blue-700 text-xs text-white hover:bg-blue-800"
+                                                                            className="mt-2 bg-brand-ocean-700 text-xs text-white hover:bg-brand-ocean-800"
                                                                         >
                                                                             {moderatingTechnicianId === user.technicianId ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
                                                                             {user.technicianModerationStatus === 'SUSPENDED' ? 'Restaurar perfil' : 'Aprobar perfil'}
@@ -2646,7 +2642,7 @@ const SantiagoTechRDApp = () => {
                                 exit={{ opacity: 0, y: -10 }}
                             >
                                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
-                                    <div className="bg-gradient-to-r from-emerald-500 to-teal-500 p-4">
+                                    <div className="bg-gradient-to-r from-brand-teal-700 to-brand-teal-800 p-4">
                                         <h3 className="text-xl font-bold text-white flex items-center gap-2">
                                             <Calendar className="w-5 h-5" />
                                             Todas las Reservas ({allBookings.length})
@@ -2689,11 +2685,11 @@ const SantiagoTechRDApp = () => {
                                                         <td className="px-6 py-4 whitespace-nowrap">
                                                             <span className={cn(
                                                                 "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold",
-                                                                booking.status === 'COMPLETED' ? "bg-green-100 text-green-800" :
-                                                                    booking.status === 'PENDING' ? "bg-yellow-100 text-yellow-800" :
-                                                                        booking.status === 'CONFIRMED' ? "bg-blue-100 text-blue-800" :
-                                                                            booking.status === 'IN_PROGRESS' ? "bg-purple-100 text-purple-800" :
-                                                                                "bg-red-100 text-red-800"
+                                                                booking.status === 'COMPLETED' ? "bg-brand-teal-100 text-brand-teal-800" :
+                                                                    booking.status === 'PENDING' ? "bg-brand-clay-100 text-brand-clay-700" :
+                                                                        booking.status === 'CONFIRMED' ? "bg-brand-ocean-100 text-brand-ocean-800" :
+                                                                            booking.status === 'IN_PROGRESS' ? "bg-brand-ink/10 text-brand-ink" :
+                                                                                "bg-brand-danger-100 text-brand-danger-800"
                                                             )}>
                                                                 {booking.status}
                                                             </span>
@@ -2721,70 +2717,73 @@ const SantiagoTechRDApp = () => {
                             >
                                 {loadingStats ? (
                                     <div className="flex justify-center items-center py-20">
-                                        <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+                                        <Loader2 className="w-8 h-8 animate-spin text-brand-ocean-500" />
                                     </div>
                                 ) : adminStats ? (
                                     <>
                                         {/* Stats Cards */}
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                            <motion.div
+                                            <motion.button
+                                                type="button"
                                                 whileHover={{ scale: 1.02 }}
                                                 whileTap={{ scale: 0.98 }}
                                                 onClick={() => setReportDetailModal({ type: 'users', title: 'Total Usuarios' })}
-                                                className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 text-white shadow-lg cursor-pointer"
+                                                className="cursor-pointer rounded-2xl bg-gradient-to-br from-brand-ocean-600 to-brand-ocean-800 p-5 text-left text-white shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500 focus-visible:ring-offset-2"
                                             >
                                                 <div className="flex items-center justify-between">
                                                     <div>
-                                                        <p className="text-blue-100 text-sm">Total Usuarios</p>
+                                                        <p className="text-white text-sm">Total Usuarios</p>
                                                         <p className="text-3xl font-bold">{adminStats.totalUsers}</p>
                                                     </div>
-                                                    <Users className="w-12 h-12 text-blue-200" />
+                                                    <Users className="w-12 h-12 text-brand-ocean-100" />
                                                 </div>
-                                                <p className="text-blue-200 text-xs mt-2">Click para ver detalles →</p>
-                                            </motion.div>
+                                                <p className="text-white text-xs mt-2">Abrir detalles →</p>
+                                            </motion.button>
 
-                                            <motion.div
+                                            <motion.button
+                                                type="button"
                                                 whileHover={{ scale: 1.02 }}
                                                 whileTap={{ scale: 0.98 }}
                                                 onClick={() => setReportDetailModal({ type: 'technicians', title: 'Técnicos Registrados' })}
-                                                className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl p-5 text-white shadow-lg cursor-pointer"
+                                                className="cursor-pointer rounded-2xl bg-gradient-to-br from-brand-clay-600 to-brand-clay-700 p-5 text-left text-white shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500 focus-visible:ring-offset-2"
                                             >
                                                 <div className="flex items-center justify-between">
                                                     <div>
-                                                        <p className="text-amber-100 text-sm">Técnicos</p>
+                                                        <p className="text-white text-sm">Técnicos</p>
                                                         <p className="text-3xl font-bold">{adminStats.totalTechnicians}</p>
                                                     </div>
-                                                    <Wrench className="w-12 h-12 text-amber-200" />
+                                                    <Wrench className="w-12 h-12 text-brand-clay-100" />
                                                 </div>
-                                                <p className="text-amber-200 text-xs mt-2">Click para ver detalles →</p>
-                                            </motion.div>
+                                                <p className="text-white text-xs mt-2">Abrir detalles →</p>
+                                            </motion.button>
 
-                                            <motion.div
+                                            <motion.button
+                                                type="button"
                                                 whileHover={{ scale: 1.02 }}
                                                 whileTap={{ scale: 0.98 }}
                                                 onClick={() => setReportDetailModal({ type: 'bookings', title: 'Todas las Reservas' })}
-                                                className="bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl p-5 text-white shadow-lg cursor-pointer"
+                                                className="cursor-pointer rounded-2xl bg-gradient-to-br from-brand-teal-700 to-brand-teal-800 p-5 text-left text-white shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500 focus-visible:ring-offset-2"
                                             >
                                                 <div className="flex items-center justify-between">
                                                     <div>
-                                                        <p className="text-emerald-100 text-sm">Reservas Totales</p>
+                                                        <p className="text-white text-sm">Reservas Totales</p>
                                                         <p className="text-3xl font-bold">{adminStats.totalBookings}</p>
                                                     </div>
-                                                    <Calendar className="w-12 h-12 text-emerald-200" />
+                                                    <Calendar className="w-12 h-12 text-brand-teal-100" />
                                                 </div>
-                                                <p className="text-emerald-200 text-xs mt-2">Click para ver detalles →</p>
-                                            </motion.div>
+                                                <p className="text-white text-xs mt-2">Abrir detalles →</p>
+                                            </motion.button>
 
                                             <motion.div
                                                 whileHover={{ scale: 1.02 }}
-                                                className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl p-5 text-white shadow-lg"
+                                                className="bg-gradient-to-br from-brand-ink to-brand-charcoal rounded-2xl p-5 text-white shadow-lg"
                                             >
                                                 <div className="flex items-center justify-between">
                                                     <div>
-                                                        <p className="text-green-100 text-sm">Ingresos Totales</p>
+                                                        <p className="text-brand-sand text-sm">Ingresos Totales</p>
                                                         <p className="text-3xl font-bold">RD${adminStats.totalRevenue.toLocaleString()}</p>
                                                     </div>
-                                                    <DollarSign className="w-12 h-12 text-green-200" />
+                                                    <DollarSign className="w-12 h-12 text-brand-sand" />
                                                 </div>
                                             </motion.div>
                                         </div>
@@ -2793,45 +2792,45 @@ const SantiagoTechRDApp = () => {
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             <motion.div
                                                 whileHover={{ scale: 1.02 }}
-                                                className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-lg border-2 border-green-200"
+                                                className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-lg border-2 border-brand-teal-100"
                                             >
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                                                        <CheckCircle className="w-6 h-6 text-green-600" />
+                                                    <div className="w-12 h-12 bg-brand-teal-100 rounded-full flex items-center justify-center">
+                                                        <CheckCircle className="w-6 h-6 text-brand-teal-700" />
                                                     </div>
                                                     <div>
                                                         <p className="text-gray-500 dark:text-gray-400 text-sm">Completadas</p>
-                                                        <p className="text-2xl font-bold text-green-600">{adminStats.completedBookings}</p>
+                                                        <p className="text-2xl font-bold text-brand-teal-700">{adminStats.completedBookings}</p>
                                                     </div>
                                                 </div>
                                             </motion.div>
 
                                             <motion.div
                                                 whileHover={{ scale: 1.02 }}
-                                                className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-lg border-2 border-yellow-200"
+                                                className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-lg border-2 border-brand-clay-100"
                                             >
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
-                                                        <Clock className="w-6 h-6 text-yellow-600" />
+                                                    <div className="w-12 h-12 bg-brand-clay-50 rounded-full flex items-center justify-center">
+                                                        <Clock className="w-6 h-6 text-brand-clay-700" />
                                                     </div>
                                                     <div>
                                                         <p className="text-gray-500 dark:text-gray-400 text-sm">Pendientes</p>
-                                                        <p className="text-2xl font-bold text-yellow-600">{adminStats.pendingBookings}</p>
+                                                        <p className="text-2xl font-bold text-brand-clay-700">{adminStats.pendingBookings}</p>
                                                     </div>
                                                 </div>
                                             </motion.div>
 
                                             <motion.div
                                                 whileHover={{ scale: 1.02 }}
-                                                className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-lg border-2 border-amber-200"
+                                                className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-lg border-2 border-brand-clay-100"
                                             >
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center">
-                                                        <Star className="w-6 h-6 text-amber-600" />
+                                                    <div className="w-12 h-12 bg-brand-clay-50 rounded-full flex items-center justify-center">
+                                                        <Star className="w-6 h-6 text-brand-clay-700" />
                                                     </div>
                                                     <div>
                                                         <p className="text-gray-500 dark:text-gray-400 text-sm">Rating Promedio</p>
-                                                        <p className="text-2xl font-bold text-amber-600">{adminStats.averageRating.toFixed(1)} ⭐</p>
+                                                        <p className="text-2xl font-bold text-brand-clay-700">{adminStats.averageRating.toFixed(1)} ⭐</p>
                                                     </div>
                                                 </div>
                                             </motion.div>
@@ -2842,7 +2841,7 @@ const SantiagoTechRDApp = () => {
                                             {/* Users by Role */}
                                             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
                                                 <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-                                                    <Users className="w-5 h-5 text-blue-500" />
+                                                    <Users className="w-5 h-5 text-brand-ocean-500" />
                                                     Usuarios por Rol
                                                 </h3>
                                                 <div className="space-y-3">
@@ -2856,7 +2855,7 @@ const SantiagoTechRDApp = () => {
                                                                     transition={{ duration: 0.8 }}
                                                                     className={cn(
                                                                         "h-full rounded-full",
-                                                                        idx === 0 ? "bg-blue-500" : idx === 1 ? "bg-amber-500" : "bg-purple-500"
+                                                                        idx === 0 ? "bg-brand-ocean-600" : idx === 1 ? "bg-brand-clay-600" : "bg-brand-ink"
                                                                     )}
                                                                 />
                                                             </div>
@@ -2869,7 +2868,7 @@ const SantiagoTechRDApp = () => {
                                             {/* Bookings by Status */}
                                             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
                                                 <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-                                                    <Calendar className="w-5 h-5 text-emerald-500" />
+                                                    <Calendar className="w-5 h-5 text-brand-teal-700" />
                                                     Reservas por Estado
                                                 </h3>
                                                 <div className="space-y-3">
@@ -2883,10 +2882,10 @@ const SantiagoTechRDApp = () => {
                                                                     transition={{ duration: 0.8 }}
                                                                     className={cn(
                                                                         "h-full rounded-full",
-                                                                        idx === 0 ? "bg-yellow-500" :
-                                                                            idx === 1 ? "bg-blue-500" :
-                                                                                idx === 2 ? "bg-purple-500" :
-                                                                                    idx === 3 ? "bg-green-500" : "bg-red-500"
+                                                                        idx === 0 ? "bg-brand-clay-600" :
+                                                                            idx === 1 ? "bg-brand-ocean-600" :
+                                                                                idx === 2 ? "bg-brand-ink" :
+                                                                                    idx === 3 ? "bg-brand-teal-700" : "bg-brand-danger-600"
                                                                     )}
                                                                 />
                                                             </div>
@@ -2923,7 +2922,7 @@ const SantiagoTechRDApp = () => {
                                                                 {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '⭐'}
                                                             </div>
                                                             <p className="font-bold text-gray-800 dark:text-white truncate">{tech.name}</p>
-                                                            <p className="text-sm text-amber-600">⭐ {tech.rating.toFixed(1)}</p>
+                                                            <p className="text-sm font-medium text-brand-charcoal">⭐ {tech.rating.toFixed(1)}</p>
                                                             <p className="text-xs text-gray-500">{tech.jobs} trabajos</p>
                                                         </motion.div>
                                                     ))}
@@ -2963,7 +2962,7 @@ const SantiagoTechRDApp = () => {
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                     {/* Specializations Management */}
                                     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
-                                        <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-4">
+                                        <div className="bg-gradient-to-r from-brand-clay-600 to-brand-clay-700 p-4">
                                             <h3 className="text-xl font-bold text-white flex items-center gap-2">
                                                 <Wrench className="w-5 h-5" />
                                                 Especializaciones ({specializations.length})
@@ -2993,7 +2992,7 @@ const SantiagoTechRDApp = () => {
                                                             setNewSpecialization('');
                                                         }
                                                     }}
-                                                    className="bg-amber-500 hover:bg-amber-600"
+                                                    className="bg-brand-clay-600 hover:bg-brand-clay-700"
                                                 >
                                                     <Plus className="w-4 h-4" />
                                                 </Button>
@@ -3006,7 +3005,7 @@ const SantiagoTechRDApp = () => {
                                                         className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
                                                     >
                                                         <span className="flex items-center gap-2">
-                                                            <Wrench className="w-4 h-4 text-amber-500" />
+                                                            <Wrench className="w-4 h-4 text-brand-clay-500" />
                                                             {spec}
                                                         </span>
                                                         <Button
@@ -3021,7 +3020,7 @@ const SantiagoTechRDApp = () => {
                                                                     await removeSpecializationFromAPI(spec);
                                                                 }
                                                             }}
-                                                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                            className="text-brand-danger-700 hover:text-brand-danger-800 hover:bg-brand-danger-50"
                                                         >
                                                             <Trash2 className="w-4 h-4" />
                                                         </Button>
@@ -3033,7 +3032,7 @@ const SantiagoTechRDApp = () => {
 
                                     {/* Locations Management */}
                                     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
-                                        <div className="bg-gradient-to-r from-blue-500 to-indigo-500 p-4">
+                                        <div className="bg-gradient-to-r from-brand-ink to-brand-ocean-700 p-4">
                                             <h3 className="text-xl font-bold text-white flex items-center gap-2">
                                                 <MapPin className="w-5 h-5" />
                                                 Ubicaciones ({locations.length})
@@ -3063,7 +3062,7 @@ const SantiagoTechRDApp = () => {
                                                             setNewLocation('');
                                                         }
                                                     }}
-                                                    className="bg-blue-500 hover:bg-blue-600"
+                                                    className="bg-brand-ocean-500 hover:bg-brand-ocean-600"
                                                 >
                                                     <Plus className="w-4 h-4" />
                                                 </Button>
@@ -3076,7 +3075,7 @@ const SantiagoTechRDApp = () => {
                                                         className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
                                                     >
                                                         <span className="flex items-center gap-2">
-                                                            <MapPin className="w-4 h-4 text-blue-500" />
+                                                            <MapPin className="w-4 h-4 text-brand-ocean-500" />
                                                             {loc}
                                                         </span>
                                                         <Button
@@ -3091,7 +3090,7 @@ const SantiagoTechRDApp = () => {
                                                                     await removeLocationFromAPI(loc);
                                                                 }
                                                             }}
-                                                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                            className="text-brand-danger-700 hover:text-brand-danger-800 hover:bg-brand-danger-50"
                                                         >
                                                             <Trash2 className="w-4 h-4" />
                                                         </Button>
@@ -3103,8 +3102,8 @@ const SantiagoTechRDApp = () => {
                                 </div>
 
                                 {/* Info note */}
-                                <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
-                                    <p className="text-blue-700 dark:text-blue-300 text-sm flex items-start gap-2">
+                                <div className="bg-brand-ocean-50 dark:bg-brand-ocean-800/30 border border-brand-ocean-100 dark:border-brand-ocean-700 rounded-xl p-4">
+                                    <p className="text-brand-ocean-800 dark:text-brand-ocean-100 text-sm flex items-start gap-2">
                                         <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
                                         <span>
                                             Las especializaciones y ubicaciones que agregues estarán disponibles inmediatamente
@@ -3184,7 +3183,7 @@ const SantiagoTechRDApp = () => {
                 <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr] lg:px-8">
                     <div className="max-w-md">
                         <div className="flex items-center gap-3 text-white">
-                            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-clay-600">
+                            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-clay-500 text-brand-ink">
                                 <Wrench className="h-5 w-5" aria-hidden="true" />
                             </span>
                             <span className="text-lg font-bold">Técnicos en RD</span>
@@ -3226,29 +3225,32 @@ const SantiagoTechRDApp = () => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50"
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-brand-ink/70 p-4 backdrop-blur-sm"
                     >
                         <motion.div
                             initial={{ scale: 0.8, y: -20 }}
                             animate={{ scale: 1, y: 0 }}
                             exit={{ scale: 0.8, y: -20 }}
-                            className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="technician-registration-title"
+                            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-800"
                         >
-                            <h2 className="text-2xl font-semibold text-gray-800 dark:text-white mb-4">
+                            <h2 id="technician-registration-title" className="text-2xl font-semibold text-gray-800 dark:text-white mb-4">
                                 Regístrate como Técnico
                             </h2>
                             {registrationSuccess ? (
-                                <div className="bg-green-100 dark:bg-green-900 border border-green-400 dark:border-green-600 text-green-700 dark:text-green-300 px-4 py-3 rounded relative mb-4" role="alert">
+                                <div className="bg-brand-teal-100 dark:bg-brand-teal-800/40 border border-brand-teal-600 dark:border-brand-teal-600 text-brand-teal-800 dark:text-brand-teal-100 px-4 py-3 rounded relative mb-4" role="alert">
                                     <strong className="font-bold">¡Registro Exitoso! </strong>
                                     <span className="block sm:inline">Tu solicitud ha sido enviada. Un administrador la revisará pronto.</span>
-                                    <CheckCircle className="absolute top-3 left-4 w-5 h-5 text-green-500" />
+                                    <CheckCircle className="absolute top-3 left-4 w-5 h-5 text-brand-teal-700" />
                                     <div className="mt-4 flex justify-end">
                                         <Button
                                             onClick={() => {
                                                 setShowRegisterForm(false);
                                                 setRegistrationSuccess(false);
                                             }}
-                                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                                            className="bg-brand-ocean-500 hover:bg-brand-ocean-600 text-white"
                                         >
                                             Continuar
                                         </Button>
@@ -3267,12 +3269,12 @@ const SantiagoTechRDApp = () => {
                                                 {...registerTechnician('firstName')}
                                                 className={cn(
                                                     'mt-1',
-                                                    technicianErrors.firstName && 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                                                    technicianErrors.firstName && 'border-brand-danger-600 focus:ring-brand-danger-600 focus:border-brand-danger-600'
                                                 )}
                                                 placeholder="Tu nombre"
                                             />
                                             {technicianErrors.firstName && (
-                                                <p className="text-red-500 text-sm mt-1">{technicianErrors.firstName.message}</p>
+                                                <p className="text-brand-danger-600 text-sm mt-1">{technicianErrors.firstName.message}</p>
                                             )}
                                         </div>
                                         <div>
@@ -3285,12 +3287,12 @@ const SantiagoTechRDApp = () => {
                                                 {...registerTechnician('lastName')}
                                                 className={cn(
                                                     'mt-1',
-                                                    technicianErrors.lastName && 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                                                    technicianErrors.lastName && 'border-brand-danger-600 focus:ring-brand-danger-600 focus:border-brand-danger-600'
                                                 )}
                                                 placeholder="Tu apellido"
                                             />
                                             {technicianErrors.lastName && (
-                                                <p className="text-red-500 text-sm mt-1">{technicianErrors.lastName.message}</p>
+                                                <p className="text-brand-danger-600 text-sm mt-1">{technicianErrors.lastName.message}</p>
                                             )}
                                         </div>
                                     </div>
@@ -3311,7 +3313,7 @@ const SantiagoTechRDApp = () => {
                                                         className={cn(
                                                             'mt-1 w-full',
                                                             technicianErrors.specialization &&
-                                                            'border-red-500 focus:ring-red-500 focus:border-red-500'
+                                                            'border-brand-danger-600 focus:ring-brand-danger-600 focus:border-brand-danger-600'
                                                         )}
                                                     >
                                                         <SelectValue placeholder="Selecciona tu especialización" />
@@ -3327,7 +3329,7 @@ const SantiagoTechRDApp = () => {
                                             )}
                                         />
                                         {technicianErrors.specialization && (
-                                            <p className="text-red-500 text-sm mt-1">{technicianErrors.specialization.message}</p>
+                                            <p className="text-brand-danger-600 text-sm mt-1">{technicianErrors.specialization.message}</p>
                                         )}
                                     </div>
                                     <div>
@@ -3347,7 +3349,7 @@ const SantiagoTechRDApp = () => {
                                                         className={cn(
                                                             'mt-1 w-full',
                                                             technicianErrors.location &&
-                                                            'border-red-500 focus:ring-red-500 focus:border-red-500'
+                                                            'border-brand-danger-600 focus:ring-brand-danger-600 focus:border-brand-danger-600'
                                                         )}
                                                     >
                                                         <SelectValue placeholder="Selecciona tu ubicación" />
@@ -3363,7 +3365,7 @@ const SantiagoTechRDApp = () => {
                                             )}
                                         />
                                         {technicianErrors.location && (
-                                            <p className="text-red-500 text-sm mt-1">{technicianErrors.location.message}</p>
+                                            <p className="text-brand-danger-600 text-sm mt-1">{technicianErrors.location.message}</p>
                                         )}
                                     </div>
                                     <div>
@@ -3376,12 +3378,12 @@ const SantiagoTechRDApp = () => {
                                             {...registerTechnician('phone')}
                                             className={cn(
                                                 'mt-1',
-                                                technicianErrors.phone && 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                                                technicianErrors.phone && 'border-brand-danger-600 focus:ring-brand-danger-600 focus:border-brand-danger-600'
                                             )}
                                             placeholder="XXX-XXX-XXXX"
                                         />
                                         {technicianErrors.phone && (
-                                            <p className="text-red-500 text-sm mt-1">{technicianErrors.phone.message}</p>
+                                            <p className="text-brand-danger-600 text-sm mt-1">{technicianErrors.phone.message}</p>
                                         )}
                                     </div>
                                     <div>
@@ -3394,33 +3396,33 @@ const SantiagoTechRDApp = () => {
                                             {...registerTechnician('email')}
                                             className={cn(
                                                 'mt-1',
-                                                technicianErrors.email && 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                                                technicianErrors.email && 'border-brand-danger-600 focus:ring-brand-danger-600 focus:border-brand-danger-600'
                                             )}
                                             placeholder="tu.correo@ejemplo.com"
                                         />
                                         {technicianErrors.email && (
-                                            <p className="text-red-500 text-sm mt-1">{technicianErrors.email.message}</p>
+                                            <p className="text-brand-danger-600 text-sm mt-1">{technicianErrors.email.message}</p>
                                         )}
                                     </div>
                                     <div className={cn(
                                         'rounded-xl border p-3',
-                                        technicianErrors.ugcTermsAccepted ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-700/40'
+                                        technicianErrors.ugcTermsAccepted ? 'border-brand-danger-600 bg-brand-danger-50' : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-700/40'
                                     )}>
                                         <div className="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-200">
                                             <input
                                                 type="checkbox"
                                                 {...registerTechnician('ugcTermsAccepted')}
                                                 aria-label="Acepto las Normas de la comunidad y los Términos de uso"
-                                                className="mt-0.5 h-5 w-5 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                className="mt-0.5 h-5 w-5 shrink-0 rounded border-gray-300 text-brand-ocean-600 focus:ring-brand-ocean-500"
                                             />
                                             <span>
                                                 Acepto las{' '}
-                                                <button type="button" onClick={() => setShowCommunityGuidelines(true)} className="font-bold text-blue-700 underline dark:text-blue-300">
+                                                <button type="button" onClick={() => setShowCommunityGuidelines(true)} className="font-bold text-brand-ocean-700 underline dark:text-brand-ocean-100">
                                                     Normas de la comunidad y los Términos de uso
                                                 </button>. Entiendo que mi perfil y fotos estarán sujetos a moderación.
                                             </span>
                                         </div>
-                                        {technicianErrors.ugcTermsAccepted && <p role="alert" className="mt-2 text-sm text-red-600">{technicianErrors.ugcTermsAccepted.message}</p>}
+                                        {technicianErrors.ugcTermsAccepted && <p role="alert" className="mt-2 text-sm text-brand-danger-700">{technicianErrors.ugcTermsAccepted.message}</p>}
                                     </div>
                                     <div className="flex justify-end gap-4">
                                         <Button
@@ -3438,7 +3440,7 @@ const SantiagoTechRDApp = () => {
                                         <Button
                                             type="submit"
                                             disabled={isTechnicianSubmitting}
-                                            className="bg-blue-500 hover:bg-blue-600 text-white"
+                                                className="bg-brand-ocean-500 hover:bg-brand-ocean-600 text-white"
                                         >
                                             {isTechnicianSubmitting ? (
                                                 <>
@@ -3464,7 +3466,7 @@ const SantiagoTechRDApp = () => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm"
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-brand-ink/70 p-4 backdrop-blur-sm"
                     >
                         <motion.div
                             initial={{ scale: 0.8, y: -20 }}
@@ -3479,7 +3481,7 @@ const SantiagoTechRDApp = () => {
                                 type="button"
                                 aria-label="Cerrar registro"
                                 onClick={() => setShowUserRegisterForm(false)}
-                                className="absolute right-4 top-4 rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                                className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full text-brand-muted hover:bg-brand-sand hover:text-brand-charcoal focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500 dark:hover:bg-gray-700 dark:hover:text-gray-200"
                             >
                                 <X className="h-5 w-5" />
                             </button>
@@ -3488,17 +3490,17 @@ const SantiagoTechRDApp = () => {
                             </h2>
                             <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">Reserva servicios o publica tu perfil profesional.</p>
                             {userRegistrationSuccess ? (
-                                <div className="bg-green-100 dark:bg-green-900 border border-green-400 dark:border-green-600 text-green-700 dark:text-green-300 px-4 py-3 rounded relative mb-4" role="alert">
+                                <div className="bg-brand-teal-100 dark:bg-brand-teal-800/40 border border-brand-teal-600 dark:border-brand-teal-600 text-brand-teal-800 dark:text-brand-teal-100 px-4 py-3 rounded relative mb-4" role="alert">
                                     <strong className="font-bold">Registro exitoso. </strong>
                                     <span className="block sm:inline">Tu cuenta ha sido creada. Por favor revisa tu correo para verificar tu cuenta.</span>
                                     <span className="mt-2 block text-sm">Si añadiste una foto o un perfil profesional, se publicará después de la revisión de moderación.</span>
-                                    <CheckCircle className="absolute top-3 left-4 w-5 h-5 text-green-500" />
+                                    <CheckCircle className="absolute top-3 left-4 w-5 h-5 text-brand-teal-700" />
                                     <Button
                                         onClick={() => {
                                             setShowUserRegisterForm(false);
                                             setUserRegistrationSuccess(false);
                                         }}
-                                        className="mt-4 w-full bg-green-600 hover:bg-green-700 text-white"
+                                        className="mt-4 w-full bg-brand-teal-700 hover:bg-brand-teal-800 text-white"
                                     >
                                         Cerrar
                                     </Button>
@@ -3508,14 +3510,14 @@ const SantiagoTechRDApp = () => {
                                     {/* Tipo de cuenta - PRIMERO */}
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            ¿Qué tipo de cuenta deseas? <span className="text-red-500">*</span>
+                                            ¿Qué tipo de cuenta deseas? <span className="text-brand-danger-600">*</span>
                                         </label>
                                         <div className="grid grid-cols-2 gap-3">
                                             <label className={cn(
-                                                "flex flex-col items-center p-4 border-2 rounded-xl cursor-pointer transition-all",
+                                                "flex flex-col items-center p-4 border-2 rounded-xl cursor-pointer transition-all focus-within:ring-2 focus-within:ring-brand-ocean-500 focus-within:ring-offset-2",
                                                 selectedAccountType === 'user'
-                                                    ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20"
-                                                    : "border-gray-200 dark:border-gray-600 hover:border-emerald-300"
+                                                    ? "border-brand-ocean-500 bg-brand-ocean-50 dark:bg-brand-ocean-800/20"
+                                                    : "border-gray-200 dark:border-gray-600 hover:border-brand-ocean-500"
                                             )}>
                                                 <input
                                                     type="radio"
@@ -3525,21 +3527,21 @@ const SantiagoTechRDApp = () => {
                                                 />
                                                 <UserIcon className={cn(
                                                     "w-8 h-8 mb-2",
-                                                    selectedAccountType === 'user' ? "text-emerald-600" : "text-gray-400"
+                                                    selectedAccountType === 'user' ? "text-brand-ocean-600" : "text-gray-400"
                                                 )} />
                                                 <span className={cn(
                                                     "font-medium text-sm",
-                                                    selectedAccountType === 'user' ? "text-emerald-700 dark:text-emerald-400" : "text-gray-600 dark:text-gray-300"
+                                                    selectedAccountType === 'user' ? "text-brand-ocean-700 dark:text-brand-ocean-100" : "text-gray-600 dark:text-gray-300"
                                                 )}>
                                                     Busco Técnicos
                                                 </span>
                                                 <span className="text-xs text-gray-500 mt-1">Cliente</span>
                                             </label>
                                             <label className={cn(
-                                                "flex flex-col items-center p-4 border-2 rounded-xl cursor-pointer transition-all",
+                                                "flex flex-col items-center p-4 border-2 rounded-xl cursor-pointer transition-all focus-within:ring-2 focus-within:ring-brand-clay-500 focus-within:ring-offset-2",
                                                 selectedAccountType === 'technician'
-                                                    ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20"
-                                                    : "border-gray-200 dark:border-gray-600 hover:border-amber-300"
+                                                    ? "border-brand-clay-500 bg-brand-clay-50 dark:bg-brand-clay-700/20"
+                                                    : "border-gray-200 dark:border-gray-600 hover:border-brand-clay-500"
                                             )}>
                                                 <input
                                                     type="radio"
@@ -3549,11 +3551,11 @@ const SantiagoTechRDApp = () => {
                                                 />
                                                 <Wrench className={cn(
                                                     "w-8 h-8 mb-2",
-                                                    selectedAccountType === 'technician' ? "text-amber-600" : "text-gray-400"
+                                                    selectedAccountType === 'technician' ? "text-brand-clay-700" : "text-gray-400"
                                                 )} />
                                                 <span className={cn(
                                                     "font-medium text-sm",
-                                                    selectedAccountType === 'technician' ? "text-amber-700 dark:text-amber-400" : "text-gray-600 dark:text-gray-300"
+                                                    selectedAccountType === 'technician' ? "text-brand-clay-700 dark:text-brand-clay-100" : "text-gray-600 dark:text-gray-300"
                                                 )}>
                                                     Soy Técnico
                                                 </span>
@@ -3561,10 +3563,10 @@ const SantiagoTechRDApp = () => {
                                             </label>
                                         </div>
                                         {userErrors.accountType && (
-                                            <p className="text-red-500 text-sm mt-1">{userErrors.accountType.message}</p>
+                                            <p className="text-brand-danger-600 text-sm mt-1">{userErrors.accountType.message}</p>
                                         )}
                                         {selectedAccountType === 'technician' && (
-                                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 bg-amber-50 dark:bg-amber-900/20 p-2 rounded-lg">
+                                            <p className="text-xs text-brand-clay-700 dark:text-brand-clay-100 mt-2 bg-brand-clay-50 dark:bg-brand-clay-700/20 p-2 rounded-lg">
                                                 💡 Como técnico también podrás contratar otros servicios.
                                             </p>
                                         )}
@@ -3579,7 +3581,7 @@ const SantiagoTechRDApp = () => {
                                             <div className={cn(
                                                 "w-24 h-24 rounded-full flex items-center justify-center overflow-hidden border-2 transition-all",
                                                 registrationPhoto
-                                                    ? "border-emerald-400"
+                                                    ? "border-brand-ocean-500"
                                                     : "border-gray-300 dark:border-gray-600 border-dashed"
                                             )}>
                                                 {registrationPhoto ? (
@@ -3608,7 +3610,7 @@ const SantiagoTechRDApp = () => {
                                             <button
                                                 type="button"
                                                 onClick={() => setRegistrationPhoto(null)}
-                                                className="mt-2 text-xs text-red-500 hover:text-red-700"
+                                                className="mt-2 text-xs text-brand-danger-700 hover:text-brand-danger-800"
                                             >
                                                 Quitar foto
                                             </button>
@@ -3626,12 +3628,12 @@ const SantiagoTechRDApp = () => {
                                                 {...registerUser('firstName')}
                                                 className={cn(
                                                     'mt-1',
-                                                    userErrors.firstName && 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                                                    userErrors.firstName && 'border-brand-danger-600 focus:ring-brand-danger-600 focus:border-brand-danger-600'
                                                 )}
                                                 placeholder="Tu nombre"
                                             />
                                             {userErrors.firstName && (
-                                                <p className="text-red-500 text-sm mt-1">{userErrors.firstName.message}</p>
+                                                <p className="text-brand-danger-600 text-sm mt-1">{userErrors.firstName.message}</p>
                                             )}
                                         </div>
                                         <div>
@@ -3644,12 +3646,12 @@ const SantiagoTechRDApp = () => {
                                                 {...registerUser('lastName')}
                                                 className={cn(
                                                     'mt-1',
-                                                    userErrors.lastName && 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                                                    userErrors.lastName && 'border-brand-danger-600 focus:ring-brand-danger-600 focus:border-brand-danger-600'
                                                 )}
                                                 placeholder="Tu apellido"
                                             />
                                             {userErrors.lastName && (
-                                                <p className="text-red-500 text-sm mt-1">{userErrors.lastName.message}</p>
+                                                <p className="text-brand-danger-600 text-sm mt-1">{userErrors.lastName.message}</p>
                                             )}
                                         </div>
                                     </div>
@@ -3663,12 +3665,12 @@ const SantiagoTechRDApp = () => {
                                             {...registerUser('email')}
                                             className={cn(
                                                 'mt-1',
-                                                userErrors.email && 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                                                userErrors.email && 'border-brand-danger-600 focus:ring-brand-danger-600 focus:border-brand-danger-600'
                                             )}
                                             placeholder="tu.correo@ejemplo.com"
                                         />
                                         {userErrors.email && (
-                                            <p className="text-red-500 text-sm mt-1">{userErrors.email.message}</p>
+                                            <p className="text-brand-danger-600 text-sm mt-1">{userErrors.email.message}</p>
                                         )}
                                     </div>
                                     <div>
@@ -3681,12 +3683,12 @@ const SantiagoTechRDApp = () => {
                                             {...registerUser('phone')}
                                             className={cn(
                                                 'mt-1',
-                                                userErrors.phone && 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                                                userErrors.phone && 'border-brand-danger-600 focus:ring-brand-danger-600 focus:border-brand-danger-600'
                                             )}
                                             placeholder="XXX-XXX-XXXX"
                                         />
                                         {userErrors.phone && (
-                                            <p className="text-red-500 text-sm mt-1">{userErrors.phone.message}</p>
+                                            <p className="text-brand-danger-600 text-sm mt-1">{userErrors.phone.message}</p>
                                         )}
                                     </div>
                                     <div>
@@ -3699,12 +3701,12 @@ const SantiagoTechRDApp = () => {
                                             {...registerUser('password')}
                                             className={cn(
                                                 'mt-1',
-                                                userErrors.password && 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                                                userErrors.password && 'border-brand-danger-600 focus:ring-brand-danger-600 focus:border-brand-danger-600'
                                             )}
                                             placeholder="******"
                                         />
                                         {userErrors.password && (
-                                            <p className="text-red-500 text-sm mt-1">{userErrors.password.message}</p>
+                                            <p className="text-brand-danger-600 text-sm mt-1">{userErrors.password.message}</p>
                                         )}
                                     </div>
 
@@ -3717,15 +3719,15 @@ const SantiagoTechRDApp = () => {
                                                 exit={{ opacity: 0, height: 0 }}
                                                 className="space-y-4 overflow-hidden"
                                             >
-                                                <div className="border-t border-amber-200 dark:border-amber-800 pt-4">
-                                                    <h3 className="text-sm font-semibold text-amber-700 dark:text-amber-400 mb-3 flex items-center gap-2">
+                                                <div className="border-t border-brand-clay-100 dark:border-brand-clay-700 pt-4">
+                                                    <h3 className="text-sm font-semibold text-brand-clay-700 dark:text-brand-clay-100 mb-3 flex items-center gap-2">
                                                         <Wrench className="w-4 h-4" />
                                                         Información de Técnico
                                                     </h3>
                                                     <div className="space-y-4">
                                                         <div>
                                                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                                                Servicios que ofreces <span className="text-red-500">*</span>
+                                                                Servicios que ofreces <span className="text-brand-danger-600">*</span>
                                                             </label>
                                                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
                                                                 Selecciona todos los servicios que puedes proveer
@@ -3736,7 +3738,7 @@ const SantiagoTechRDApp = () => {
                                                                 render={({ field }) => (
                                                                     <div className={cn(
                                                                         "grid grid-cols-2 gap-2 p-3 border rounded-lg max-h-48 overflow-y-auto",
-                                                                        userErrors.specializations ? 'border-red-500' : 'border-gray-200 dark:border-gray-600'
+                                                                        userErrors.specializations ? 'border-brand-danger-600' : 'border-gray-200 dark:border-gray-600'
                                                                     )}>
                                                                         {specializations.map((spec) => {
                                                                             const isSelected = field.value?.includes(spec) || false;
@@ -3746,7 +3748,7 @@ const SantiagoTechRDApp = () => {
                                                                                     className={cn(
                                                                                         "flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all text-sm",
                                                                                         isSelected
-                                                                                            ? "bg-amber-100 dark:bg-amber-900/30 border border-amber-400"
+                                                                                            ? "bg-brand-clay-100 dark:bg-brand-clay-700/30 border border-brand-clay-500"
                                                                                             : "bg-gray-50 dark:bg-gray-800 border border-transparent hover:bg-gray-100 dark:hover:bg-gray-700"
                                                                                     )}
                                                                                 >
@@ -3761,11 +3763,11 @@ const SantiagoTechRDApp = () => {
                                                                                                 field.onChange(currentValues.filter((v: string) => v !== spec));
                                                                                             }
                                                                                         }}
-                                                                                        className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                                                                                        className="w-4 h-4 rounded border-brand-control text-brand-clay-600 focus:ring-brand-clay-500"
                                                                                     />
                                                                                     <span className={cn(
                                                                                         "text-sm",
-                                                                                        isSelected ? "text-amber-700 dark:text-amber-300 font-medium" : "text-gray-700 dark:text-gray-300"
+                                                                                        isSelected ? "text-brand-clay-700 dark:text-brand-clay-100 font-medium" : "text-gray-700 dark:text-gray-300"
                                                                                     )}>
                                                                                         {spec}
                                                                                     </span>
@@ -3776,12 +3778,12 @@ const SantiagoTechRDApp = () => {
                                                                 )}
                                                             />
                                                             {userErrors.specializations && (
-                                                                <p className="text-red-500 text-sm mt-1">{userErrors.specializations.message}</p>
+                                                                <p className="text-brand-danger-600 text-sm mt-1">{userErrors.specializations.message}</p>
                                                             )}
                                                         </div>
                                                         <div>
                                                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                                                Ubicación <span className="text-red-500">*</span>
+                                                                Ubicación <span className="text-brand-danger-600">*</span>
                                                             </label>
                                                             <Controller
                                                                 name="location"
@@ -3790,7 +3792,7 @@ const SantiagoTechRDApp = () => {
                                                                     <Select onValueChange={field.onChange} value={field.value}>
                                                                         <SelectTrigger className={cn(
                                                                             "mt-1",
-                                                                            userErrors.location && 'border-red-500'
+                                                                            userErrors.location && 'border-brand-danger-600'
                                                                         )}>
                                                                             <SelectValue placeholder="Selecciona tu ubicación" />
                                                                         </SelectTrigger>
@@ -3805,7 +3807,7 @@ const SantiagoTechRDApp = () => {
                                                                 )}
                                                             />
                                                             {userErrors.location && (
-                                                                <p className="text-red-500 text-sm mt-1">{userErrors.location.message}</p>
+                                                                <p className="text-brand-danger-600 text-sm mt-1">{userErrors.location.message}</p>
                                                             )}
                                                         </div>
                                                         <div>
@@ -3830,23 +3832,23 @@ const SantiagoTechRDApp = () => {
                                     </AnimatePresence>
                                     <div className={cn(
                                         'rounded-xl border p-3',
-                                        userErrors.ugcTermsAccepted ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-700/40'
+                                        userErrors.ugcTermsAccepted ? 'border-brand-danger-600 bg-brand-danger-50' : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-700/40'
                                     )}>
                                         <div className="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-200">
                                             <input
                                                 type="checkbox"
                                                 {...registerUser('ugcTermsAccepted')}
                                                 aria-label="Acepto las Normas de la comunidad y los Términos de uso"
-                                                className="mt-0.5 h-5 w-5 shrink-0 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                                className="mt-0.5 h-5 w-5 shrink-0 rounded border-brand-control text-brand-ocean-600 focus:ring-brand-ocean-500"
                                             />
                                             <span>
                                                 Acepto las{' '}
-                                                <button type="button" onClick={() => setShowCommunityGuidelines(true)} className="font-bold text-blue-700 underline dark:text-blue-300">
+                                                <button type="button" onClick={() => setShowCommunityGuidelines(true)} className="font-bold text-brand-ocean-700 underline dark:text-brand-ocean-100">
                                                     Normas de la comunidad y los Términos de uso
                                                 </button>. El contenido que publique puede ser revisado o retirado si infringe estas reglas.
                                             </span>
                                         </div>
-                                        {userErrors.ugcTermsAccepted && <p role="alert" className="mt-2 text-sm text-red-600">{userErrors.ugcTermsAccepted.message}</p>}
+                                        {userErrors.ugcTermsAccepted && <p role="alert" className="mt-2 text-sm text-brand-danger-700">{userErrors.ugcTermsAccepted.message}</p>}
                                     </div>
                                     <div className="flex justify-end gap-4 pt-2">
                                         <Button
@@ -3869,8 +3871,8 @@ const SantiagoTechRDApp = () => {
                                             className={cn(
                                                 "text-white",
                                                 selectedAccountType === 'technician'
-                                                    ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
-                                                    : "bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600"
+                                                    ? "bg-gradient-to-r from-brand-clay-600 to-brand-clay-700 hover:from-brand-clay-700 hover:to-brand-clay-700"
+                                                    : "bg-gradient-to-r from-brand-ocean-500 to-brand-ocean-600 hover:from-brand-ocean-600 hover:to-brand-ocean-700"
                                             )}
                                         >
                                             {isUserSubmitting ? (
@@ -3934,14 +3936,14 @@ const SantiagoTechRDApp = () => {
                                         {...registerReview('comment')}
                                         className={cn(
                                             'mt-1 min-h-12 w-full rounded-xl border border-gray-300 bg-white px-3 text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-white',
-                                            reviewErrors.comment && 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                                            reviewErrors.comment && 'border-brand-danger-600 focus:ring-brand-danger-600 focus:border-brand-danger-600'
                                         )}
                                     >
                                         <option value="">Selecciona una opción</option>
                                         {REVIEW_FEEDBACK_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
                                     </select>
                                     {reviewErrors.comment && (
-                                        <p className="text-red-500 text-sm mt-1">{reviewErrors.comment.message}</p>
+                                        <p className="text-brand-danger-600 text-sm mt-1">{reviewErrors.comment.message}</p>
                                     )}
                                 </div>
                                 <div>
@@ -3975,11 +3977,11 @@ const SantiagoTechRDApp = () => {
                                         )}
                                     />
                                     {reviewErrors.rating && (
-                                        <p className="text-red-500 text-sm mt-1">{reviewErrors.rating.message}</p>
+                                        <p className="text-brand-danger-600 text-sm mt-1">{reviewErrors.rating.message}</p>
                                     )}
                                 </div>
                                 {reviewSubmitError && (
-                                    <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                                    <p role="alert" className="rounded-lg border border-brand-danger-200 bg-brand-danger-50 px-3 py-2 text-sm text-brand-danger-700">
                                         {reviewSubmitError}
                                     </p>
                                 )}
@@ -3996,7 +3998,7 @@ const SantiagoTechRDApp = () => {
                                     <Button
                                         type="submit"
                                         disabled={isReviewSubmitting}
-                                        className="bg-blue-500 hover:bg-blue-600 text-white"
+                                        className="bg-brand-ocean-500 hover:bg-brand-ocean-600 text-white"
                                     >
                                         {isReviewSubmitting ? (
                                             <>
@@ -4037,7 +4039,7 @@ const SantiagoTechRDApp = () => {
                                     type="button"
                                     aria-label="Cerrar inicio de sesión"
                                     onClick={() => setShowLoginForm(false)}
-                                    className="absolute right-4 top-4 rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                                    className="absolute right-4 top-4 rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-700 dark:hover:bg-gray-700 dark:hover:text-gray-200"
                                 >
                                     <X className="w-5 h-5" />
                                 </button>
@@ -4058,12 +4060,12 @@ const SantiagoTechRDApp = () => {
                                             aria-describedby={loginErrors.email ? 'login-email-error' : undefined}
                                             className={cn(
                                                 'mt-1',
-                                                loginErrors.email && 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                                                loginErrors.email && 'border-brand-danger-600 focus:ring-brand-danger-600 focus:border-brand-danger-600'
                                             )}
                                             placeholder="tu.correo@ejemplo.com"
                                         />
                                         {loginErrors.email && (
-                                            <p id="login-email-error" role="alert" className="text-red-500 text-sm mt-1">{loginErrors.email.message}</p>
+                                            <p id="login-email-error" role="alert" className="text-brand-danger-600 text-sm mt-1">{loginErrors.email.message}</p>
                                         )}
                                     </div>
                                     <div>
@@ -4078,12 +4080,12 @@ const SantiagoTechRDApp = () => {
                                             aria-describedby={loginErrors.password ? 'login-password-error' : undefined}
                                             className={cn(
                                                 'mt-1',
-                                                loginErrors.password && 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                                                loginErrors.password && 'border-brand-danger-600 focus:ring-brand-danger-600 focus:border-brand-danger-600'
                                             )}
                                             placeholder="******"
                                         />
                                         {loginErrors.password && (
-                                            <p id="login-password-error" role="alert" className="text-red-500 text-sm mt-1">{loginErrors.password.message}</p>
+                                            <p id="login-password-error" role="alert" className="text-brand-danger-600 text-sm mt-1">{loginErrors.password.message}</p>
                                         )}
                                     </div>
                                     <Button
@@ -4110,7 +4112,7 @@ const SantiagoTechRDApp = () => {
                                             setForgotPasswordMessage('');
                                             setResetEmail('');
                                         }}
-                                        className="text-sm text-gray-500 hover:text-blue-600 hover:underline"
+                                        className="text-sm text-gray-500 hover:text-brand-ocean-600 hover:underline"
                                     >
                                         ¿Olvidaste tu contraseña?
                                     </button>
@@ -4122,7 +4124,7 @@ const SantiagoTechRDApp = () => {
                                                 setShowLoginForm(false);
                                                 setShowUserRegisterForm(true);
                                             }}
-                                            className="text-blue-600 hover:underline font-medium"
+                                            className="text-brand-ocean-600 hover:underline font-medium"
                                         >
                                             Regístrate aquí
                                         </button>
@@ -4177,14 +4179,14 @@ const SantiagoTechRDApp = () => {
                                     />
                                 </div>
                                 {forgotPasswordMessage && (
-                                    <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-sm">
+                                    <div className="p-3 rounded-lg bg-brand-ocean-50 dark:bg-brand-ocean-800/20 text-brand-ocean-700 dark:text-brand-ocean-100 text-sm">
                                         {forgotPasswordMessage}
                                     </div>
                                 )}
                                 <Button
                                     onClick={handleForgotPassword}
                                     disabled={forgotPasswordLoading}
-                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                                    className="w-full bg-brand-ocean-600 hover:bg-brand-ocean-700 text-white"
                                 >
                                     {forgotPasswordLoading ? (
                                         <>
@@ -4200,7 +4202,7 @@ const SantiagoTechRDApp = () => {
                                         setShowForgotPasswordForm(false);
                                         setShowLoginForm(true);
                                     }}
-                                    className="w-full text-sm text-gray-500 hover:text-blue-600 hover:underline"
+                                    className="w-full text-sm text-gray-500 hover:text-brand-ocean-600 hover:underline"
                                 >
                                     Volver a iniciar sesión
                                 </button>
@@ -4260,12 +4262,12 @@ const SantiagoTechRDApp = () => {
                                     />
                                 </div>
                                 {newPassword && confirmPassword && newPassword !== confirmPassword && (
-                                    <p className="text-red-500 text-sm">Las contraseñas no coinciden</p>
+                                    <p className="text-brand-danger-600 text-sm">Las contraseñas no coinciden</p>
                                 )}
                                 <Button
                                     onClick={handleResetPassword}
                                     disabled={resetPasswordLoading || !newPassword || !confirmPassword || newPassword !== confirmPassword}
-                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+                                    className="w-full bg-brand-ocean-600 hover:bg-brand-ocean-700 text-white disabled:opacity-50"
                                 >
                                     {resetPasswordLoading ? (
                                         <>
@@ -4303,7 +4305,7 @@ const SantiagoTechRDApp = () => {
                             className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
                         >
                             {/* Header */}
-                            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-6 rounded-t-2xl relative">
+                            <div className="bg-gradient-to-r from-brand-ink to-brand-ocean-700 p-6 rounded-t-2xl relative">
                                 <button
                                     type="button"
                                     autoFocus
@@ -4353,8 +4355,8 @@ const SantiagoTechRDApp = () => {
                                                 currentUser.photoModerationStatus === 'PENDING'
                                                     ? 'bg-amber-100 text-amber-950'
                                                     : currentUser.photoModerationStatus === 'REJECTED'
-                                                        ? 'bg-rose-100 text-rose-950'
-                                                        : 'bg-emerald-100 text-emerald-950'
+                                                        ? 'bg-brand-danger-100 text-brand-danger-800'
+                                                        : 'bg-brand-teal-100 text-brand-teal-800'
                                             )}>
                                                 {currentUser.photoModerationStatus === 'PENDING'
                                                     ? <><Clock className="h-3.5 w-3.5" /> Nueva foto en revisión</>
@@ -4373,7 +4375,7 @@ const SantiagoTechRDApp = () => {
                                         "mt-2 px-3 py-1 rounded-full text-xs font-semibold",
                                         currentUser.role === 'admin' ? "bg-purple-200 text-purple-800" :
                                             currentUser.role === 'technician' ? "bg-amber-200 text-amber-800" :
-                                                "bg-blue-200 text-blue-800"
+                                                "bg-brand-ocean-100 text-brand-ocean-800"
                                     )}>
                                         {currentUser.role === 'admin' ? 'Administrador' :
                                             currentUser.role === 'technician' ? 'Técnico' : 'Cliente'}
@@ -4383,7 +4385,7 @@ const SantiagoTechRDApp = () => {
                                             'mt-2 rounded-full px-3 py-1 text-xs font-semibold',
                                             currentUser.technicianModerationStatus === 'PENDING'
                                                 ? 'bg-amber-100 text-amber-900'
-                                                : 'bg-rose-100 text-rose-900'
+                                                : 'bg-brand-danger-100 text-brand-danger-800'
                                         )}>
                                             {currentUser.technicianModerationStatus === 'PENDING' ? 'Perfil profesional en revisión' :
                                                 currentUser.technicianModerationStatus === 'SUSPENDED' ? 'Perfil profesional suspendido' : 'Perfil profesional rechazado'}
@@ -4401,7 +4403,7 @@ const SantiagoTechRDApp = () => {
                                         className={cn(
                                             "flex-1 py-2 px-3 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-1.5",
                                             profileTab === 'info'
-                                                ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                                                ? "bg-brand-ocean-100 text-brand-ocean-700 dark:bg-brand-ocean-800/30 dark:text-brand-ocean-100"
                                                 : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200"
                                         )}
                                     >
@@ -4427,7 +4429,7 @@ const SantiagoTechRDApp = () => {
                                         className={cn(
                                             "flex-1 py-2 px-3 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-1.5",
                                             profileTab === 'history'
-                                                ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                                                ? "bg-brand-ocean-100 text-brand-ocean-700 dark:bg-brand-ocean-800/30 dark:text-brand-ocean-100"
                                                 : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200"
                                         )}
                                     >
@@ -4511,7 +4513,7 @@ const SantiagoTechRDApp = () => {
                                                             })}
                                                         </div>
                                                         {editingSpecializations.length === 0 && (
-                                                            <p className="text-xs text-red-500 mt-1">Debes seleccionar al menos un servicio</p>
+                                                            <p className="text-xs text-brand-danger-600 mt-1">Debes seleccionar al menos un servicio</p>
                                                         )}
                                                     </div>
                                                     <div>
@@ -4523,7 +4525,7 @@ const SantiagoTechRDApp = () => {
                                                             name="location"
                                                             defaultValue={currentUser.location || ''}
                                                             required
-                                                            className="h-11 w-full rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                                                            className="h-11 w-full rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-800 focus:border-brand-ocean-500 focus:outline-none focus:ring-2 focus:ring-brand-ocean-500/30 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
                                                         >
                                                             <option value="" disabled>Selecciona una zona</option>
                                                             {locations.map((location) => (
@@ -4539,7 +4541,7 @@ const SantiagoTechRDApp = () => {
                                                             type="checkbox"
                                                             checked={editingMapVisible}
                                                             onChange={(event) => setEditingMapVisible(event.target.checked)}
-                                                            className="mt-0.5 h-4 w-4 rounded text-blue-600 focus:ring-blue-500"
+                                                            className="mt-0.5 h-4 w-4 rounded text-brand-ocean-600 focus:ring-brand-ocean-500"
                                                         />
                                                         <span>
                                                             <span className="block text-sm font-medium text-gray-800 dark:text-white">
@@ -4563,7 +4565,7 @@ const SantiagoTechRDApp = () => {
                                                     </Button>
                                                     <Button
                                                         type="submit"
-                                                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                                                        className="flex-1 bg-brand-ocean-600 hover:bg-brand-ocean-700 text-white"
                                                         disabled={
                                                             savingProfile ||
                                                             (currentUser.role === 'technician' && editingSpecializations.length === 0)
@@ -4646,7 +4648,7 @@ const SantiagoTechRDApp = () => {
                                                     <div className={cn(
                                                         'rounded-lg border p-3 text-sm',
                                                         currentUser.technicianModerationStatus === 'APPROVED'
-                                                            ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                                                            ? 'border-brand-teal-100 bg-brand-teal-50 text-brand-teal-800'
                                                             : 'border-amber-200 bg-amber-50 text-amber-950'
                                                     )}>
                                                         <p className="font-bold">Estado profesional: {currentUser.technicianModerationStatus === 'APPROVED' ? 'Aprobado' :
@@ -4664,7 +4666,7 @@ const SantiagoTechRDApp = () => {
                                                         }
                                                         setIsEditingProfile(true);
                                                     }}
-                                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white mt-4"
+                                                    className="w-full bg-brand-ocean-600 hover:bg-brand-ocean-700 text-white mt-4"
                                                 >
                                                     <Edit className="w-4 h-4 mr-2" />
                                                     Editar Perfil
@@ -4686,7 +4688,7 @@ const SantiagoTechRDApp = () => {
                                                         setShowProfileModal(false);
                                                         setShowRegisterForm(true);
                                                     }}
-                                                    className="w-full bg-green-600 hover:bg-green-700 text-white"
+                                                    className="w-full bg-brand-teal-700 hover:bg-brand-teal-700 text-white"
                                                 >
                                                     <Wrench className="w-4 h-4 mr-2" />
                                                     Convertirme en Técnico
@@ -4737,7 +4739,7 @@ const SantiagoTechRDApp = () => {
                                                                 className={cn(
                                                                     "p-3 rounded-lg border transition-colors",
                                                                     daySlot.isAvailable
-                                                                        ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+                                                                        ? "bg-brand-teal-50 dark:bg-brand-teal-800/20 border-brand-teal-100 dark:border-brand-teal-800"
                                                                         : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700"
                                                                 )}
                                                             >
@@ -4748,7 +4750,7 @@ const SantiagoTechRDApp = () => {
                                                                                 type="checkbox"
                                                                                 checked={daySlot.isAvailable}
                                                                                 onChange={(e) => updateDayAvailability(dayNum, 'isAvailable', e.target.checked)}
-                                                                                className="w-5 h-5 text-green-600 rounded focus:ring-green-500"
+                                                                                className="w-5 h-5 text-brand-teal-700 rounded focus:ring-brand-teal-700"
                                                                             />
                                                                             <span className={cn(
                                                                                 "ml-3 font-medium",
@@ -4827,11 +4829,11 @@ const SantiagoTechRDApp = () => {
                                                             </p>
                                                             <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                                                                 {change.oldValue && (
-                                                                    <p className="text-red-500 line-through">
+                                                                    <p className="text-brand-danger-600 line-through">
                                                                         {change.oldValue}
                                                                     </p>
                                                                 )}
-                                                                <p className="text-green-600">
+                                                                <p className="text-brand-teal-700">
                                                                     {change.newValue || 'Valor eliminado'}
                                                                 </p>
                                                             </div>
@@ -4882,17 +4884,20 @@ const SantiagoTechRDApp = () => {
                             initial={{ scale: 0.9, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.9, opacity: 0 }}
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="admin-report-detail-title"
                             className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[80vh] overflow-hidden"
                             onClick={(e) => e.stopPropagation()}
                         >
                             {/* Header */}
                             <div className={cn(
                                 "p-4 flex items-center justify-between",
-                                reportDetailModal.type === 'users' && "bg-gradient-to-r from-blue-500 to-blue-600",
-                                reportDetailModal.type === 'technicians' && "bg-gradient-to-r from-amber-500 to-orange-500",
-                                reportDetailModal.type === 'bookings' && "bg-gradient-to-r from-emerald-500 to-teal-500"
+                                reportDetailModal.type === 'users' && "bg-gradient-to-r from-brand-ink to-brand-ocean-700",
+                                reportDetailModal.type === 'technicians' && "bg-gradient-to-r from-brand-clay-600 to-brand-clay-700",
+                                reportDetailModal.type === 'bookings' && "bg-gradient-to-r from-brand-teal-700 to-brand-teal-800"
                             )}>
-                                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                <h2 id="admin-report-detail-title" className="text-xl font-bold text-white flex items-center gap-2">
                                     {reportDetailModal.type === 'users' && <Users className="w-6 h-6" />}
                                     {reportDetailModal.type === 'technicians' && <Wrench className="w-6 h-6" />}
                                     {reportDetailModal.type === 'bookings' && <Calendar className="w-6 h-6" />}
@@ -4900,7 +4905,7 @@ const SantiagoTechRDApp = () => {
                                 </h2>
                                 <button
                                     onClick={() => setReportDetailModal({ type: null, title: '' })}
-                                    className="text-white/80 hover:text-white p-1 rounded-full hover:bg-white/20 transition-colors"
+                                    className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                                 >
                                     <X className="w-6 h-6" />
                                 </button>
@@ -4930,7 +4935,7 @@ const SantiagoTechRDApp = () => {
                                                         <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                                                             <td className="px-4 py-3">
                                                                 <div className="flex items-center gap-3">
-                                                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold overflow-hidden">
+                                                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-ocean-500 to-brand-ocean-700 flex items-center justify-center text-white font-bold overflow-hidden">
                                                                         {user.photoUrl ? (
                                                                             <img src={user.photoUrl} alt={user.name} className="w-full h-full object-cover" />
                                                                         ) : (
@@ -4945,18 +4950,18 @@ const SantiagoTechRDApp = () => {
                                                             <td className="px-4 py-3">
                                                                 <span className={cn(
                                                                     "px-2 py-1 rounded-full text-xs font-medium",
-                                                                    user.role === 'admin' && "bg-purple-100 text-purple-700",
-                                                                    user.role === 'technician' && "bg-amber-100 text-amber-700",
-                                                                    user.role === 'user' && "bg-blue-100 text-blue-700"
+                                                                    user.role === 'admin' && "bg-brand-ink/10 text-brand-ink",
+                                                                    user.role === 'technician' && "bg-brand-clay-100 text-brand-clay-700",
+                                                                    user.role === 'user' && "bg-brand-ocean-100 text-brand-ocean-700"
                                                                 )}>
                                                                     {user.role === 'admin' ? 'Admin' : user.role === 'technician' ? 'Técnico' : 'Usuario'}
                                                                 </span>
                                                             </td>
                                                             <td className="px-4 py-3">
                                                                 {user.emailVerified ? (
-                                                                    <CheckCircle className="w-5 h-5 text-green-500" />
+                                                                    <CheckCircle className="w-5 h-5 text-brand-teal-700" />
                                                                 ) : (
-                                                                    <X className="w-5 h-5 text-red-400" />
+                                                                    <X className="w-5 h-5 text-brand-danger-600" />
                                                                 )}
                                                             </td>
                                                         </tr>
@@ -4977,7 +4982,7 @@ const SantiagoTechRDApp = () => {
                                             {technicians.map((tech) => (
                                                 <div key={tech.id} className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4">
                                                     <div className="flex items-start gap-4">
-                                                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center text-white font-bold text-xl overflow-hidden flex-shrink-0">
+                                                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-brand-clay-600 to-brand-clay-700 flex items-center justify-center text-white font-bold text-xl overflow-hidden flex-shrink-0">
                                                             {tech.photoUrl ? (
                                                                 <img src={tech.photoUrl} alt={tech.name} className="w-full h-full object-cover" />
                                                             ) : (
@@ -4988,7 +4993,7 @@ const SantiagoTechRDApp = () => {
                                                             <div className="flex items-center gap-2">
                                                                 <h4 className="font-bold text-gray-800 dark:text-white truncate">{tech.name}</h4>
                                                                 {tech.verified && (
-                                                                    <CheckCircle className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                                                                    <CheckCircle className="w-4 h-4 text-brand-teal-700 flex-shrink-0" />
                                                                 )}
                                                             </div>
                                                             {tech.companyName && (
@@ -5005,7 +5010,7 @@ const SantiagoTechRDApp = () => {
                                                             </div>
                                                             <div className="flex flex-wrap gap-1 mt-2">
                                                                 {(tech.specializations || [tech.specialization]).map((spec, idx) => (
-                                                                    <span key={idx} className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">
+                                                                    <span key={idx} className="px-2 py-0.5 bg-brand-clay-100 text-brand-clay-700 text-xs rounded-full">
                                                                         {spec}
                                                                     </span>
                                                                 ))}
@@ -5068,10 +5073,10 @@ const SantiagoTechRDApp = () => {
                                                                 <span className={cn(
                                                                     "px-2 py-1 rounded-full text-xs font-medium",
                                                                     booking.status === 'PENDING' && "bg-yellow-100 text-yellow-700",
-                                                                    booking.status === 'CONFIRMED' && "bg-blue-100 text-blue-700",
-                                                                    booking.status === 'IN_PROGRESS' && "bg-purple-100 text-purple-700",
-                                                                    booking.status === 'COMPLETED' && "bg-green-100 text-green-700",
-                                                                    booking.status === 'CANCELLED' && "bg-red-100 text-red-700"
+                                                                    booking.status === 'CONFIRMED' && "bg-brand-ocean-100 text-brand-ocean-700",
+                                                                    booking.status === 'IN_PROGRESS' && "bg-brand-ink/10 text-brand-ink",
+                                                                    booking.status === 'COMPLETED' && "bg-brand-teal-100 text-brand-teal-700",
+                                                                    booking.status === 'CANCELLED' && "bg-brand-danger-100 text-brand-danger-700"
                                                                 )}>
                                                                     {booking.status === 'PENDING' && 'Pendiente'}
                                                                     {booking.status === 'CONFIRMED' && 'Confirmada'}

@@ -44,27 +44,27 @@ interface BookingCardProps {
 const statusConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   PENDING: {
     label: 'Pendiente',
-    color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+    color: 'bg-brand-clay-100 text-brand-clay-700 dark:bg-yellow-900/30 dark:text-yellow-400',
     icon: <AlertCircle className="w-4 h-4" />,
   },
   CONFIRMED: {
     label: 'Confirmada',
-    color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+    color: 'bg-brand-ocean-100 text-brand-ocean-800 dark:bg-brand-ocean-800/30 dark:text-brand-ocean-100',
     icon: <CheckCircle className="w-4 h-4" />,
   },
   IN_PROGRESS: {
     label: 'En Progreso',
-    color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+    color: 'bg-brand-ink text-white dark:bg-purple-900/30 dark:text-purple-400',
     icon: <PlayCircle className="w-4 h-4" />,
   },
   COMPLETED: {
     label: 'Completada',
-    color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+    color: 'bg-brand-teal-100 text-brand-teal-700 dark:bg-brand-teal-800/30 dark:text-brand-teal-100',
     icon: <CheckCircle className="w-4 h-4" />,
   },
   CANCELLED: {
     label: 'Cancelada',
-    color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+    color: 'bg-brand-danger-100 text-brand-danger-700 dark:bg-brand-danger-800/30 dark:text-brand-danger-200',
     icon: <XCircle className="w-4 h-4" />,
   },
   NO_SHOW: {
@@ -111,12 +111,12 @@ const BookingCard: React.FC<BookingCardProps> = ({
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden border border-gray-200 dark:border-gray-700"
+      className="overflow-hidden rounded-xl border border-brand-border bg-brand-cream shadow-md dark:border-gray-700 dark:bg-gray-800"
     >
       {/* Header */}
       <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900 flex justify-between items-center">
         <div className="flex items-center gap-2">
-          <Wrench className="w-5 h-5 text-blue-500" />
+          <Wrench className="w-5 h-5 text-brand-clay-500" />
           <span className="font-semibold text-gray-900 dark:text-white">{booking.serviceType}</span>
         </div>
         <span className={`px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1.5 ${status.color}`}>
@@ -158,8 +158,8 @@ const BookingCard: React.FC<BookingCardProps> = ({
                     className="w-12 h-12 rounded-full object-cover border-2 border-white dark:border-gray-700 shadow-sm"
                   />
                 ) : (
-                  <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                    <User className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-ocean-100 dark:bg-brand-ocean-800/30">
+                    <User className="w-6 h-6 text-brand-ocean-700 dark:text-brand-ocean-100" />
                   </div>
                 )}
               </div>
@@ -176,7 +176,7 @@ const BookingCard: React.FC<BookingCardProps> = ({
                     <Mail className="w-3.5 h-3.5 text-gray-400" />
                     <a
                       href={`mailto:${contactPerson.email}`}
-                      className="text-sm text-blue-600 dark:text-blue-400 hover:underline truncate"
+                      className="truncate text-sm text-brand-ocean-700 hover:underline dark:text-brand-ocean-100"
                     >
                       {contactPerson.email}
                     </a>
@@ -187,7 +187,7 @@ const BookingCard: React.FC<BookingCardProps> = ({
                     <Phone className="w-3.5 h-3.5 text-gray-400" />
                     <a
                       href={`tel:${contactPerson.phone}`}
-                      className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                      className="text-sm text-brand-ocean-700 hover:underline dark:text-brand-ocean-100"
                     >
                       {contactPerson.phone}
                     </a>
@@ -214,12 +214,12 @@ const BookingCard: React.FC<BookingCardProps> = ({
         {(onReport || onReportPhoto || onBlock) && (
           <div className="flex flex-wrap gap-1 border-t border-gray-200 pt-3 dark:border-gray-700" aria-label="Opciones de seguridad de la reserva">
             {onReport && (
-              <button type="button" onClick={onReport} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-gray-500 hover:bg-rose-50 hover:text-rose-800">
+              <button type="button" onClick={onReport} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-gray-500 hover:bg-brand-danger-50 hover:text-brand-danger-700">
                 <Flag className="h-3.5 w-3.5" /> Reportar conducta
               </button>
             )}
             {contactPerson?.photoUrl && onReportPhoto && (
-              <button type="button" onClick={onReportPhoto} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-gray-500 hover:bg-rose-50 hover:text-rose-800">
+              <button type="button" onClick={onReportPhoto} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-gray-500 hover:bg-brand-danger-50 hover:text-brand-danger-700">
                 <Flag className="h-3.5 w-3.5" /> Reportar foto
               </button>
             )}
@@ -239,7 +239,7 @@ const BookingCard: React.FC<BookingCardProps> = ({
             <button
               type="button"
               onClick={onConfirm}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+              className="rounded-lg bg-brand-ocean-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-ocean-600"
             >
               Confirmar
             </button>
@@ -249,7 +249,7 @@ const BookingCard: React.FC<BookingCardProps> = ({
             <button
               type="button"
               onClick={onStart}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+              className="rounded-lg bg-brand-ink px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-ocean-800"
             >
               Iniciar trabajo
             </button>
@@ -259,7 +259,7 @@ const BookingCard: React.FC<BookingCardProps> = ({
             <button
               type="button"
               onClick={onComplete}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+              className="rounded-lg bg-brand-teal-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-teal-800"
             >
               Completar
             </button>
@@ -269,7 +269,7 @@ const BookingCard: React.FC<BookingCardProps> = ({
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2 border border-red-300 text-red-600 dark:border-red-800 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm font-medium"
+              className="rounded-lg border border-brand-danger-200 px-4 py-2 text-sm font-medium text-brand-danger-700 transition-colors hover:bg-brand-danger-50 dark:border-brand-danger-800 dark:text-brand-danger-200 dark:hover:bg-brand-danger-800/20"
             >
               Cancelar
             </button>

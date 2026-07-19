@@ -296,7 +296,7 @@ const TechnicianCard: React.FC<TechnicianCardProps> = ({
           <button
             type="button"
             onClick={() => requireLogin(() => onReport(technician, 'PROFILE'))}
-            className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-brand-muted hover:bg-rose-50 hover:text-rose-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-brand-muted hover:bg-brand-danger-50 hover:text-brand-danger-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-danger-600"
           >
             <Flag className="h-3.5 w-3.5" aria-hidden="true" /> Reportar perfil
           </button>
@@ -304,7 +304,7 @@ const TechnicianCard: React.FC<TechnicianCardProps> = ({
             <button
               type="button"
               onClick={() => requireLogin(() => onReport(technician, 'PHOTO'))}
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-brand-muted hover:bg-rose-50 hover:text-rose-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-brand-muted hover:bg-brand-danger-50 hover:text-brand-danger-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-danger-600"
             >
               <Flag className="h-3.5 w-3.5" aria-hidden="true" /> Reportar foto
             </button>
@@ -422,7 +422,7 @@ const HomeView: React.FC<HomeViewProps> = ({
   return (
     <main className="bg-brand-sand text-brand-charcoal">
       <section className="relative overflow-visible bg-brand-ink text-white" aria-labelledby="home-title">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(42,111,151,0.42),transparent_54%)]" aria-hidden="true" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(47,111,237,0.34),transparent_54%)]" aria-hidden="true" />
         <div className="relative mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 sm:py-14 lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)] lg:grid-rows-[auto_auto] lg:gap-x-12 lg:gap-y-8 lg:px-8 lg:py-20">
           <div className="max-w-2xl lg:col-start-1 lg:row-start-1 lg:self-end">
             <span className="inline-flex items-center gap-2 rounded-full border border-brand-ocean-500/50 bg-brand-ocean-500/15 px-3 py-1.5 text-xs font-semibold text-brand-ocean-100 max-[359px]:hidden sm:text-sm">
@@ -471,7 +471,7 @@ const HomeView: React.FC<HomeViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowMobileFilters((visible) => !visible)}
-                className="flex min-h-11 w-full items-center justify-between rounded-xl border border-brand-border bg-white px-3 text-sm font-semibold text-brand-charcoal sm:hidden"
+                className="flex min-h-11 w-full items-center justify-between rounded-xl border border-brand-control bg-white px-3 text-sm font-semibold text-brand-charcoal sm:hidden"
                 aria-expanded={showMobileFilters}
                 aria-controls="mobile-home-filters"
               >
@@ -496,7 +496,7 @@ const HomeView: React.FC<HomeViewProps> = ({
                       setSelectedSpecialization(value === 'all' ? '' : value)
                     }
                   >
-                    <SelectTrigger aria-label="Servicio" className="h-12 border-brand-border bg-white text-left text-base focus:ring-brand-ocean-500">
+                    <SelectTrigger aria-label="Servicio" className="h-12 border-brand-control bg-white text-left text-base focus:ring-brand-ocean-500">
                       <SelectValue placeholder="Todos" />
                     </SelectTrigger>
                     <SelectContent>
@@ -518,7 +518,7 @@ const HomeView: React.FC<HomeViewProps> = ({
                       setSelectedLocation(value === 'all' ? '' : value)
                     }
                   >
-                    <SelectTrigger aria-label="Ubicación" className="h-12 border-brand-border bg-white text-left text-base focus:ring-brand-ocean-500">
+                    <SelectTrigger aria-label="Ubicación" className="h-12 border-brand-control bg-white text-left text-base focus:ring-brand-ocean-500">
                       <SelectValue placeholder="Todas" />
                     </SelectTrigger>
                     <SelectContent>
@@ -536,7 +536,7 @@ const HomeView: React.FC<HomeViewProps> = ({
               <div className="flex flex-col gap-3 pt-1 sm:flex-row sm:items-center">
                 <button
                   type="submit"
-                  className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-brand-clay-600 px-5 py-3 font-bold text-white shadow-sm transition-colors hover:bg-brand-clay-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500 focus-visible:ring-offset-2"
+                  className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-brand-ocean-500 px-5 py-3 font-bold text-white shadow-sm transition-colors hover:bg-brand-ocean-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500 focus-visible:ring-offset-2"
                 >
                   Ver {filteredTechnicians.length} {filteredTechnicians.length === 1 ? 'técnico' : 'técnicos'}
                   <ArrowRight className="h-5 w-5" aria-hidden="true" />
@@ -599,11 +599,11 @@ const HomeView: React.FC<HomeViewProps> = ({
                     aria-pressed={isSelected}
                     className={`flex min-h-12 min-w-[9rem] snap-start items-center gap-2 rounded-full border px-3 py-2 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500 focus-visible:ring-offset-2 sm:min-h-24 sm:min-w-0 sm:flex-col sm:items-start sm:justify-between sm:rounded-2xl sm:p-4 ${
                       isSelected
-                        ? 'border-brand-clay-600 bg-brand-clay-50 text-brand-clay-700 shadow-sm'
-                        : 'border-brand-border bg-brand-sand text-brand-charcoal hover:-translate-y-0.5 hover:border-brand-clay-500 hover:bg-white hover:shadow-sm motion-reduce:hover:translate-y-0'
+                        ? 'border-brand-ocean-500 bg-brand-ocean-50 text-brand-ocean-700 shadow-sm'
+                        : 'border-brand-border bg-brand-sand text-brand-charcoal hover:-translate-y-0.5 hover:border-brand-ocean-500 hover:bg-white hover:shadow-sm motion-reduce:hover:translate-y-0'
                     }`}
                   >
-                    <span className={`rounded-xl p-1.5 sm:p-2 ${isSelected ? 'bg-brand-clay-600 text-white' : 'bg-brand-cream text-brand-ocean-600 shadow-sm'}`}>
+                    <span className={`rounded-xl p-1.5 sm:p-2 ${isSelected ? 'bg-brand-ocean-500 text-white' : 'bg-brand-cream text-brand-ocean-700 shadow-sm'}`}>
                       <ServiceIcon className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
                     </span>
                     <span className="text-sm font-bold leading-5 sm:mt-3">{service}</span>
@@ -706,8 +706,8 @@ const HomeView: React.FC<HomeViewProps> = ({
               </div>
             </div>
           ) : error ? (
-            <div className="mt-7 rounded-3xl border border-rose-200 bg-brand-cream px-6 py-12 text-center shadow-sm" role="alert">
-              <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-700">
+            <div className="mt-7 rounded-3xl border border-brand-danger-200 bg-brand-cream px-6 py-12 text-center shadow-sm" role="alert">
+              <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-danger-50 text-brand-danger-700">
                 <WifiOff className="h-7 w-7" aria-hidden="true" />
               </span>
               <h3 className="mt-5 text-xl font-extrabold text-brand-ink">No pudimos cargar el directorio</h3>
@@ -740,7 +740,7 @@ const HomeView: React.FC<HomeViewProps> = ({
                 <button
                   type="button"
                   onClick={onResetFilters}
-                  className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand-clay-600 px-5 py-2.5 font-bold text-white transition-colors hover:bg-brand-clay-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500 focus-visible:ring-offset-2"
+                  className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand-ocean-500 px-5 py-2.5 font-bold text-white transition-colors hover:bg-brand-ocean-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500 focus-visible:ring-offset-2"
                 >
                   <RotateCcw className="h-4 w-4" aria-hidden="true" />
                   Ver todos los técnicos
@@ -817,7 +817,7 @@ const HomeView: React.FC<HomeViewProps> = ({
               return (
                 <li key={step.title} className="relative rounded-2xl border border-brand-border bg-brand-sand p-6">
                   <div className="flex items-center justify-between">
-                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-clay-600 text-white">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-ocean-500 text-white">
                       <StepIcon className="h-5 w-5" aria-hidden="true" />
                     </span>
                     <span className="text-4xl font-black text-brand-border" aria-hidden="true">

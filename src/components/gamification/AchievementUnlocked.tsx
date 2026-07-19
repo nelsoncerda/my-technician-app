@@ -176,7 +176,7 @@ const AchievementUnlocked: React.FC<AchievementUnlockedProps> = ({ achievement, 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.7 }}
-              className="text-emerald-600 dark:text-emerald-400 text-sm mt-4 font-medium"
+              className="text-brand-teal-700 dark:text-brand-teal-100 text-sm mt-4 font-medium"
             >
               ¡Tá' duro el tíguere! 🔥
             </motion.p>
@@ -191,7 +191,7 @@ const AchievementUnlocked: React.FC<AchievementUnlockedProps> = ({ achievement, 
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={onClose}
-              className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-semibold hover:from-emerald-600 hover:to-teal-600 transition-all shadow-lg"
+              className="w-full py-3 bg-gradient-to-r from-brand-teal-700 to-brand-teal-700 text-white rounded-xl font-semibold hover:from-brand-teal-700 hover:to-brand-teal-700 transition-all shadow-lg"
             >
               ¡Dímelo! 🎉
             </motion.button>

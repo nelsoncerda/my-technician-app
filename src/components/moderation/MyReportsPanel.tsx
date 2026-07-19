@@ -64,7 +64,7 @@ const MyReportsPanel = () => {
     <section className="mt-6 border-t border-gray-200 pt-6 dark:border-gray-700" aria-labelledby="my-reports-title">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-800"><Flag className="h-5 w-5" /></span>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-clay-50 text-brand-clay-700"><Flag className="h-5 w-5" /></span>
           <div>
             <h3 id="my-reports-title" className="font-bold text-gray-900 dark:text-white">Mis reportes de seguridad</h3>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Consulta el estado sin exponer notas internas de moderación.</p>
@@ -76,7 +76,7 @@ const MyReportsPanel = () => {
       {loading ? (
         <p role="status" className="mt-4 flex items-center gap-2 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" /> Cargando reportes…</p>
       ) : error ? (
-        <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{error}</p>
+        <p role="alert" className="mt-4 rounded-xl bg-brand-danger-50 p-3 text-sm text-brand-danger-800">{error}</p>
       ) : reports.length === 0 ? (
         <p className="mt-4 rounded-xl bg-gray-50 p-3 text-sm text-gray-500 dark:bg-gray-700/50 dark:text-gray-300">No has enviado reportes.</p>
       ) : (
@@ -88,7 +88,7 @@ const MyReportsPanel = () => {
                   <p className="text-sm font-bold text-gray-900 dark:text-white">{contentLabels[report.contentType] || report.contentType}{report.targetUser?.name ? ` · ${report.targetUser.name}` : ''}</p>
                   <p className="mt-0.5 text-xs text-gray-500">{reasonLabels[report.reason] || report.reason}</p>
                 </div>
-                <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${report.status === 'RESOLVED' ? 'bg-emerald-100 text-emerald-800' : report.status === 'DISMISSED' ? 'bg-gray-100 text-gray-700' : 'bg-amber-100 text-amber-900'}`}>
+                <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${report.status === 'RESOLVED' ? 'bg-brand-teal-100 text-brand-teal-700' : report.status === 'DISMISSED' ? 'bg-gray-100 text-gray-700' : 'bg-brand-clay-100 text-brand-clay-700'}`}>
                   {statusLabels[report.status] || report.status}
                 </span>
               </div>

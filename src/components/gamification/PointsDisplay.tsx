@@ -48,11 +48,11 @@ const PointsDisplay: React.FC<PointsDisplayProps> = ({
 
   const getLevelColor = (level: number) => {
     const colors = [
-      'from-emerald-400 to-teal-500',      // Level 1 - Novato
-      'from-sky-400 to-blue-500',          // Level 2 - Aprendiz
+      'from-brand-teal-700 to-brand-teal-700',      // Level 1 - Novato
+      'from-sky-400 to-brand-ocean-500',          // Level 2 - Aprendiz
       'from-amber-400 to-orange-500',      // Level 3 - Profesional
       'from-purple-400 to-violet-500',     // Level 4 - Experto
-      'from-pink-400 to-rose-500',         // Level 5 - Maestro
+      'from-pink-400 to-brand-danger-600',         // Level 5 - Maestro
       'from-yellow-400 to-amber-500',      // Level 6 - Elite
     ];
     return colors[Math.min(level - 1, colors.length - 1)];
@@ -94,7 +94,7 @@ const PointsDisplay: React.FC<PointsDisplayProps> = ({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       onClick={onClick}
-      className={`bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border-2 border-transparent hover:border-emerald-300 ${onClick ? 'cursor-pointer hover:shadow-2xl transition-all' : ''}`}
+      className={`bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border-2 border-transparent hover:border-brand-teal-600 ${onClick ? 'cursor-pointer hover:shadow-2xl transition-all' : ''}`}
     >
       {/* Header with level badge - Dominican style */}
       <div className={`bg-gradient-to-r ${getLevelColor(currentLevel)} p-6 relative overflow-hidden`}>
@@ -134,7 +134,7 @@ const PointsDisplay: React.FC<PointsDisplayProps> = ({
         <div className="p-5 bg-gradient-to-b from-gray-50 to-white dark:from-gray-800 dark:to-gray-900">
           <div className="flex justify-between text-sm mb-3">
             <span className="text-gray-600 dark:text-gray-400 font-medium">🎯 Pa'l próximo nivel</span>
-            <span className="font-bold text-emerald-600 dark:text-emerald-400">
+            <span className="font-bold text-brand-teal-700 dark:text-brand-teal-100">
               {pointsToNextLevel.toLocaleString()} pts
             </span>
           </div>
@@ -150,7 +150,7 @@ const PointsDisplay: React.FC<PointsDisplayProps> = ({
             <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
               {getLevelEmoji(currentLevel)} {levelName}
             </span>
-            <span className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
+            <span className="text-xs text-brand-teal-700 dark:text-brand-teal-100 flex items-center gap-1 font-medium">
               <TrendingUp className="w-3 h-3" />
               {nextLevelName} 🔥
             </span>

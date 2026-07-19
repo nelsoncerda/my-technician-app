@@ -511,7 +511,7 @@ test('admin users table requires reasons for account and professional restoratio
   render(<App />);
   await screen.findByText('María Rodríguez');
   fireEvent.click(screen.getByLabelText('Panel administrativo'));
-  fireEvent.click(await screen.findByRole('button', { name: 'Usuarios' }));
+  fireEvent.click(await screen.findByRole('tab', { name: 'Usuarios' }));
 
   const userRow = (await screen.findByText('Usuario Regular')).closest('tr');
   const suspend = within(userRow).getByRole('button', { name: 'Suspender cuenta' });

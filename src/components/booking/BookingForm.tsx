@@ -188,13 +188,13 @@ const BookingForm: React.FC<BookingFormProps> = ({ technician, onSubmit, onClose
                   onClick={() => setFormData({ ...formData, serviceType: service.nameEs })}
                   className={`p-4 rounded-lg border-2 text-left transition-all ${
                     formData.serviceType === service.nameEs
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-blue-300'
+                      ? 'border-brand-clay-500 bg-brand-clay-50 dark:bg-brand-ocean-800/20'
+                      : 'border-brand-control dark:border-gray-700 hover:border-brand-clay-500'
                   }`}
                 >
                   <span className={`font-medium ${
                     formData.serviceType === service.nameEs
-                      ? 'text-blue-600 dark:text-blue-400'
+                      ? 'text-brand-clay-700 dark:text-brand-ocean-100'
                       : 'text-gray-900 dark:text-white'
                   }`}>
                     {service.nameEs}
@@ -211,8 +211,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ technician, onSubmit, onClose
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               Selecciona la fecha
             </h3>
-            <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-              <Calendar className="w-6 h-6 text-blue-500" />
+            <div className="flex items-center gap-3 rounded-lg border border-brand-control bg-brand-sand p-4 focus-within:border-brand-ocean-500 focus-within:ring-2 focus-within:ring-brand-ocean-500 focus-within:ring-offset-2 dark:bg-gray-800">
+              <Calendar className="w-6 h-6 text-brand-clay-500" />
               <input
                 type="date"
                 value={formData.scheduledDate}
@@ -238,10 +238,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ technician, onSubmit, onClose
             </h3>
             {loadingSlots ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                <Loader2 className="w-8 h-8 animate-spin text-brand-ocean-500" />
               </div>
             ) : slotsError ? (
-              <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              <div role="alert" className="rounded-xl border border-brand-danger-200 bg-brand-danger-50 p-4 text-sm text-brand-danger-700">
                 {slotsError}
               </div>
             ) : availableSlots.length === 0 ? (
@@ -256,16 +256,16 @@ const BookingForm: React.FC<BookingFormProps> = ({ technician, onSubmit, onClose
                     onClick={() => setFormData({ ...formData, scheduledTime: slot })}
                     className={`p-3 rounded-lg border-2 text-center transition-all ${
                       formData.scheduledTime === slot
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                        : 'border-gray-200 dark:border-gray-700 hover:border-blue-300'
+                        ? 'border-brand-clay-500 bg-brand-clay-50 dark:bg-brand-ocean-800/20'
+                        : 'border-brand-control dark:border-gray-700 hover:border-brand-clay-500'
                     }`}
                   >
                     <Clock className={`w-5 h-5 mx-auto mb-1 ${
-                      formData.scheduledTime === slot ? 'text-blue-500' : 'text-gray-400'
+                      formData.scheduledTime === slot ? 'text-brand-clay-500' : 'text-gray-400'
                     }`} />
                     <span className={`font-medium ${
                       formData.scheduledTime === slot
-                        ? 'text-blue-600 dark:text-blue-400'
+                        ? 'text-brand-clay-700 dark:text-brand-ocean-100'
                         : 'text-gray-900 dark:text-white'
                     }`}>
                       {formatTime(slot)}
@@ -288,7 +288,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ technician, onSubmit, onClose
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Dirección
                 </label>
-                <div className="flex items-center gap-2 p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
+                <div className="flex items-center gap-2 rounded-lg border border-brand-control p-3 focus-within:border-brand-ocean-500 focus-within:ring-2 focus-within:ring-brand-ocean-500 focus-within:ring-offset-2 dark:border-gray-700">
                   <MapPin className="w-5 h-5 text-gray-400" />
                   <input
                     type="text"
@@ -307,7 +307,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ technician, onSubmit, onClose
                 <select
                   value={formData.city}
                   onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                  className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-brand-control bg-white p-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-ocean-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                 >
                   <option value="">Selecciona una ciudad</option>
                   {CITIES.map((city) => (
@@ -320,7 +320,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ technician, onSubmit, onClose
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Teléfono de contacto
                 </label>
-                <div className="flex items-center gap-2 p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
+                <div className="flex items-center gap-2 rounded-lg border border-brand-control p-3 focus-within:border-brand-ocean-500 focus-within:ring-2 focus-within:ring-brand-ocean-500 focus-within:ring-offset-2 dark:border-gray-700">
                   <Phone className="w-5 h-5 text-gray-400" />
                   <input
                     type="tel"
@@ -336,7 +336,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ technician, onSubmit, onClose
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Descripción del problema (opcional)
                 </label>
-                <div className="flex items-start gap-2 p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
+                <div className="flex items-start gap-2 rounded-lg border border-brand-control p-3 focus-within:border-brand-ocean-500 focus-within:ring-2 focus-within:ring-brand-ocean-500 focus-within:ring-offset-2 dark:border-gray-700">
                   <FileText className="w-5 h-5 text-gray-400 mt-0.5" />
                   <textarea
                     placeholder="Describe el problema o servicio que necesitas..."
@@ -393,7 +393,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ technician, onSubmit, onClose
                 </div>
               )}
             </div>
-            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-sm text-blue-700 dark:text-blue-300">
+            <div className="rounded-lg bg-brand-ocean-50 p-3 text-sm text-brand-ocean-800 dark:bg-brand-ocean-800/20 dark:text-brand-ocean-100">
               Al confirmar, el técnico recibirá una notificación y podrá aceptar o rechazar la reserva.
             </div>
           </div>
@@ -435,7 +435,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ technician, onSubmit, onClose
         <div className="px-6 py-2">
           <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
             <motion.div
-              className="h-full bg-blue-500"
+              className="h-full bg-brand-clay-500"
               initial={{ width: 0 }}
               animate={{ width: `${(step / 5) * 100}%` }}
               transition={{ duration: 0.3 }}
@@ -479,7 +479,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ technician, onSubmit, onClose
               disabled={!isStepValid()}
               className={`flex items-center gap-2 px-6 py-2 rounded-lg transition-colors ${
                 isStepValid()
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  ? 'bg-brand-clay-600 text-white hover:bg-brand-clay-700'
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed'
               }`}
             >
@@ -490,7 +490,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ technician, onSubmit, onClose
             <button
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 rounded-lg bg-brand-teal-700 px-6 py-2 text-white transition-colors hover:bg-brand-teal-800 disabled:opacity-50"
             >
               {isSubmitting ? (
                 <Loader2 className="w-5 h-5 animate-spin" />

@@ -117,14 +117,14 @@ const AchievementCard: React.FC<AchievementCardProps> = ({
 
           {/* Unlocked date or progress */}
           {isUnlocked && unlockedAt ? (
-            <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2 font-medium">
+            <p className="text-xs text-brand-teal-700 dark:text-brand-teal-100 mt-2 font-medium">
               ✅ Desbloqueado el {formatDate(unlockedAt)}
             </p>
           ) : progress !== undefined && progress > 0 && progress < 100 ? (
             <div className="mt-2">
               <div className="flex justify-between text-xs mb-1">
                 <span className="text-gray-500 dark:text-gray-400">🎯 Progreso</span>
-                <span className="text-emerald-600 dark:text-emerald-400 font-medium">{progress}%</span>
+                <span className="text-brand-teal-700 dark:text-brand-teal-100 font-medium">{progress}%</span>
               </div>
               <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden shadow-inner">
                 <motion.div
