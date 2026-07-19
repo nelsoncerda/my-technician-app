@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Trust and safety enums.
 CREATE TYPE "TechnicianModerationStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED');
 CREATE TYPE "UserModerationStatus" AS ENUM ('ACTIVE', 'SUSPENDED');
@@ -172,3 +174,5 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER "ContentReport_identity_snapshots_immutable"
 BEFORE UPDATE ON "ContentReport"
 FOR EACH ROW EXECUTE FUNCTION "preserve_content_report_identity_snapshots"();
+
+COMMIT;

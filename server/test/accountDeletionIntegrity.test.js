@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const prismaPath = require.resolve('../dist/prisma');
 const userControllerPath = require.resolve('../dist/controllers/userController');
@@ -29,6 +31,15 @@ function mockPrisma(value) {
     exports: { __esModule: true, default: value },
   };
 }
+
+test('the trust-and-safety migration is atomic', () => {
+  const migration = fs.readFileSync(
+    path.resolve(__dirname, '../prisma/migrations/20260718180000_add_content_moderation/migration.sql'),
+    'utf8'
+  ).trim();
+  assert.match(migration, /^BEGIN;/);
+  assert.match(migration, /COMMIT;$/);
+});
 
 test('generic account deletion refuses another administrative account', async () => {
   let mutated = false;
