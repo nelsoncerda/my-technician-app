@@ -78,6 +78,15 @@ and the currently deployed React build, backs up PostgreSQL, applies migrations,
 switches `technician-current` atomically, restarts PM2, and verifies SMTP and all
 mobile publication pages. It deliberately does **not** install or reload Nginx.
 
+To release the matching React web application and API together, run the same
+workflow with `DEPLOY_WEB=1`. It builds and tests the web bundle inside the new
+immutable release and switches the frontend and API atomically while preserving
+the installed Nginx configuration:
+
+```bash
+DEPLOY_WEB=1 deploy/release-mobile-api.sh <revision>
+```
+
 ### Database-backup retention
 
 After creating and validating the current release's PostgreSQL dump, the release

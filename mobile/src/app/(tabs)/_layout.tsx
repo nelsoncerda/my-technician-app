@@ -1,9 +1,20 @@
-import { Tabs } from 'expo-router';
+import { router, Tabs } from 'expo-router';
 import { CalendarDays, Search, UserRound } from 'lucide-react-native';
+import { useEffect } from 'react';
 
 import { Colors } from '@/constants/theme';
+import { useAuth } from '@/providers/auth';
 
 export default function TabsLayout() {
+  const { user } = useAuth();
+  const limitedAccess = Boolean(
+    user?.limitedAccess || user?.accountModerationStatus === 'SUSPENDED'
+  );
+
+  useEffect(() => {
+    if (limitedAccess) router.replace('/(tabs)/account');
+  }, [limitedAccess]);
+
   return (
     <Tabs
       screenOptions={{
@@ -23,6 +34,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
+          href: limitedAccess ? null : undefined,
           title: 'Buscar',
           headerTitle: 'Técnicos en RD',
           tabBarIcon: ({ color, size }) => <Search color={color} size={size} />,
@@ -31,6 +43,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="bookings"
         options={{
+          href: limitedAccess ? null : undefined,
           title: 'Reservas',
           tabBarIcon: ({ color, size }) => <CalendarDays color={color} size={size} />,
         }}

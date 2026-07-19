@@ -13,7 +13,7 @@
       "es-MX": {
         "title": "Técnicos en RD",
         "subtitle": "Servicios locales de confianza",
-        "description": "Resuelve lo de tu hogar con profesionales de tu zona.\n\nTécnicos en RD te permite buscar electricistas, plomeros, técnicos de aire acondicionado, carpinteros, pintores, personal de limpieza y otros especialistas en Santiago y el Cibao.\n\nCon la aplicación puedes:\n\n- Buscar por servicio, nombre o empresa con sugerencias mientras escribes.\n- Comparar especialidades, zonas, perfiles verificados y calificaciones.\n- Consultar fechas y horarios disponibles antes de solicitar.\n- Completar la dirección manualmente o usar el GPS de forma opcional mientras utilizas la aplicación.\n- Revisar el estado y los detalles de cada reserva.\n- Contactar al profesional asignado y cancelar una solicitud pendiente o confirmada.\n- Administrar y eliminar permanentemente tu cuenta desde la aplicación.\n\nEl acceso a la ubicación es opcional. Técnicos en RD no rastrea tu ubicación en segundo plano.",
+        "description": "Resuelve lo de tu hogar con profesionales de tu zona.\n\nTécnicos en RD te permite buscar electricistas, plomeros, técnicos de aire acondicionado, carpinteros, pintores, personal de limpieza y otros especialistas en Santiago y el Cibao.\n\nCon la aplicación puedes:\n\n- Buscar por servicio, nombre o empresa con sugerencias mientras escribes.\n- Explorar zonas aproximadas de servicio en el mapa.\n- Comparar especialidades, perfiles verificados y calificaciones agregadas.\n- Consultar fechas y horarios disponibles antes de solicitar.\n- Completar la dirección manualmente o usar el GPS de forma opcional mientras utilizas la aplicación.\n- Revisar, contactar, cancelar y calificar servicios según su estado.\n- Crear una cuenta profesional, publicar servicios y configurar la disponibilidad semanal.\n- Confirmar, iniciar y completar trabajos recibidos como técnico.\n- Editar el perfil y elegir una foto opcional desde la biblioteca.\n- Reportar contenido o conducta y bloquear usuarios mediante acciones separadas.\n- Consultar reportes y administrar o deshacer bloqueos desde Cuenta.\n- Acumular puntos, desbloquear logros y canjear recompensas.\n- Administrar y eliminar permanentemente tu cuenta desde la aplicación.\n\nPerfiles profesionales y fotos nuevas pasan por revisión antes de publicarse. El acceso a la ubicación es opcional. Técnicos en RD no rastrea tu ubicación en segundo plano. Las calificaciones móviles usan estrellas y frases controladas; no hay comentarios libres ni chat.",
         "keywords": [
           "técnicos",
           "electricista",
@@ -71,7 +71,7 @@
       "healthOrWellnessTopics": false,
       "messagingAndChat": false,
       "parentalControls": false,
-      "userGeneratedContent": false
+      "userGeneratedContent": true
     }
   }
 }

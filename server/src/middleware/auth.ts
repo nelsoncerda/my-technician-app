@@ -5,6 +5,7 @@ import { AuthRole, normalizeAuthRole, verifyAuthToken } from '../security/token'
 export interface AuthContext {
   userId: string;
   role: AuthRole;
+  accountSuspended?: boolean;
 }
 
 declare global {
@@ -21,6 +22,17 @@ function unauthorized(res: Response) {
 
 function forbidden(res: Response) {
   return res.status(403).json({ message: 'No autorizado' });
+}
+
+function accountSuspended(res: Response, reason?: string | null) {
+  return res.status(403).json({
+    code: 'ACCOUNT_SUSPENDED',
+    message: 'Esta cuenta está suspendida. Contacta a soporte si deseas apelar.',
+    accountModerationStatus: 'SUSPENDED',
+    accountModerationReason: reason || null,
+    limitedAccess: true,
+    supportUrl: '/support',
+  });
 }
 
 export const requireAuth: RequestHandler = async (req, res, next) => {
@@ -41,13 +53,96 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
     // This immediately invalidates deleted users and stale role claims.
     const user = await prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, role: true },
+      select: { id: true, role: true, moderationStatus: true, moderationReason: true, deletedAt: true },
     });
-    if (!user) {
+    if (!user || user.deletedAt) {
       unauthorized(res);
       return;
     }
+    if (user.moderationStatus === 'SUSPENDED') {
+      accountSuspended(res, user.moderationReason);
+      return;
+    }
 
+    req.auth = { userId: user.id, role: normalizeAuthRole(user.role) };
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Limited authentication for rights that must remain available after an
+ * account suspension: own-report history and permanent self-service deletion.
+ * Never attach this middleware to general application or admin routes.
+ */
+export const requireAuthAllowSuspended: RequestHandler = async (req, res, next) => {
+  const authorization = req.headers.authorization;
+  if (!authorization?.startsWith('Bearer ')) {
+    unauthorized(res);
+    return;
+  }
+  const payload = verifyAuthToken(authorization.slice('Bearer '.length).trim());
+  if (!payload) {
+    unauthorized(res);
+    return;
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { id: true, role: true, moderationStatus: true, moderationReason: true, deletedAt: true },
+    });
+    if (!user || user.deletedAt) {
+      unauthorized(res);
+      return;
+    }
+    req.auth = {
+      userId: user.id,
+      role: normalizeAuthRole(user.role),
+      accountSuspended: user.moderationStatus === 'SUSPENDED',
+    };
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Adds authenticated context to otherwise-public routes. A missing token keeps
+ * the request anonymous; a supplied but invalid/stale token is rejected so a
+ * blocked user cannot bypass visibility rules by sending a bad credential.
+ */
+export const optionalAuth: RequestHandler = async (req, res, next) => {
+  const authorization = req.headers.authorization;
+  if (!authorization) {
+    next();
+    return;
+  }
+  if (!authorization.startsWith('Bearer ')) {
+    unauthorized(res);
+    return;
+  }
+
+  const payload = verifyAuthToken(authorization.slice('Bearer '.length).trim());
+  if (!payload) {
+    unauthorized(res);
+    return;
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { id: true, role: true, moderationStatus: true, moderationReason: true, deletedAt: true },
+    });
+    if (!user || user.deletedAt) {
+      unauthorized(res);
+      return;
+    }
+    if (user.moderationStatus === 'SUSPENDED') {
+      accountSuspended(res, user.moderationReason);
+      return;
+    }
     req.auth = { userId: user.id, role: normalizeAuthRole(user.role) };
     next();
   } catch (error) {
@@ -76,6 +171,24 @@ export function requireSelfOrAdmin(paramName = 'id'): RequestHandler {
       return;
     }
     if (req.auth.role !== 'admin' && req.params[paramName] !== req.auth.userId) {
+      forbidden(res);
+      return;
+    }
+    next();
+  };
+}
+
+/** Active administrators may delete other accounts; suspended administrators
+ * retain only the same self-deletion right as every other suspended user. */
+export function requireSelfOrActiveAdmin(paramName = 'id'): RequestHandler {
+  return (req, res, next) => {
+    if (!req.auth) {
+      unauthorized(res);
+      return;
+    }
+    const isSelf = req.params[paramName] === req.auth.userId;
+    const isActiveAdmin = req.auth.role === 'admin' && !req.auth.accountSuspended;
+    if (!isSelf && !isActiveAdmin) {
       forbidden(res);
       return;
     }

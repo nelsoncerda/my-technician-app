@@ -2,10 +2,12 @@ import React from 'react';
 import {
   ArrowRight,
   BadgeCheck,
+  Ban,
   CalendarDays,
   Car,
   CheckCircle2,
   Droplets,
+  Flag,
   Hammer,
   KeyRound,
   List,
@@ -44,6 +46,7 @@ export interface HomeTechnicianReview {
   author: string;
   comment: string;
   rating: number;
+  ratingCount?: number;
   date: string;
 }
 
@@ -56,6 +59,7 @@ export interface HomeTechnicianMapLocation {
 
 export interface HomeTechnician {
   id: string;
+  userId?: string;
   name: string;
   specialization: string;
   specializations?: string[];
@@ -91,6 +95,8 @@ export interface HomeViewProps {
   onLoginRequired: () => void;
   onBook: (technician: HomeTechnician) => void;
   onReview: (technicianId: string) => void;
+  onReport: (technician: HomeTechnician, contentType: 'PROFILE' | 'PHOTO') => void;
+  onBlock: (technician: HomeTechnician) => void;
   hasCompletedBooking: (technicianId: string) => boolean;
   onRetry: () => void;
   onResetFilters: () => void;
@@ -126,6 +132,8 @@ interface TechnicianCardProps {
   onLoginRequired: () => void;
   onBook: (technician: HomeTechnician) => void;
   onReview: (technicianId: string) => void;
+  onReport: (technician: HomeTechnician, contentType: 'PROFILE' | 'PHOTO') => void;
+  onBlock: (technician: HomeTechnician) => void;
   canReview: boolean;
   isMapActive: boolean;
   onShowOnMap: (technicianId: string) => void;
@@ -137,6 +145,8 @@ const TechnicianCard: React.FC<TechnicianCardProps> = ({
   onLoginRequired,
   onBook,
   onReview,
+  onReport,
+  onBlock,
   canReview,
   isMapActive,
   onShowOnMap,
@@ -151,6 +161,16 @@ const TechnicianCard: React.FC<TechnicianCardProps> = ({
       return;
     }
     onBook(technician);
+  };
+
+  const canModerate = Boolean(currentUser && technician.userId && currentUser.id !== technician.userId);
+
+  const requireLogin = (action: () => void) => {
+    if (!currentUser) {
+      onLoginRequired();
+      return;
+    }
+    action();
   };
 
   return (
@@ -271,6 +291,33 @@ const TechnicianCard: React.FC<TechnicianCardProps> = ({
           {currentUser ? 'Solicitar servicio' : 'Entrar para solicitar'}
         </button>
       </div>
+      {(canModerate || !currentUser) && (
+        <div className="mt-3 flex flex-wrap items-center gap-x-1 gap-y-1 border-t border-brand-border pt-3" aria-label={`Seguridad para ${technician.name}`}>
+          <button
+            type="button"
+            onClick={() => requireLogin(() => onReport(technician, 'PROFILE'))}
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-brand-muted hover:bg-rose-50 hover:text-rose-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
+          >
+            <Flag className="h-3.5 w-3.5" aria-hidden="true" /> Reportar perfil
+          </button>
+          {technician.photoUrl && (
+            <button
+              type="button"
+              onClick={() => requireLogin(() => onReport(technician, 'PHOTO'))}
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-brand-muted hover:bg-rose-50 hover:text-rose-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
+            >
+              <Flag className="h-3.5 w-3.5" aria-hidden="true" /> Reportar foto
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => requireLogin(() => onBlock(technician))}
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-brand-muted hover:bg-gray-100 hover:text-brand-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ocean-500"
+          >
+            <Ban className="h-3.5 w-3.5" aria-hidden="true" /> Bloquear usuario
+          </button>
+        </div>
+      )}
     </article>
   );
 };
@@ -313,6 +360,8 @@ const HomeView: React.FC<HomeViewProps> = ({
   onLoginRequired,
   onBook,
   onReview,
+  onReport,
+  onBlock,
   hasCompletedBooking,
   onRetry,
   onResetFilters,
@@ -712,6 +761,8 @@ const HomeView: React.FC<HomeViewProps> = ({
                     onLoginRequired={onLoginRequired}
                     onBook={onBook}
                     onReview={onReview}
+                    onReport={onReport}
+                    onBlock={onBlock}
                     canReview={hasCompletedBooking(technician.id)}
                     isMapActive={activeMapTechnicianId === technician.id}
                     onShowOnMap={showTechnicianOnMap}

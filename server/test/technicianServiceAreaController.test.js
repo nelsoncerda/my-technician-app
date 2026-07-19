@@ -30,6 +30,7 @@ test('service-area update stores only rounded coordinates', async () => {
       serviceAreaLatitude: options.data.serviceAreaLatitude,
       serviceAreaLongitude: options.data.serviceAreaLongitude,
       serviceAreaRadiusKm: options.data.serviceAreaRadiusKm,
+      moderationStatus: options.data.moderationStatus,
     };
   };
 
@@ -37,7 +38,20 @@ test('service-area update stores only rounded coordinates', async () => {
     id: prismaPath,
     filename: prismaPath,
     loaded: true,
-    exports: { __esModule: true, default: { technician: { update } } },
+    exports: {
+      __esModule: true,
+      default: {
+        $transaction: async (task) => task({
+          technician: {
+            findUnique: async () => ({ id: 'tech-1', userId: 'user-1', moderationStatus: 'APPROVED' }),
+            update,
+          },
+          ugcTermsConsent: {
+            findUnique: async () => ({ id: 'consent-1' }),
+          },
+        }),
+      },
+    },
   };
   delete require.cache[controllerPath];
 
@@ -53,13 +67,16 @@ test('service-area update stores only rounded coordinates', async () => {
   }, response);
 
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(updateOptions.data, {
-    location: 'Gurabo',
-    mapVisible: true,
-    serviceAreaLatitude: 19.49,
-    serviceAreaLongitude: -70.66,
-    serviceAreaRadiusKm: 4,
-  });
+  assert.equal(updateOptions.data.location, 'Gurabo');
+  assert.equal(updateOptions.data.mapVisible, true);
+  assert.equal(updateOptions.data.serviceAreaLatitude, 19.49);
+  assert.equal(updateOptions.data.serviceAreaLongitude, -70.66);
+  assert.equal(updateOptions.data.serviceAreaRadiusKm, 4);
+  assert.equal(updateOptions.data.moderationStatus, 'PENDING');
+  assert.equal(updateOptions.data.moderationReason, null);
+  assert.equal(updateOptions.data.moderatedAt, null);
+  assert.equal(updateOptions.data.moderatedById, null);
+  assert.ok(updateOptions.data.moderationSubmittedAt instanceof Date);
   assert.deepEqual(response.body.mapLocation, {
     latitude: 19.49,
     longitude: -70.66,

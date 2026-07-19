@@ -12,14 +12,18 @@ interface Booking {
   address: string;
   city: string;
   description?: string;
+  interactionBlocked?: boolean;
   customer?: {
+    id?: string;
     name: string;
     email?: string;
     phone?: string;
     photoUrl?: string;
   };
   technician?: {
+    id?: string;
     user: {
+      id?: string;
       name: string;
       email?: string;
       phone?: string;
@@ -36,6 +40,10 @@ interface BookingListProps {
   onStart?: (bookingId: string) => void;
   onComplete?: (bookingId: string) => void;
   onCancel?: (bookingId: string) => void;
+  onReport?: (booking: Booking) => void;
+  onReportPhoto?: (booking: Booking) => void;
+  onBlock?: (booking: Booking) => void;
+  blockedUserIds?: ReadonlySet<string>;
 }
 
 const statusFilters = [
@@ -55,6 +63,10 @@ const BookingList: React.FC<BookingListProps> = ({
   onStart,
   onComplete,
   onCancel,
+  onReport,
+  onReportPhoto,
+  onBlock,
+  blockedUserIds,
 }) => {
   const [statusFilter, setStatusFilter] = useState('ALL');
 
@@ -164,6 +176,16 @@ const BookingList: React.FC<BookingListProps> = ({
                       onStart={onStart ? () => onStart(booking.id) : undefined}
                       onComplete={onComplete ? () => onComplete(booking.id) : undefined}
                       onCancel={onCancel ? () => onCancel(booking.id) : undefined}
+                      onReport={onReport ? () => onReport(booking) : undefined}
+                      onReportPhoto={onReportPhoto ? () => onReportPhoto(booking) : undefined}
+                      onBlock={onBlock ? () => onBlock(booking) : undefined}
+                      interactionBlocked={Boolean(
+                        booking.interactionBlocked || blockedUserIds?.has(
+                          userRole === 'customer'
+                            ? booking.technician?.user?.id || ''
+                            : booking.customer?.id || ''
+                        )
+                      )}
                     />
                   ))}
                 </div>

@@ -9,7 +9,13 @@ import {
     getUserProfileHistory,
     uploadProfilePhoto
 } from '../controllers/userController';
-import { requireAdmin, requireAuth, requireSelfOrAdmin } from '../middleware/auth';
+import {
+    requireAdmin,
+    requireAuth,
+    requireAuthAllowSuspended,
+    requireSelfOrActiveAdmin,
+    requireSelfOrAdmin,
+} from '../middleware/auth';
 
 const router = Router();
 
@@ -20,6 +26,6 @@ router.put('/:id', requireAuth, requireSelfOrAdmin('id'), updateUser);
 router.put('/:id/profile', requireAuth, requireSelfOrAdmin('id'), updateUserProfile);
 router.put('/:id/role', requireAuth, requireAdmin, updateUserRole);
 router.post('/:id/photo', requireAuth, requireSelfOrAdmin('id'), uploadProfilePhoto);
-router.delete('/:id', requireAuth, requireSelfOrAdmin('id'), deleteUser);
+router.delete('/:id', requireAuthAllowSuspended, requireSelfOrActiveAdmin('id'), deleteUser);
 
 export default router;

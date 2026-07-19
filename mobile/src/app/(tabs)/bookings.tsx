@@ -18,20 +18,37 @@ import { useAuth } from '@/providers/auth';
 import type { Booking } from '@/types/api';
 
 type ListMode = 'upcoming' | 'history';
+type BookingAudience = 'received' | 'hired';
+
+function dedupeBookings(bookings: Booking[]): Booking[] {
+  const seen = new Set<string>();
+  return bookings.filter((booking) => {
+    if (seen.has(booking.id)) return false;
+    seen.add(booking.id);
+    return true;
+  });
+}
 
 export default function BookingsScreen() {
   const { user, token, isAuthenticated, isLoading: authLoading } = useAuth();
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [receivedBookings, setReceivedBookings] = useState<Booking[]>([]);
+  const [hiredBookings, setHiredBookings] = useState<Booking[]>([]);
+  const [audience, setAudience] = useState<BookingAudience>('received');
   const [mode, setMode] = useState<ListMode>('upcoming');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
-  const perspective = user?.role === 'technician' && user.technicianId ? 'technician' : 'customer';
+  const technicianId = user?.role === 'technician' ? user.technicianId : undefined;
+  const isTechnician = Boolean(technicianId);
+  const selectedAudience = isTechnician ? audience : 'hired';
+  const bookings = selectedAudience === 'received' ? receivedBookings : hiredBookings;
+  const perspective = selectedAudience === 'received' ? 'technician' : 'customer';
 
   const loadBookings = useCallback(async (asRefresh = false) => {
     if (!user || !token) {
-      setBookings([]);
+      setReceivedBookings([]);
+      setHiredBookings([]);
       setLoading(false);
       return;
     }
@@ -39,17 +56,28 @@ export default function BookingsScreen() {
     else setLoading(true);
     setError('');
     try {
-      const data = user.role === 'technician' && user.technicianId
-        ? await api.bookings.forTechnician(user.technicianId, token)
-        : await api.bookings.forCustomer(user.id, token);
-      setBookings(data);
+      if (technicianId) {
+        const [received, hired] = await Promise.all([
+          api.bookings.forTechnician(technicianId, token),
+          api.bookings.forCustomer(user.id, token),
+        ]);
+        const uniqueReceived = dedupeBookings(received);
+        const receivedIds = new Set(uniqueReceived.map((booking) => booking.id));
+        setReceivedBookings(uniqueReceived);
+        setHiredBookings(
+          dedupeBookings(hired).filter((booking) => !receivedIds.has(booking.id))
+        );
+      } else {
+        setReceivedBookings([]);
+        setHiredBookings(dedupeBookings(await api.bookings.forCustomer(user.id, token)));
+      }
     } catch (requestError: unknown) {
       setError(extractApiErrorMessage(requestError));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [token, user]);
+  }, [technicianId, token, user]);
 
   useFocusEffect(useCallback(() => {
     void loadBookings();
@@ -95,8 +123,27 @@ export default function BookingsScreen() {
       <View style={styles.intro}>
         <Text style={styles.eyebrow}>TU AGENDA</Text>
         <Text style={styles.title}>Servicios reservados</Text>
-        <Text style={styles.subtitle}>Consulta la fecha, dirección y estado de cada visita.</Text>
+        <Text style={styles.subtitle}>
+          {isTechnician
+            ? 'Gestiona las solicitudes que recibes y los servicios que contratas.'
+            : 'Consulta la fecha, dirección y estado de cada visita.'}
+        </Text>
       </View>
+
+      {isTechnician ? (
+        <View accessibilityLabel="Tipo de reserva" accessibilityRole="tablist" style={styles.audienceSegmented}>
+          <SegmentButton
+            active={audience === 'received'}
+            label={`Recibidos (${receivedBookings.length})`}
+            onPress={() => setAudience('received')}
+          />
+          <SegmentButton
+            active={audience === 'hired'}
+            label={`Contratados (${hiredBookings.length})`}
+            onPress={() => setAudience('hired')}
+          />
+        </View>
+      ) : null}
 
       <View accessibilityRole="tablist" style={styles.segmented}>
         <SegmentButton
@@ -130,12 +177,24 @@ export default function BookingsScreen() {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={(
             <EmptyState
-              actionLabel={mode === 'upcoming' ? 'Buscar un técnico' : undefined}
+              actionLabel={mode === 'upcoming' && selectedAudience === 'hired'
+                ? 'Buscar un técnico'
+                : undefined}
               message={mode === 'upcoming'
-                ? 'Cuando reserves un servicio aparecerá aquí.'
-                : 'Las reservas completadas o canceladas aparecerán aquí.'}
-              onAction={mode === 'upcoming' ? () => router.push('/(tabs)') : undefined}
-              title={mode === 'upcoming' ? 'No tienes reservas próximas' : 'Sin historial todavía'}
+                ? selectedAudience === 'received'
+                  ? 'Las solicitudes que los clientes hagan contigo aparecerán aquí.'
+                  : 'Cuando reserves un servicio aparecerá aquí.'
+                : selectedAudience === 'received'
+                  ? 'Los trabajos completados o cancelados aparecerán aquí.'
+                  : 'Las reservas completadas o canceladas aparecerán aquí.'}
+              onAction={mode === 'upcoming' && selectedAudience === 'hired'
+                ? () => router.push('/(tabs)')
+                : undefined}
+              title={mode === 'upcoming'
+                ? selectedAudience === 'received'
+                  ? 'No tienes solicitudes próximas'
+                  : 'No tienes reservas próximas'
+                : 'Sin historial todavía'}
             />
           )}
         />
@@ -180,6 +239,16 @@ const styles = StyleSheet.create({
   eyebrow: { ...Typography.label, color: Colors.clay, letterSpacing: 1.2 },
   title: { ...Typography.title, color: Colors.ink },
   subtitle: { ...Typography.body, color: Colors.muted },
+  audienceSegmented: {
+    backgroundColor: Colors.oceanLight,
+    borderColor: Colors.oceanSoft,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 4,
+    marginBottom: Spacing.sm,
+    padding: 4,
+  },
   segmented: {
     backgroundColor: Colors.cream,
     borderColor: Colors.border,

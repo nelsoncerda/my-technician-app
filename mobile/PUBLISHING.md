@@ -33,6 +33,14 @@ El dominio principal `tecnicosenrd.com` actualmente sirve otra aplicación. No l
 - EAS Metadata v0 todavía no representa esas dos preguntas sociales; después de futuras sincronizaciones de metadatos, verificarlas manualmente en App Information antes de enviar otra versión.
 - App Privacy publicada para el build anterior: nueve tipos de datos, usados para funcionalidad, vinculados a la identidad y sin rastreo. Antes de enviar la versión con mapa, añadir `Ubicación aproximada` para las zonas de servicio publicadas por técnicos.
 
+Los artefactos anteriores no contienen la paridad móvil añadida después: cuentas profesionales, agenda recibida/contratada, ciclo completo de reservas, disponibilidad, perfiles editables, fotos, recompensas y panel administrativo. Estas funciones requieren un build nuevo; `expo-image-picker` añade código nativo y no puede entregarse como una simple actualización de JavaScript.
+
+### Controles de contenido generado por usuarios
+
+La versión actual implementa los controles necesarios dentro del producto: aceptación explícita y versionada de las normas, filtros de texto público, revisión previa de perfiles profesionales y fotos, reporte confidencial con motivos controlados, bloqueo separado entre usuarios, seguimiento de reportes y cola administrativa con SLA, notas de resolución, retiro de contenido y suspensión. Las fotos candidatas no se publican hasta ser aprobadas; una entrega rechazada o reemplazada se limpia del almacenamiento temporal.
+
+Antes de solicitar revisión pública todavía debe completarse la preparación operativa: desplegar la migración y API de moderación, verificar que `ncerda@hotmail.com` esté monitoreado para soporte y apelaciones, asignar responsables de revisar la cola diariamente y probar los flujos completos en producción. Mantener `userGeneratedContent` en `true` y responder coherentemente en Apple y Google. Consulta la [directriz 1.2 de Apple](https://developer.apple.com/app-store/review/guidelines/#user-generated-content) y la [política de contenido generado por usuarios de Google Play](https://support.google.com/googleplay/android-developer/answer/9876937).
+
 Los builds se consultan en `https://expo.dev/accounts/nelsoncerda/projects/tecnicos-en-rd/builds`.
 
 ## 2. Cuentas necesarias
@@ -67,12 +75,26 @@ npx eas-cli@latest build --profile preview --platform ios
 
 Prueba como mínimo:
 
-- Registro, verificación de correo, inicio y cierre de sesión.
+- Registro como cliente y como profesional; conversión de una cuenta existente.
+- Verificación de correo, reenvío/actualización del estado, inicio y cierre de sesión.
 - Recuperación de contraseña.
 - Búsqueda y selección desde el autocompletado.
 - Permiso de GPS aceptado y rechazado.
 - Reserva completa con dirección manual y con GPS.
-- Consulta y cancelación de reserva.
+- Agenda de servicios contratados y solicitudes recibidas.
+- Confirmar, iniciar y completar una reserva como técnico; registrar precio opcional.
+- Consulta, contacto y cancelación desde ambos roles.
+- Calificación estructurada después de completar un servicio y prevención de duplicados.
+- Aceptación explícita y no preseleccionada de las normas al crear cuenta y para cuentas antiguas antes de publicar.
+- Perfil/foto pendientes hasta aprobación; rechazo y reemplazo sin publicar la candidata.
+- Reportar y Bloquear como acciones distintas desde perfiles y contactos de reservas, en ambos sentidos.
+- Consulta de Mis reportes, administración de bloqueos y desbloqueo.
+- Cola administrativa: antigüedad/SLA, notas requeridas, aprobar/rechazar fotos y perfiles, advertir, retirar, suspender, resolver y descartar.
+- Edición de perfil, foto permitida/denegada, historial y visibilidad del mapa.
+- Selección de foto en Android 12 o anterior sin solicitar acceso amplio a la biblioteca; cancelación del selector y reemplazo de una foto existente.
+- Configuración de disponibilidad semanal y validación de horas.
+- Puntos, logros, clasificación y canje de recompensas.
+- Acceso denegado/permitido al panel administrativo y cada mutación protegida.
 - Eliminación de cuenta.
 - Tamaños de texto grandes, VoiceOver/TalkBack y teléfonos pequeños.
 
@@ -91,10 +113,13 @@ Preparar para ambas tiendas:
 
 Declaración funcional de ubicación: el GPS del cliente es iniciado por el usuario, solo mientras usa la aplicación, y sirve para sugerir zona y completar dirección. Además, un técnico puede publicar una zona de servicio aproximada vinculada a su perfil para aparecer en el mapa. No hay rastreo, ubicación en segundo plano ni publicación de domicilios exactos.
 
+Declaración funcional de fotos: el selector se abre únicamente al pulsar “Elegir foto” o “Cambiar foto”, acepta una sola imagen de perfil y no solicita cámara ni micrófono. Actualiza App Privacy y Data safety antes de enviar el nuevo binario.
+
 ## 6. App Store Connect
 
 1. Crear la ficha con bundle ID `com.tecnicosenrd.app`.
 2. Completar App Privacy y la información de revisión.
+   Confirmar que `userGeneratedContent` permanece en `true`, que la API de moderación está desplegada y que la cola operativa está siendo monitoreada.
 3. Generar el build:
 
    ```bash
@@ -128,6 +153,7 @@ Estado actual: la cuenta de Play Console ya está verificada, la ficha está cre
    Guardarla como variable sensible `GOOGLE_MAPS_ANDROID_API_KEY` en el entorno
    de producción de EAS; no copiar la clave a `app.json` ni guardarla en Git.
 3. Completar Data safety, App access, clasificación de contenido y eliminación de cuenta.
+   Declarar la foto de perfil como contenido/foto opcional y confirmar contenido generado por usuarios mientras pueda publicarse en el directorio.
 4. Generar un Android App Bundle nuevo después de configurar la clave. El AAB
    con código `3` es anterior al mapa y no debe publicarse como esta versión:
 
@@ -145,4 +171,4 @@ Estado actual: la cuenta de Play Console ya está verificada, la ficha está cre
 
 ## 8. Lanzamiento gradual
 
-Comienza con TestFlight y prueba interna/cerrada de Play. Corrige fallos, confirma el correo transaccional y supervisa la API antes de ampliar el porcentaje de usuarios. Mantén el portal administrativo y las funciones de técnicos en la web durante esta primera versión móvil orientada a clientes.
+Comienza con TestFlight y prueba interna/cerrada de Play. Prueba por separado cuentas de cliente, técnico y administrador; corrige fallos, confirma el correo transaccional y supervisa la API antes de ampliar el porcentaje de usuarios. Mantén la web disponible como canal alternativo durante el lanzamiento de la versión móvil con paridad funcional.

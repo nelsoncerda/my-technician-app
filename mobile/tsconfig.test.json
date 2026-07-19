@@ -18,6 +18,9 @@
     "src/lib/rating.ts",
     "src/lib/map.ts",
     "src/lib/technician.ts",
+    "src/lib/availability.ts",
+    "src/lib/availability-api.ts",
+    "src/lib/account-suspension.ts",
     "src/types/api.ts",
     "test/**/*.ts"
   ],

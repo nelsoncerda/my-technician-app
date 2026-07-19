@@ -2,13 +2,16 @@ import type {
   Booking,
   BookingFilters,
   CreateBookingInput,
+  CreateTechnicianReviewInput,
   LoginResponse,
   MessageResponse,
   RegisterInput,
   Settings,
+  TechnicianReview,
   User,
 } from '@/types/api';
 import { normalizeTechnician, type TechnicianApiPayload } from '@/lib/technician';
+import { notifyAccountSuspended } from '@/lib/account-suspension';
 
 export const API_BASE_URL = (
   process.env.EXPO_PUBLIC_API_URL || 'https://api.tecnicosenrd.com'
@@ -111,6 +114,21 @@ export async function apiRequest<T>(
 
   const data = await readResponseBody(response);
   if (!response.ok) {
+    if (
+      token &&
+      response.status === 403 &&
+      isRecord(data) &&
+      data.code === 'ACCOUNT_SUSPENDED'
+    ) {
+      notifyAccountSuspended({
+        token,
+        accountModerationReason: typeof data.accountModerationReason === 'string'
+          ? data.accountModerationReason
+          : null,
+        suspensionMessage: typeof data.message === 'string' ? data.message : undefined,
+        supportUrl: typeof data.supportUrl === 'string' ? data.supportUrl : undefined,
+      });
+    }
     throw new ApiError(extractApiErrorMessage(data), response.status, data);
   }
 
@@ -151,12 +169,22 @@ export const api = {
     get: () => apiRequest<Settings>('/api/settings'),
   },
   technicians: {
-    list: async () => {
+    list: async (token?: string | null) => {
       const technicians = await apiRequest<TechnicianApiPayload[]>(
-        '/api/technicians?view=ratings'
+        '/api/technicians?view=ratings',
+        { token }
       );
       return technicians.map(normalizeTechnician);
     },
+    addReview: (
+      technicianId: string,
+      input: CreateTechnicianReviewInput,
+      token: string
+    ) =>
+      apiRequest<TechnicianReview>(
+        `/api/technicians/${encodeURIComponent(technicianId)}/reviews`,
+        { method: 'POST', token, json: input }
+      ),
   },
   bookings: {
     create: (input: CreateBookingInput, token: string) =>
@@ -182,6 +210,22 @@ export const api = {
         method: 'PUT',
         token,
         json: { reason },
+      }),
+    confirm: (bookingId: string, token: string) =>
+      apiRequest<Booking>(`/api/bookings/${encodeURIComponent(bookingId)}/confirm`, {
+        method: 'PUT',
+        token,
+      }),
+    start: (bookingId: string, token: string) =>
+      apiRequest<Booking>(`/api/bookings/${encodeURIComponent(bookingId)}/start`, {
+        method: 'PUT',
+        token,
+      }),
+    complete: (bookingId: string, totalPrice: number | undefined, token: string) =>
+      apiRequest<Booking>(`/api/bookings/${encodeURIComponent(bookingId)}/complete`, {
+        method: 'PUT',
+        token,
+        json: totalPrice === undefined ? {} : { totalPrice },
       }),
   },
   users: {

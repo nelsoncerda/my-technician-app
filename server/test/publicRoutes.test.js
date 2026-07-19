@@ -58,7 +58,7 @@ test('privacy policy discloses the 30-day residual database-backup window', asyn
   const body = await response.text();
 
   assert.equal(response.status, 200);
-  assert.match(body, /17 de julio de 2026/);
+  assert.match(body, /18 de julio de 2026/);
   assert.match(body, /respaldos[^<]+base de datos[^<]+se eliminan dentro de 30 días/);
 });
 

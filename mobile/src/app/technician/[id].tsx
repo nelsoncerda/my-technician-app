@@ -3,12 +3,15 @@ import {
   BadgeCheck,
   CalendarDays,
   CheckCircle2,
+  Flag,
   MapPin,
   ShieldCheck,
+  UserRoundX,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -28,15 +31,20 @@ import {
   TechnicianRating,
 } from '@/components/technician';
 import { api } from '@/lib/api';
+import { moderationApi } from '@/lib/moderation-api';
+import { useAuth } from '@/providers/auth';
 import type { Technician } from '@/types/api';
 
 export default function TechnicianDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const technicianId = Array.isArray(id) ? id[0] : id;
   const router = useRouter();
+  const { isAuthenticated, token, user } = useAuth();
   const [technician, setTechnician] = useState<Technician | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [safetyError, setSafetyError] = useState('');
+  const [blocking, setBlocking] = useState(false);
 
   const loadTechnician = useCallback(async () => {
     if (!technicianId) {
@@ -48,7 +56,7 @@ export default function TechnicianDetailScreen() {
     setLoading(true);
     setError(null);
     try {
-      const technicians = await api.technicians.list();
+      const technicians = await api.technicians.list(token);
       const match = technicians.find((item) => item.id === technicianId) ?? null;
       setTechnician(match);
     } catch (caught: unknown) {
@@ -60,7 +68,56 @@ export default function TechnicianDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [technicianId]);
+  }, [technicianId, token]);
+
+  const openReport = () => {
+    if (!technician?.userId) return;
+    if (!isAuthenticated) {
+      router.push('/sign-in');
+      return;
+    }
+    router.push({
+      pathname: '/moderation/report',
+      params: {
+        targetUserId: technician.userId,
+        technicianId: technician.id,
+        targetName: technician.name,
+        contentType: 'PROFILE',
+        allowedContentTypes: technician.photoUrl ? 'PROFILE,PHOTO' : 'PROFILE',
+      },
+    } as never);
+  };
+
+  const requestBlock = () => {
+    if (!technician?.userId) return;
+    if (!isAuthenticated || !token) {
+      router.push('/sign-in');
+      return;
+    }
+    Alert.alert(
+      'Bloquear usuario',
+      `Dejarás de ver el perfil de ${technician.name} y no podrán iniciar nuevas interacciones.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Bloquear', style: 'destructive', onPress: () => void blockTechnician() },
+      ]
+    );
+  };
+
+  const blockTechnician = async () => {
+    if (!technician?.userId || !token || blocking) return;
+    setBlocking(true);
+    setSafetyError('');
+    try {
+      await moderationApi.block(technician.userId, token);
+      Alert.alert('Usuario bloqueado', 'El perfil fue retirado de tu experiencia.');
+      router.replace('/(tabs)');
+    } catch (caught: unknown) {
+      setSafetyError(caught instanceof Error ? caught.message : 'No pudimos bloquear este usuario.');
+    } finally {
+      setBlocking(false);
+    }
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => void loadTechnician(), 0);
@@ -167,6 +224,36 @@ export default function TechnicianDetailScreen() {
             </Text>
           </View>
         </View>
+
+        {technician.userId && technician.userId !== user?.id ? (
+          <View style={styles.safetySection}>
+            <Text style={styles.safetyTitle}>Seguridad y confianza</Text>
+            <Text style={styles.safetyDescription}>
+              Reportar envía el caso al equipo de moderación. Bloquear oculta inmediatamente a este usuario para tu cuenta.
+            </Text>
+            <View style={styles.safetyActions}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={openReport}
+                style={({ pressed }) => [styles.reportButton, pressed && styles.safetyPressed]}
+              >
+                <Flag color={DirectoryColors.clayDark} size={18} />
+                <Text style={styles.reportButtonText}>Reportar</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ busy: blocking }}
+                disabled={blocking}
+                onPress={requestBlock}
+                style={({ pressed }) => [styles.blockButton, pressed && styles.safetyPressed]}
+              >
+                <UserRoundX color={DirectoryColors.white} size={18} />
+                <Text style={styles.blockButtonText}>{blocking ? 'Bloqueando…' : 'Bloquear'}</Text>
+              </Pressable>
+            </View>
+            {safetyError ? <Text accessibilityLiveRegion="assertive" style={styles.safetyError}>{safetyError}</Text> : null}
+          </View>
+        ) : null}
       </ScrollView>
 
       <View style={styles.footer}>
@@ -436,6 +523,44 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: 3,
   },
+  safetySection: {
+    backgroundColor: DirectoryColors.cream,
+    borderColor: DirectoryColors.border,
+    borderRadius: DirectoryRadius.lg,
+    borderWidth: 1,
+    gap: DirectorySpacing.sm,
+    marginHorizontal: DirectorySpacing.lg,
+    marginTop: DirectorySpacing.lg,
+    padding: DirectorySpacing.lg,
+  },
+  safetyTitle: { color: DirectoryColors.ink, fontSize: 16, fontWeight: '900' },
+  safetyDescription: { color: DirectoryColors.muted, fontSize: 12, lineHeight: 18 },
+  safetyActions: { flexDirection: 'row', gap: DirectorySpacing.sm },
+  reportButton: {
+    alignItems: 'center',
+    borderColor: DirectoryColors.clay,
+    borderRadius: DirectoryRadius.md,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: DirectorySpacing.sm,
+    justifyContent: 'center',
+    minHeight: 46,
+  },
+  reportButtonText: { color: DirectoryColors.clayDark, fontSize: 14, fontWeight: '800' },
+  blockButton: {
+    alignItems: 'center',
+    backgroundColor: '#B42318',
+    borderRadius: DirectoryRadius.md,
+    flex: 1,
+    flexDirection: 'row',
+    gap: DirectorySpacing.sm,
+    justifyContent: 'center',
+    minHeight: 46,
+  },
+  blockButtonText: { color: DirectoryColors.white, fontSize: 14, fontWeight: '800' },
+  safetyPressed: { opacity: 0.72 },
+  safetyError: { color: '#B42318', fontSize: 12, fontWeight: '700' },
   footer: {
     alignItems: 'center',
     backgroundColor: DirectoryColors.cream,

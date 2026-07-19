@@ -4,12 +4,20 @@ import { sendVerificationEmail, sendWelcomeEmail, sendPasswordResetEmail } from 
 import crypto from 'crypto';
 import { hashPassword, verifyPassword } from '../security/password';
 import { createAuthToken, normalizeAuthRole } from '../security/token';
+import { accountIdentityDigest } from '../security/accountIdentity';
 import { safeUserSelect } from '../utils/safeUser';
 import {
     normalizeServiceAreaInput,
     ServiceAreaValidationError,
     toPublicMapLocation,
 } from '../utils/serviceArea';
+import { publicTextRejection } from '../utils/contentModeration';
+import {
+    CURRENT_UGC_TERMS_VERSION,
+    hasInlineCurrentTermsConsent,
+    recordCurrentTermsConsent,
+    termsRequiredPayload,
+} from '../services/moderationService';
 
 const APP_URL = process.env.APP_URL || 'https://api.tecnicosenrd.com';
 
@@ -30,7 +38,7 @@ export const register = async (req: Request, res: Response) => {
         } = req.body;
 
         if (
-            typeof name !== 'string' || !name.trim() ||
+            typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 100 ||
             typeof email !== 'string' || !email.trim() ||
             typeof password !== 'string' || password.length < 8
         ) {
@@ -43,6 +51,11 @@ export const register = async (req: Request, res: Response) => {
         }
         if (accountType !== 'user' && accountType !== 'technician') {
             return res.status(400).json({ message: 'El tipo de cuenta no es válido' });
+        }
+
+        const acceptsCurrentTerms = hasInlineCurrentTermsConsent(req.body);
+        if (!acceptsCurrentTerms) {
+            return res.status(428).json(termsRequiredPayload());
         }
 
         const normalizedSpecializations = Array.isArray(specializations)
@@ -68,18 +81,57 @@ export const register = async (req: Request, res: Response) => {
         if (photoBase64 && (typeof photoBase64 !== 'string' || photoBase64.length > 2.8 * 1024 * 1024)) {
             return res.status(400).json({ message: 'La foto de perfil es demasiado grande' });
         }
+        if (photoBase64 && !/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(photoBase64)) {
+            return res.status(400).json({ message: 'La foto debe ser JPEG, PNG o WebP' });
+        }
+        if (companyName !== undefined && companyName !== null && (
+            typeof companyName !== 'string' || companyName.trim().length > 120
+        )) {
+            return res.status(400).json({ message: 'El nombre de la empresa no es válido' });
+        }
+        const nameRejection = publicTextRejection('El nombre', name.trim());
+        const companyRejection = publicTextRejection(
+            'El nombre de la empresa',
+            typeof companyName === 'string' ? companyName.trim() : null
+        );
+        if (nameRejection || companyRejection) {
+            return res.status(400).json({
+                code: 'OBJECTIONABLE_PUBLIC_TEXT',
+                message: nameRejection || companyRejection,
+            });
+        }
 
         const normalizedServiceArea = serviceArea === undefined
             ? undefined
             : normalizeServiceAreaInput(serviceArea);
 
-        // Check if user exists
-        const existingUser = await prisma.user.findFirst({
-            where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
-            select: { id: true },
-        });
+        // Check both the live identity and privacy-safe deletion markers. A
+        // sanctioned account cannot evade an active safety decision by deleting
+        // itself and immediately registering the same email again.
+        const deletionIdentityDigest = accountIdentityDigest(normalizedEmail);
+        const [existingUser, restrictedDeletionMarker] = await Promise.all([
+            prisma.user.findFirst({
+                where: { email: { equals: normalizedEmail, mode: 'insensitive' }, deletedAt: null },
+                select: { id: true },
+            }),
+            prisma.user.findFirst({
+                where: {
+                    deletedAt: { not: null },
+                    deletionIdentityDigest,
+                    moderationStatus: 'SUSPENDED',
+                },
+                select: { id: true },
+            }),
+        ]);
         if (existingUser) {
             return res.status(400).json({ message: 'User already exists' });
+        }
+        if (restrictedDeletionMarker) {
+            return res.status(403).json({
+                code: 'ACCOUNT_RECREATION_RESTRICTED',
+                message: 'Esta cuenta no se puede volver a crear mientras exista una medida de seguridad. Contacta a soporte para apelar.',
+                supportUrl: '/support',
+            });
         }
 
         const verificationToken = crypto.randomBytes(32).toString('hex');
@@ -101,7 +153,8 @@ export const register = async (req: Request, res: Response) => {
                     role,
                     verificationToken,
                     verificationTokenExpires,
-                    photoUrl: photoBase64 || null, // Save profile photo if provided
+                    // Candidate photos are never public before human approval.
+                    photoUrl: null,
                 },
                 select: safeUserSelect,
             });
@@ -122,9 +175,31 @@ export const register = async (req: Request, res: Response) => {
                         }),
                         ...(mapVisible !== undefined && { mapVisible }),
                         verified: false,
+                        moderationStatus: 'PENDING',
+                        moderationSubmittedAt: new Date(),
                     },
                 });
             }
+
+            if (acceptsCurrentTerms) {
+                await recordCurrentTermsConsent({
+                    userId: user.id,
+                    ipAddress: req.ip || req.headers['x-forwarded-for']?.toString() || null,
+                    userAgent: req.headers['user-agent'] || null,
+                    db: tx,
+                });
+            }
+
+            const pendingPhoto = photoBase64
+                ? await tx.profilePhotoSubmission.create({
+                    data: {
+                        userId: user.id,
+                        imageData: photoBase64,
+                        pendingKey: user.id,
+                    },
+                    select: { id: true, status: true, submittedAt: true },
+                })
+                : null;
 
             // Initialize gamification points for the new user
             await tx.userPoints.create({
@@ -137,13 +212,33 @@ export const register = async (req: Request, res: Response) => {
                 },
             });
 
-            return user;
+            return { user, pendingPhoto };
         });
 
         // Send verification email
         await sendVerificationEmail(normalizedEmail, verificationToken, name.trim());
 
-        res.status(201).json(result);
+        const {
+            moderationStatus: accountModerationStatus,
+            moderationReason: accountModerationReason,
+            ...registrationUser
+        } = result.user;
+        res.status(201).json({
+            ...registrationUser,
+            accountModerationStatus,
+            accountModerationReason,
+            ugcTermsAccepted: acceptsCurrentTerms,
+            ugcTermsVersion: acceptsCurrentTerms ? CURRENT_UGC_TERMS_VERSION : null,
+            ...(result.pendingPhoto && {
+                pendingPhotoSubmissionId: result.pendingPhoto.id,
+                photoModerationStatus: result.pendingPhoto.status,
+                photoSubmittedAt: result.pendingPhoto.submittedAt,
+            }),
+            ...(accountType === 'technician' && {
+                technicianModerationStatus: 'PENDING',
+                technicianModerationReason: null,
+            }),
+        });
     } catch (error) {
         if (error instanceof ServiceAreaValidationError) {
             return res.status(400).json({ message: error.message });
@@ -255,14 +350,51 @@ export const checkVerificationStatus = async (req: Request, res: Response) => {
     try {
         const user = await prisma.user.findUnique({
             where: { id: req.auth!.userId },
-            select: { emailVerified: true }
+            select: {
+                emailVerified: true,
+                moderationStatus: true,
+                moderationReason: true,
+                technician: {
+                    select: {
+                        moderationStatus: true,
+                        moderationReason: true,
+                    },
+                },
+                // Return only the owner's latest moderation decision. The
+                // staged image and reviewer identity are deliberately omitted.
+                profilePhotoSubmissions: {
+                    select: {
+                        id: true,
+                        status: true,
+                        submittedAt: true,
+                        reviewedAt: true,
+                        reviewNote: true,
+                    },
+                    orderBy: { submittedAt: 'desc' },
+                    take: 1,
+                },
+            },
         });
 
         if (!user) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
         }
 
-        res.json({ emailVerified: user.emailVerified });
+        const latestPhoto = user.profilePhotoSubmissions[0];
+        res.json({
+            emailVerified: user.emailVerified,
+            accountModerationStatus: user.moderationStatus,
+            accountModerationReason: user.moderationReason,
+            limitedAccess: user.moderationStatus === 'SUSPENDED',
+            technicianModerationStatus: user.technician?.moderationStatus || null,
+            technicianModerationReason: user.technician?.moderationReason || null,
+            photoModerationStatus: latestPhoto?.status || null,
+            photoModerationReason: latestPhoto?.reviewNote || null,
+            photoModerationSubmissionId: latestPhoto?.id || null,
+            pendingPhotoSubmissionId: latestPhoto?.status === 'PENDING' ? latestPhoto.id : null,
+            photoSubmittedAt: latestPhoto?.submittedAt || null,
+            photoModerationReviewedAt: latestPhoto?.reviewedAt || null,
+        });
     } catch (error) {
         console.error('Error checking verification status:', error);
         res.status(500).json({ message: 'Error al verificar el estado' });
@@ -393,12 +525,29 @@ export const login = async (req: Request, res: Response) => {
             where: { email: { equals: email.trim().toLowerCase(), mode: 'insensitive' } },
             select: {
                 ...safeUserSelect,
+                deletedAt: true,
                 password: true,
                 technician: true,
+                ugcTermsConsents: {
+                    where: { termsVersion: CURRENT_UGC_TERMS_VERSION },
+                    select: { termsVersion: true, acceptedAt: true },
+                    take: 1,
+                },
+                profilePhotoSubmissions: {
+                    select: {
+                        id: true,
+                        status: true,
+                        submittedAt: true,
+                        reviewedAt: true,
+                        reviewNote: true,
+                    },
+                    orderBy: { submittedAt: 'desc' },
+                    take: 1,
+                },
             },
         });
 
-        if (!user) {
+        if (!user || user.deletedAt) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
 
@@ -406,6 +555,7 @@ export const login = async (req: Request, res: Response) => {
         if (!passwordResult.valid) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
+        const accountSuspended = user.moderationStatus === 'SUSPENDED';
 
         // Transparently migrate accounts created before password hashing was added.
         if (passwordResult.needsRehash) {
@@ -417,6 +567,8 @@ export const login = async (req: Request, res: Response) => {
 
         const role = normalizeAuthRole(user.role);
         const token = createAuthToken(user.id, role);
+        const currentConsent = user.ugcTermsConsents[0];
+        const latestPhoto = user.profilePhotoSubmissions[0];
 
         // Return user with technician fields if applicable
         const responseData = {
@@ -427,12 +579,31 @@ export const login = async (req: Request, res: Response) => {
             phone: user.phone,
             photoUrl: user.photoUrl,
             emailVerified: user.emailVerified,
+            accountModerationStatus: user.moderationStatus,
+            accountModerationReason: user.moderationReason,
+            limitedAccess: accountSuspended,
+            ...(accountSuspended && {
+                suspensionCode: 'ACCOUNT_SUSPENDED',
+                suspensionMessage: 'Esta cuenta está suspendida. Puedes contactar a soporte o eliminar tu cuenta.',
+                supportUrl: '/support',
+            }),
+            ugcTermsAccepted: Boolean(currentConsent),
+            ugcTermsVersion: currentConsent?.termsVersion || null,
+            ugcTermsAcceptedAt: currentConsent?.acceptedAt || null,
+            photoModerationStatus: latestPhoto?.status || null,
+            photoModerationReason: latestPhoto?.reviewNote || null,
+            photoModerationSubmissionId: latestPhoto?.id || null,
+            pendingPhotoSubmissionId: latestPhoto?.status === 'PENDING' ? latestPhoto.id : null,
+            photoSubmittedAt: latestPhoto?.submittedAt || null,
+            photoModerationReviewedAt: latestPhoto?.reviewedAt || null,
             // Include technician-specific fields if user is a technician
             ...(user.technician && {
                 technicianId: user.technician.id,
                 specializations: user.technician.specializations,
                 location: user.technician.location,
                 companyName: user.technician.companyName,
+                technicianModerationStatus: user.technician.moderationStatus,
+                technicianModerationReason: user.technician.moderationReason,
                 mapVisible: user.technician.mapVisible,
                 mapLocation: toPublicMapLocation(user.technician),
             }),

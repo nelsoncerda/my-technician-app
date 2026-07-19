@@ -5,11 +5,10 @@ import {
     CheckCircle, PlusCircle, Loader2, X, LogIn, LogOut, Shield, Edit,
     Calendar, Trophy, Gift, Users, BarChart3, Clock,
     DollarSign, AlertCircle, UserCheck, Trash2, Settings, Plus,
-    Camera, History, Save, MailWarning, RefreshCw, CheckCircle2
+    Camera, History, Save, MailWarning, RefreshCw, CheckCircle2, Scale
 } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
-import { Textarea } from './components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select';
 import { cn } from './lib/utils';
 import { useForm, Controller } from 'react-hook-form';
@@ -27,9 +26,33 @@ import AchievementUnlocked from './components/gamification/AchievementUnlocked';
 import HomeView from './components/home/HomeView';
 import AboutView from './components/home/AboutView';
 import MobileAccountMenu from './components/navigation/MobileAccountMenu';
+import ReportDialog from './components/moderation/ReportDialog';
+import BlockedUsersPanel from './components/moderation/BlockedUsersPanel';
+import AdminModerationQueue from './components/moderation/AdminModerationQueue';
+import SuspendedAccountView from './components/moderation/SuspendedAccountView';
+import MyReportsPanel from './components/moderation/MyReportsPanel';
 import { API_BASE_URL } from './config/constants';
-import { apiFetch, clearAuthSession, getStoredUser, setAuthSession, updateStoredUser } from './lib/api';
+import {
+    ACCOUNT_SUSPENDED_EVENT,
+    AccountSuspendedEventDetail,
+    apiFetch,
+    clearAuthSession,
+    getStoredUser,
+    setAuthSession,
+    updateStoredUser,
+} from './lib/api';
 import { getTechnicianSpecializations, normalizeSearchValue } from './lib/search';
+import {
+    acceptModerationConsent,
+    createModerationBlock,
+    deleteModerationBlock,
+    getModerationBlocks,
+    getModerationConsent,
+    mergeProfilePhotoSubmission,
+    ModerationBlock,
+    ModerationReportTarget,
+    UGC_TERMS_VERSION,
+} from './lib/moderation-api';
 
 // Default data (will be managed via state)
 export const DEFAULT_SPECIALIZATIONS = [
@@ -55,6 +78,7 @@ export const DEFAULT_SPECIALIZATIONS = [
 
 interface Technician {
     id: string;
+    userId?: string;
     name: string;
     specialization: string;
     specializations?: string[]; // Array of specializations
@@ -63,6 +87,7 @@ interface Technician {
     email?: string;
     photoUrl?: string; // Profile photo URL
     rating: number;
+    ratingCount?: number;
     reviews: Review[];
     verified: boolean;
     companyName?: string;
@@ -88,7 +113,43 @@ interface User {
     location?: string;
     companyName?: string;
     mapVisible?: boolean;
+    photoModerationStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+    photoModerationReason?: string | null;
+    photoModerationSubmissionId?: string | null;
+    photoModerationReviewedAt?: string | null;
+    accountModerationStatus?: 'ACTIVE' | 'SUSPENDED';
+    accountModerationReason?: string | null;
+    technicianModerationStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
+    technicianModerationReason?: string | null;
+    limitedAccess?: boolean;
+    suspensionMessage?: string;
+    supportUrl?: string;
 }
+
+const normalizeUserPayload = (payload: Record<string, any>): User => {
+    const {
+        moderationStatus: legacyModerationStatus,
+        moderationReason: legacyModerationReason,
+        ...user
+    } = payload;
+    const legacyAccountSuspended = payload.limitedAccess === true && legacyModerationStatus === 'SUSPENDED';
+    const legacyTechnicianStatus = ['PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED'].includes(legacyModerationStatus)
+        && !legacyAccountSuspended
+        ? legacyModerationStatus
+        : undefined;
+
+    return {
+        ...user,
+        accountModerationStatus: payload.accountModerationStatus
+            || (legacyAccountSuspended ? 'SUSPENDED' : 'ACTIVE'),
+        accountModerationReason: payload.accountModerationReason
+            ?? (legacyAccountSuspended ? legacyModerationReason : null),
+        technicianModerationStatus: payload.technicianModerationStatus || legacyTechnicianStatus,
+        technicianModerationReason: payload.technicianModerationReason
+            ?? (legacyTechnicianStatus ? legacyModerationReason : null),
+        limitedAccess: payload.limitedAccess === true || payload.accountModerationStatus === 'SUSPENDED',
+    } as User;
+};
 
 interface ProfileChangeHistory {
     id: string;
@@ -129,10 +190,23 @@ const technicianFormSchema = z.object({
     location: z.string().min(1, { message: 'Debe seleccionar una ubicación.' }),
     phone: z.string().regex(/^\d{3}-\d{3}-\d{4}$/, { message: 'Formato de teléfono inválido (XXX-XXX-XXXX).' }),
     email: z.string().email({ message: 'Formato de correo electrónico inválido.' }),
+    ugcTermsAccepted: z.boolean().refine(Boolean, {
+        message: 'Debes aceptar las normas de la comunidad y los términos de uso.',
+    }),
 });
 
+const REVIEW_FEEDBACK_OPTIONS = [
+    'Llegó a tiempo',
+    'Buena comunicación',
+    'Trabajo de calidad',
+    'Buen trato',
+    'Precio claro',
+] as const;
+
 const reviewFormSchema = z.object({
-    comment: z.string().min(10, { message: 'El comentario debe tener al menos 10 caracteres.' }),
+    comment: z.enum(REVIEW_FEEDBACK_OPTIONS, {
+        required_error: 'Selecciona una descripción de tu experiencia.',
+    }),
     rating: z.number().min(1).max(5),
 });
 
@@ -147,6 +221,9 @@ const userFormSchema = z.object({
     specializations: z.array(z.string()).optional(), // Array of specializations
     location: z.string().optional(),
     companyName: z.string().optional(), // Optional company name for technicians
+    ugcTermsAccepted: z.boolean().refine(Boolean, {
+        message: 'Debes aceptar las normas de la comunidad y los términos de uso.',
+    }),
 }).refine((data) => {
     // Si es técnico, debe tener al menos una especialización y ubicación
     if (data.accountType === 'technician') {
@@ -175,7 +252,12 @@ const SantiagoTechRDApp = () => {
     const [showUserRegisterForm, setShowUserRegisterForm] = useState(false);
     const [showLoginForm, setShowLoginForm] = useState(false);
     const [showProfileModal, setShowProfileModal] = useState(false);
-    const [currentUser, setCurrentUser] = useState<User | null>(() => getStoredUser<User>());
+    const [currentUser, setCurrentUser] = useState<User | null>(() => {
+        const storedUser = getStoredUser<Record<string, any>>();
+        return storedUser ? normalizeUserPayload(storedUser) : null;
+    });
+    const currentUserId = currentUser?.id;
+    const currentUserLimitedAccess = currentUser?.limitedAccess;
     const [users, setUsers] = useState<User[]>([]); // Store registered users
     const [currentView, setCurrentView] = useState<'home' | 'admin' | 'bookings' | 'gamification' | 'about'>('home');
     const [showReviewForm, setShowReviewForm] = useState<{ technicianId: string; show: boolean } | null>(null);
@@ -197,7 +279,20 @@ const SantiagoTechRDApp = () => {
     const [loadingGamification, setLoadingGamification] = useState(false);
 
     // Admin panel state
-    const [adminTab, setAdminTab] = useState<'technicians' | 'users' | 'bookings' | 'reports' | 'settings'>('technicians');
+    const [adminTab, setAdminTab] = useState<'technicians' | 'users' | 'bookings' | 'reports' | 'moderation' | 'settings'>('technicians');
+
+    // Trust and safety state
+    const [reportTarget, setReportTarget] = useState<ModerationReportTarget | null>(null);
+    const [moderationBlocks, setModerationBlocks] = useState<ModerationBlock[]>([]);
+    const [loadingBlocks, setLoadingBlocks] = useState(false);
+    const [blocksError, setBlocksError] = useState('');
+    const [unblockingUserId, setUnblockingUserId] = useState<string | null>(null);
+    const [showCommunityGuidelines, setShowCommunityGuidelines] = useState(false);
+    const [deletingOwnAccount, setDeletingOwnAccount] = useState(false);
+    const [moderatingUserId, setModeratingUserId] = useState<string | null>(null);
+    const [userModerationReasons, setUserModerationReasons] = useState<Record<string, string>>({});
+    const [moderatingTechnicianId, setModeratingTechnicianId] = useState<string | null>(null);
+    const [technicianModerationReasons, setTechnicianModerationReasons] = useState<Record<string, string>>({});
 
     // Specializations and Locations state (editable by admin)
     const [specializations, setSpecializations] = useState<string[]>(DEFAULT_SPECIALIZATIONS);
@@ -268,9 +363,49 @@ const SantiagoTechRDApp = () => {
             setShowProfileModal(false);
         };
 
+        const handleSuspendedSession = (event: Event) => {
+            const detail = (event as CustomEvent<AccountSuspendedEventDetail>).detail;
+            setCurrentUser((current) => current
+                ? normalizeUserPayload({ ...current, ...detail })
+                : current);
+            setCurrentView('home');
+            setShowProfileModal(false);
+            setShowBookingForm(null);
+            setShowReviewForm(null);
+        };
+
         window.addEventListener('tecnicos-rd:session-expired', handleExpiredSession);
-        return () => window.removeEventListener('tecnicos-rd:session-expired', handleExpiredSession);
+        window.addEventListener(ACCOUNT_SUSPENDED_EVENT, handleSuspendedSession);
+        return () => {
+            window.removeEventListener('tecnicos-rd:session-expired', handleExpiredSession);
+            window.removeEventListener(ACCOUNT_SUSPENDED_EVENT, handleSuspendedSession);
+        };
     }, []);
+
+    // Refresh owner-visible moderation decisions when a stored session is
+    // restored. A newly suspended account is handled by apiFetch's 403 event.
+    useEffect(() => {
+        if (!currentUserId || currentUserLimitedAccess) return;
+        let cancelled = false;
+
+        void apiFetch(`${API_BASE_URL}/api/auth/verification-status`)
+            .then(async (response) => {
+                if (!response.ok || cancelled) return;
+                const status = await response.json();
+                if (cancelled) return;
+                setCurrentUser((current) => {
+                    if (!current || current.id !== currentUserId) return current;
+                    const updated = normalizeUserPayload({ ...current, ...status });
+                    updateStoredUser(updated);
+                    return updated;
+                });
+            })
+            .catch(() => undefined);
+
+        return () => {
+            cancelled = true;
+        };
+    }, [currentUserId, currentUserLimitedAccess]);
 
     // Form for Technician Registration
     const {
@@ -288,6 +423,7 @@ const SantiagoTechRDApp = () => {
             location: '',
             phone: '',
             email: '',
+            ugcTermsAccepted: false,
         },
     });
 
@@ -302,6 +438,7 @@ const SantiagoTechRDApp = () => {
                 phone: currentUser.phone || '',
                 specialization: '',
                 location: '',
+                ugcTermsAccepted: false,
             });
         }
     }, [showRegisterForm, currentUser, resetTechnicianForm]);
@@ -316,7 +453,7 @@ const SantiagoTechRDApp = () => {
     } = useForm<z.infer<typeof reviewFormSchema>>({
         resolver: zodResolver(reviewFormSchema),
         defaultValues: {
-            comment: '',
+            comment: undefined,
             rating: 5,
         },
     });
@@ -341,6 +478,7 @@ const SantiagoTechRDApp = () => {
             specializations: [],
             location: '',
             companyName: '',
+            ugcTermsAccepted: false,
         },
     });
 
@@ -366,12 +504,18 @@ const SantiagoTechRDApp = () => {
         let cancelled = false;
 
         const fetchData = async () => {
+            if (currentUser?.limitedAccess) {
+                setLoading(false);
+                setTechnicians([]);
+                setUsers([]);
+                return;
+            }
             setLoading(true);
             setDirectoryError('');
 
             try {
                 const [techResult, settingsResult] = await Promise.allSettled([
-                    apiFetch(`${API_BASE_URL}/api/technicians`),
+                    apiFetch(`${API_BASE_URL}/api/technicians?view=ratings`),
                     apiFetch(`${API_BASE_URL}/api/settings`),
                 ]);
 
@@ -385,7 +529,12 @@ const SantiagoTechRDApp = () => {
                     throw new Error('El directorio devolvió una respuesta inválida');
                 }
 
-                if (!cancelled) setTechnicians(techData);
+                if (!cancelled) {
+                    setTechnicians(techData.map((technician: Technician) => ({
+                        ...technician,
+                        reviews: Array.isArray(technician.reviews) ? technician.reviews : [],
+                    })));
+                }
 
                 if (settingsResult.status === 'fulfilled' && settingsResult.value.ok) {
                     const settingsResponse = settingsResult.value;
@@ -402,7 +551,7 @@ const SantiagoTechRDApp = () => {
                     const userResponse = await apiFetch(`${API_BASE_URL}/api/users`);
                     if (userResponse.ok) {
                         const userData = await userResponse.json();
-                        if (!cancelled) setUsers(Array.isArray(userData) ? userData : []);
+                        if (!cancelled) setUsers(Array.isArray(userData) ? userData.map(normalizeUserPayload) : []);
                     }
                 } else if (!cancelled) {
                     setUsers([]);
@@ -422,11 +571,11 @@ const SantiagoTechRDApp = () => {
         return () => {
             cancelled = true;
         };
-    }, [currentUser?.role, directoryReloadKey]);
+    }, [currentUser?.limitedAccess, currentUser?.role, directoryReloadKey]);
 
     // Fetch user bookings
     const fetchUserBookings = useCallback(async () => {
-        if (!currentUser) return;
+        if (!currentUser || currentUser.limitedAccess) return;
         setLoadingBookings(true);
         try {
             // For technicians, fetch BOTH: bookings where they are the technician AND where they are the customer
@@ -472,7 +621,7 @@ const SantiagoTechRDApp = () => {
 
     // Fetch gamification data
     const fetchGamificationData = useCallback(async () => {
-        if (!currentUser) return;
+        if (!currentUser || currentUser.limitedAccess) return;
         setLoadingGamification(true);
         try {
             const [pointsRes, achievementsRes, leaderboardRes, rewardsRes] = await Promise.all([
@@ -521,7 +670,7 @@ const SantiagoTechRDApp = () => {
 
     // Fetch admin stats when admin view is active
     const fetchAdminStats = useCallback(async () => {
-        if (currentUser?.role !== 'admin') return;
+        if (currentUser?.role !== 'admin' || currentUser.limitedAccess) return;
 
         setLoadingStats(true);
         try {
@@ -663,9 +812,79 @@ const SantiagoTechRDApp = () => {
         }
     };
 
+    const handleModerateUserAccount = async (user: User) => {
+        if (!currentUser || user.id === currentUser.id || user.role === 'admin') return;
+        const reason = userModerationReasons[user.id]?.trim();
+        if (!reason) {
+            alert('Escribe una razón antes de cambiar el estado de la cuenta.');
+            return;
+        }
+        const decision = user.accountModerationStatus === 'SUSPENDED' ? 'RESTORE' : 'SUSPEND';
+        setModeratingUserId(user.id);
+        try {
+            const response = await apiFetch(`${API_BASE_URL}/api/moderation/admin/users/${user.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ decision, reason }),
+            });
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.message || 'No pudimos cambiar el estado de la cuenta');
+            }
+            const data = await response.json();
+            const accountModerationStatus = data.accountModerationStatus
+                || data.moderationStatus
+                || (decision === 'SUSPEND' ? 'SUSPENDED' : 'ACTIVE');
+            setUsers((current) => current.map((item) => item.id === user.id ? {
+                ...item,
+                accountModerationStatus,
+                accountModerationReason: data.accountModerationReason ?? data.moderationReason ?? null,
+            } : item));
+            setUserModerationReasons((current) => ({ ...current, [user.id]: '' }));
+        } catch (error) {
+            alert(error instanceof Error ? error.message : 'No pudimos cambiar el estado de la cuenta');
+        } finally {
+            setModeratingUserId(null);
+        }
+    };
+
+    const handleRestoreTechnicianProfile = async (user: User) => {
+        if (!user.technicianId || !['REJECTED', 'SUSPENDED'].includes(user.technicianModerationStatus || '')) return;
+        const reason = technicianModerationReasons[user.id]?.trim();
+        if (!reason) {
+            alert('Escribe una nota antes de aprobar o restaurar el perfil.');
+            return;
+        }
+        setModeratingTechnicianId(user.technicianId);
+        try {
+            const response = await apiFetch(`${API_BASE_URL}/api/moderation/admin/technicians/${user.technicianId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ decision: 'APPROVE', reason }),
+            });
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.message || 'No pudimos restaurar el perfil profesional');
+            }
+            const data = await response.json();
+            setUsers((current) => current.map((item) => item.id === user.id ? {
+                ...item,
+                technicianModerationStatus: data.technicianModerationStatus || data.moderationStatus || 'APPROVED',
+                technicianModerationReason: data.technicianModerationReason ?? data.moderationReason ?? null,
+            } : item));
+            setTechnicianModerationReasons((current) => ({ ...current, [user.id]: '' }));
+            setDirectoryReloadKey((key) => key + 1);
+        } catch (error) {
+            alert(error instanceof Error ? error.message : 'No pudimos restaurar el perfil profesional');
+        } finally {
+            setModeratingTechnicianId(null);
+        }
+    };
+
     // Handle booking creation
     const handleCreateBooking = async (bookingData: any) => {
         try {
+            if (!(await ensureModerationConsent())) return;
             const response = await apiFetch(`${API_BASE_URL}/api/bookings`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -867,8 +1086,17 @@ const SantiagoTechRDApp = () => {
         }
     };
 
+    const blockedUserIds = React.useMemo(
+        () => new Set(moderationBlocks.map((block) => block.blockedUserId)),
+        [moderationBlocks]
+    );
+    const visibleTechnicians = React.useMemo(
+        () => technicians.filter((technician) => !technician.userId || !blockedUserIds.has(technician.userId)),
+        [blockedUserIds, technicians]
+    );
+
     // Filtered Technicians based on search and filters
-    const filteredTechnicians = technicians.filter((technician) => {
+    const filteredTechnicians = visibleTechnicians.filter((technician) => {
         const normalizedSearch = normalizeSearchValue(searchTerm);
         const technicianSpecializations = getTechnicianSpecializations(technician);
         const searchMatch =
@@ -887,6 +1115,7 @@ const SantiagoTechRDApp = () => {
         setLoading(true);
         try {
             if (!currentUser) return;
+            if (!(await ensureModerationConsent(true))) return;
 
             const response = await apiFetch(`${API_BASE_URL}/api/technicians`, {
                 method: 'POST',
@@ -900,8 +1129,11 @@ const SantiagoTechRDApp = () => {
 
             if (response.ok) {
                 const newTechnician = await response.json();
-                // Update local state to reflect changes immediately
-                setTechnicians([...technicians, { ...newTechnician, name: currentUser.name, email: currentUser.email, reviews: [] }]);
+                const technicianModerationStatus = newTechnician.technicianModerationStatus || newTechnician.moderationStatus || 'PENDING';
+                // Pending profiles stay out of the public directory until an administrator approves them.
+                if (technicianModerationStatus === 'APPROVED') {
+                    setTechnicians([...technicians, { ...newTechnician, name: currentUser.name, email: currentUser.email, reviews: [] }]);
+                }
                 const updatedUser: User = {
                     ...currentUser,
                     role: 'technician',
@@ -909,6 +1141,8 @@ const SantiagoTechRDApp = () => {
                     technicianId: newTechnician.id,
                     specializations: [data.specialization],
                     location: data.location,
+                    technicianModerationStatus,
+                    technicianModerationReason: newTechnician.technicianModerationReason || null,
                 };
                 setCurrentUser(updatedUser);
                 updateStoredUser(updatedUser);
@@ -937,11 +1171,13 @@ const SantiagoTechRDApp = () => {
                     ...restData,
                     name: `${firstName} ${lastName}`,
                     photoBase64: registrationPhoto, // Include photo if selected
+                    ugcTermsAccepted: true,
+                    ugcTermsVersion: UGC_TERMS_VERSION,
                 }),
             });
 
             if (response.ok) {
-                const newUser = await response.json();
+                const newUser = normalizeUserPayload(await response.json());
                 setUsers([...users, newUser]);
                 setUserRegistrationSuccess(true);
                 resetUserForm();
@@ -969,8 +1205,9 @@ const SantiagoTechRDApp = () => {
 
             if (response.ok) {
                 const loginResult = await response.json();
-                const { token, ...user } = loginResult;
+                const { token, ...rawUser } = loginResult;
                 if (!token) throw new Error('La sesión no incluyó un token válido');
+                const user = normalizeUserPayload(rawUser);
 
                 setAuthSession(token, user);
                 setCurrentUser(user);
@@ -995,7 +1232,106 @@ const SantiagoTechRDApp = () => {
         setCurrentUser(null);
         setCurrentView('home');
         setVerificationEmailSent(false);
+        setModerationBlocks([]);
     };
+
+    const handleDeleteOwnAccount = async () => {
+        if (!currentUser) return;
+        if (!window.confirm('¿Eliminar permanentemente tu cuenta y todos sus datos? Esta acción no se puede deshacer.')) return;
+        if (!window.confirm('Confirma una última vez que deseas eliminar tu cuenta.')) return;
+
+        setDeletingOwnAccount(true);
+        try {
+            const response = await apiFetch(`${API_BASE_URL}/api/users/${currentUser.id}`, { method: 'DELETE' });
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.message || 'No pudimos eliminar tu cuenta');
+            }
+            handleLogout();
+            alert('Tu cuenta fue eliminada permanentemente.');
+        } catch (error) {
+            alert(error instanceof Error ? error.message : 'No pudimos eliminar tu cuenta');
+        } finally {
+            setDeletingOwnAccount(false);
+        }
+    };
+
+    const loadModerationBlocks = useCallback(async () => {
+        if (!currentUser || currentUser.limitedAccess) {
+            setModerationBlocks([]);
+            return;
+        }
+        setLoadingBlocks(true);
+        setBlocksError('');
+        try {
+            setModerationBlocks(await getModerationBlocks());
+        } catch (error) {
+            setBlocksError(error instanceof Error ? error.message : 'No pudimos cargar los usuarios bloqueados');
+        } finally {
+            setLoadingBlocks(false);
+        }
+    }, [currentUser]);
+
+    useEffect(() => {
+        if (currentUser && !currentUser.limitedAccess) loadModerationBlocks();
+    }, [currentUser, loadModerationBlocks]);
+
+    const ensureModerationConsent = useCallback(async (alreadyConfirmed = false) => {
+        if (!currentUser) return false;
+        try {
+            if (await getModerationConsent()) return true;
+            const accepted = alreadyConfirmed || window.confirm(
+                'Para continuar debes aceptar las Normas de la comunidad y los Términos de uso. El contenido puede ser revisado y retirado si infringe estas reglas. ¿Aceptas?'
+            );
+            if (!accepted) return false;
+            await acceptModerationConsent();
+            return true;
+        } catch (error) {
+            alert(error instanceof Error ? error.message : 'No pudimos registrar tu aceptación');
+            return false;
+        }
+    }, [currentUser]);
+
+    const handleBlockTechnician = useCallback(async (technician: Pick<Technician, 'id' | 'userId' | 'name' | 'photoUrl'>) => {
+        if (!currentUser) {
+            setShowLoginForm(true);
+            return;
+        }
+        if (!technician.userId) {
+            alert('Este perfil todavía no se puede bloquear. Inténtalo de nuevo en unos minutos.');
+            return;
+        }
+        if (technician.userId === currentUser.id) return;
+        if (!window.confirm(`¿Bloquear a ${technician.name}? Se impedirán nuevas interacciones; las reservas históricas seguirán visibles.`)) return;
+
+        setModerationBlocks((current) => current.some((item) => item.blockedUserId === technician.userId)
+            ? current
+            : [...current, { blockedUserId: technician.userId!, name: technician.name, photoUrl: technician.photoUrl }]);
+        setTechnicians((current) => current.filter((item) => item.userId !== technician.userId));
+        if (showBookingForm?.technician?.id === technician.id) setShowBookingForm(null);
+        if (showReviewForm?.technicianId === technician.id) setShowReviewForm(null);
+
+        try {
+            await createModerationBlock(technician.userId);
+        } catch (error) {
+            setModerationBlocks((current) => current.filter((item) => item.blockedUserId !== technician.userId));
+            setDirectoryReloadKey((key) => key + 1);
+            alert(error instanceof Error ? error.message : 'No pudimos bloquear este usuario');
+        }
+    }, [currentUser, showBookingForm, showReviewForm]);
+
+    const handleUnblockUser = useCallback(async (userId: string) => {
+        setUnblockingUserId(userId);
+        try {
+            await deleteModerationBlock(userId);
+            setModerationBlocks((current) => current.filter((item) => item.blockedUserId !== userId));
+            setDirectoryReloadKey((key) => key + 1);
+        } catch (error) {
+            alert(error instanceof Error ? error.message : 'No pudimos desbloquear este usuario');
+        } finally {
+            setUnblockingUserId(null);
+        }
+    }, []);
 
     // Handle Forgot Password
     const handleForgotPassword = async () => {
@@ -1152,6 +1488,7 @@ const SantiagoTechRDApp = () => {
     const handleUpdateProfile = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!currentUser) return;
+        if (!(await ensureModerationConsent())) return;
 
         setSavingProfile(true);
 
@@ -1186,7 +1523,7 @@ const SantiagoTechRDApp = () => {
             });
 
             if (response.ok) {
-                const updatedUser = { ...currentUser, ...await response.json() };
+                const updatedUser = normalizeUserPayload({ ...currentUser, ...await response.json() });
                 setCurrentUser(updatedUser);
                 updateStoredUser(updatedUser);
                 setIsEditingProfile(false);
@@ -1311,6 +1648,11 @@ const SantiagoTechRDApp = () => {
             return;
         }
 
+        if (!(await ensureModerationConsent())) {
+            e.target.value = '';
+            return;
+        }
+
         setUploadingPhoto(true);
 
         try {
@@ -1327,10 +1669,14 @@ const SantiagoTechRDApp = () => {
 
                 if (response.ok) {
                     const result = await response.json();
-                    const updatedUser = { ...currentUser, photoUrl: result.photoUrl };
+                    const { pending: isPending, user: updatedUser } = mergeProfilePhotoSubmission(currentUser, result);
                     setCurrentUser(updatedUser);
                     updateStoredUser(updatedUser);
-                    fetchProfileHistory();
+                    if (isPending) {
+                        alert('Foto recibida. Se publicará después de que el equipo de moderación la apruebe.');
+                    } else {
+                        fetchProfileHistory();
+                    }
                 } else {
                     alert('Error al subir la foto');
                 }
@@ -1394,6 +1740,7 @@ const SantiagoTechRDApp = () => {
             setReviewSubmitError('');
 
             try {
+                if (!(await ensureModerationConsent())) return;
                 const response = await apiFetch(`${API_BASE_URL}/api/technicians/${technicianId}/reviews`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1422,7 +1769,7 @@ const SantiagoTechRDApp = () => {
                 setReviewSubmitError(error instanceof Error ? error.message : 'No pudimos publicar tu reseña');
             }
         },
-        [resetReviewForm]
+        [ensureModerationConsent, resetReviewForm]
     );
 
     // Calculate Average Rating
@@ -1431,6 +1778,19 @@ const SantiagoTechRDApp = () => {
         const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
         return parseFloat((totalRating / reviews.length).toFixed(1));
     };
+
+    if (currentUser?.limitedAccess || currentUser?.accountModerationStatus === 'SUSPENDED') {
+        return (
+            <SuspendedAccountView
+                name={currentUser.name}
+                email={currentUser.email}
+                reason={currentUser.accountModerationReason}
+                deleting={deletingOwnAccount}
+                onLogout={handleLogout}
+                onDelete={handleDeleteOwnAccount}
+            />
+        );
+    }
 
     return (
         <div className="min-h-screen bg-brand-sand text-brand-charcoal dark:bg-gray-950 dark:text-white">
@@ -1665,10 +2025,45 @@ const SantiagoTechRDApp = () => {
                                     bookings={userBookings.filter((booking: any) => booking.technicianId === currentUser.technicianId)}
                                     userRole="technician"
                                     loading={loadingBookings}
+                                    blockedUserIds={blockedUserIds}
                                     onConfirm={handleConfirmBooking}
                                     onStart={handleStartBooking}
                                     onComplete={handleCompleteBooking}
                                     onCancel={handleCancelBooking}
+                                    onReport={(booking) => {
+                                        const targetUserId = booking.customer?.id;
+                                        if (!targetUserId) {
+                                            alert('No pudimos identificar el cliente de esta reserva.');
+                                            return;
+                                        }
+                                        setReportTarget({
+                                            targetUserId,
+                                            contentType: 'BEHAVIOR',
+                                            name: booking.customer?.name || 'Cliente',
+                                        });
+                                    }}
+                                    onReportPhoto={(booking) => {
+                                        const targetUserId = booking.customer?.id;
+                                        if (!targetUserId || !booking.customer?.photoUrl) return;
+                                        setReportTarget({
+                                            targetUserId,
+                                            contentType: 'PHOTO',
+                                            name: booking.customer.name || 'Cliente',
+                                        });
+                                    }}
+                                    onBlock={(booking) => {
+                                        const targetUserId = booking.customer?.id;
+                                        if (!targetUserId) {
+                                            alert('No pudimos identificar el cliente de esta reserva.');
+                                            return;
+                                        }
+                                        handleBlockTechnician({
+                                            id: targetUserId,
+                                            userId: targetUserId,
+                                            name: booking.customer?.name || 'Cliente',
+                                            photoUrl: booking.customer?.photoUrl,
+                                        });
+                                    }}
                                 />
                             </section>
 
@@ -1683,7 +2078,47 @@ const SantiagoTechRDApp = () => {
                                     bookings={userBookings.filter((booking: any) => booking.customerId === currentUser.id)}
                                     userRole="customer"
                                     loading={loadingBookings}
+                                    blockedUserIds={blockedUserIds}
                                     onCancel={handleCancelBooking}
+                                    onReport={(booking) => {
+                                        const targetUserId = booking.technician?.user?.id;
+                                        const technicianId = booking.technician?.id;
+                                        if (!targetUserId || !technicianId) {
+                                            alert('No pudimos identificar el técnico de esta reserva.');
+                                            return;
+                                        }
+                                        setReportTarget({
+                                            targetUserId,
+                                            technicianId,
+                                            contentType: 'BEHAVIOR',
+                                            name: booking.technician?.user?.name || 'Técnico',
+                                        });
+                                    }}
+                                    onReportPhoto={(booking) => {
+                                        const targetUserId = booking.technician?.user?.id;
+                                        const technicianId = booking.technician?.id;
+                                        if (!targetUserId || !technicianId || !booking.technician?.user?.photoUrl) return;
+                                        setReportTarget({
+                                            targetUserId,
+                                            technicianId,
+                                            contentType: 'PHOTO',
+                                            name: booking.technician.user.name || 'Técnico',
+                                        });
+                                    }}
+                                    onBlock={(booking) => {
+                                        const targetUserId = booking.technician?.user?.id;
+                                        const technicianId = booking.technician?.id;
+                                        if (!targetUserId || !technicianId) {
+                                            alert('No pudimos identificar el técnico de esta reserva.');
+                                            return;
+                                        }
+                                        handleBlockTechnician({
+                                            id: technicianId,
+                                            userId: targetUserId,
+                                            name: booking.technician?.user?.name || 'Técnico',
+                                            photoUrl: booking.technician?.user?.photoUrl,
+                                        });
+                                    }}
                                 />
                             </section>
                         </div>
@@ -1692,7 +2127,47 @@ const SantiagoTechRDApp = () => {
                             bookings={userBookings}
                             userRole="customer"
                             loading={loadingBookings}
+                            blockedUserIds={blockedUserIds}
                             onCancel={handleCancelBooking}
+                            onReport={(booking) => {
+                                const targetUserId = booking.technician?.user?.id;
+                                const technicianId = booking.technician?.id;
+                                if (!targetUserId || !technicianId) {
+                                    alert('No pudimos identificar el técnico de esta reserva.');
+                                    return;
+                                }
+                                setReportTarget({
+                                    targetUserId,
+                                    technicianId,
+                                    contentType: 'BEHAVIOR',
+                                    name: booking.technician?.user?.name || 'Técnico',
+                                });
+                            }}
+                            onReportPhoto={(booking) => {
+                                const targetUserId = booking.technician?.user?.id;
+                                const technicianId = booking.technician?.id;
+                                if (!targetUserId || !technicianId || !booking.technician?.user?.photoUrl) return;
+                                setReportTarget({
+                                    targetUserId,
+                                    technicianId,
+                                    contentType: 'PHOTO',
+                                    name: booking.technician.user.name || 'Técnico',
+                                });
+                            }}
+                            onBlock={(booking) => {
+                                const targetUserId = booking.technician?.user?.id;
+                                const technicianId = booking.technician?.id;
+                                if (!targetUserId || !technicianId) {
+                                    alert('No pudimos identificar el técnico de esta reserva.');
+                                    return;
+                                }
+                                handleBlockTechnician({
+                                    id: technicianId,
+                                    userId: targetUserId,
+                                    name: booking.technician?.user?.name || 'Técnico',
+                                    photoUrl: booking.technician?.user?.photoUrl,
+                                });
+                            }}
                         />
                     )}
                 </main>
@@ -1854,6 +2329,7 @@ const SantiagoTechRDApp = () => {
                             { id: 'users', label: 'Usuarios', icon: Users, color: 'blue' },
                             { id: 'bookings', label: 'Reservas', icon: Calendar, color: 'emerald' },
                             { id: 'reports', label: 'Reportes', icon: BarChart3, color: 'purple' },
+                            { id: 'moderation', label: 'Moderación', icon: Shield, color: 'red' },
                             { id: 'settings', label: 'Configuración', icon: Settings, color: 'gray' },
                         ].map((tab) => (
                             <button
@@ -1867,8 +2343,9 @@ const SantiagoTechRDApp = () => {
                                 )}
                                 style={adminTab === tab.id ? {
                                     backgroundColor: tab.color === 'amber' ? '#f59e0b' :
-                                        tab.color === 'blue' ? '#3b82f6' :
-                                            tab.color === 'emerald' ? '#10b981' :
+                                            tab.color === 'blue' ? '#3b82f6' :
+                                                tab.color === 'emerald' ? '#10b981' :
+                                                    tab.color === 'red' ? '#b91c1c' :
                                                 tab.color === 'gray' ? '#6b7280' : '#8b5cf6'
                                 } : {}}
                             >
@@ -2017,13 +2494,14 @@ const SantiagoTechRDApp = () => {
                                                     <th className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Email</th>
                                                     <th className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Teléfono</th>
                                                     <th className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Rol</th>
+                                                    <th className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Estado</th>
                                                     <th className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Acciones</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
                                                 {users.length === 0 ? (
                                                     <tr>
-                                                        <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                                                        <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                                                             <Users className="w-12 h-12 mx-auto mb-2 text-gray-300" />
                                                             No hay usuarios registrados
                                                         </td>
@@ -2062,15 +2540,93 @@ const SantiagoTechRDApp = () => {
                                                             </Select>
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap">
-                                                            <Button
-                                                                size="sm"
-                                                                variant="destructive"
-                                                                onClick={() => handleDeleteUser(user.id)}
-                                                                className="text-xs"
-                                                            >
-                                                                <Trash2 className="w-3 h-3 mr-1" />
-                                                                Eliminar
-                                                            </Button>
+                                                            <div className="space-y-1.5">
+                                                                <span className={cn(
+                                                                    'inline-flex rounded-full px-2.5 py-1 text-xs font-bold',
+                                                                    user.accountModerationStatus === 'SUSPENDED'
+                                                                        ? 'bg-rose-100 text-rose-800'
+                                                                        : 'bg-emerald-100 text-emerald-800'
+                                                                )}>
+                                                                    Cuenta {user.accountModerationStatus === 'SUSPENDED' ? 'suspendida' : 'activa'}
+                                                                </span>
+                                                                {user.technicianModerationStatus && (
+                                                                    <span className={cn(
+                                                                        'block w-fit rounded-full px-2.5 py-1 text-xs font-bold',
+                                                                        user.technicianModerationStatus === 'APPROVED' ? 'bg-blue-100 text-blue-800' :
+                                                                            user.technicianModerationStatus === 'PENDING' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                                                                    )}>
+                                                                        Perfil {user.technicianModerationStatus === 'APPROVED' ? 'aprobado' :
+                                                                            user.technicianModerationStatus === 'PENDING' ? 'pendiente' :
+                                                                                user.technicianModerationStatus === 'SUSPENDED' ? 'suspendido' : 'rechazado'}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="min-w-[20rem] px-6 py-4">
+                                                            <div className="space-y-3">
+                                                                {user.id !== currentUser?.id && user.role !== 'admin' ? (
+                                                                    <div className="space-y-2">
+                                                                    <Input
+                                                                        aria-label={`Razón de moderación para ${user.name}`}
+                                                                        value={userModerationReasons[user.id] || ''}
+                                                                        onChange={(event) => setUserModerationReasons((current) => ({ ...current, [user.id]: event.target.value.slice(0, 500) }))}
+                                                                        maxLength={500}
+                                                                        placeholder={user.accountModerationStatus === 'SUSPENDED' ? 'Razón para restaurar' : 'Razón para suspender'}
+                                                                        className="h-9 text-xs"
+                                                                    />
+                                                                    <div className="flex flex-wrap gap-2">
+                                                                        <Button
+                                                                            size="sm"
+                                                                            onClick={() => handleModerateUserAccount(user)}
+                                                                            disabled={moderatingUserId === user.id || !userModerationReasons[user.id]?.trim()}
+                                                                            className={cn(
+                                                                                'text-xs text-white',
+                                                                                user.accountModerationStatus === 'SUSPENDED'
+                                                                                    ? 'bg-emerald-700 hover:bg-emerald-800'
+                                                                                    : 'bg-rose-700 hover:bg-rose-800'
+                                                                            )}
+                                                                        >
+                                                                            {moderatingUserId === user.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+                                                                            {user.accountModerationStatus === 'SUSPENDED' ? 'Restaurar cuenta' : 'Suspender cuenta'}
+                                                                        </Button>
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="destructive"
+                                                                            onClick={() => handleDeleteUser(user.id)}
+                                                                            className="text-xs"
+                                                                        >
+                                                                            <Trash2 className="w-3 h-3 mr-1" />
+                                                                            Eliminar
+                                                                        </Button>
+                                                                    </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-xs text-gray-500">
+                                                                        {user.id === currentUser?.id ? 'Cuenta actual protegida' : 'Cuenta administrativa protegida'}
+                                                                    </span>
+                                                                )}
+                                                                {user.id !== currentUser?.id && user.technicianId && ['REJECTED', 'SUSPENDED'].includes(user.technicianModerationStatus || '') && (
+                                                                    <div className="border-t border-gray-200 pt-3 dark:border-gray-700">
+                                                                        <Input
+                                                                            aria-label={`Nota para restaurar el perfil de ${user.name}`}
+                                                                            value={technicianModerationReasons[user.id] || ''}
+                                                                            onChange={(event) => setTechnicianModerationReasons((current) => ({ ...current, [user.id]: event.target.value.slice(0, 500) }))}
+                                                                            maxLength={500}
+                                                                            placeholder="Nota requerida para el perfil"
+                                                                            className="h-9 text-xs"
+                                                                        />
+                                                                        <Button
+                                                                            size="sm"
+                                                                            onClick={() => handleRestoreTechnicianProfile(user)}
+                                                                            disabled={moderatingTechnicianId === user.technicianId || !technicianModerationReasons[user.id]?.trim()}
+                                                                            className="mt-2 bg-blue-700 text-xs text-white hover:bg-blue-800"
+                                                                        >
+                                                                            {moderatingTechnicianId === user.technicianId ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+                                                                            {user.technicianModerationStatus === 'SUSPENDED' ? 'Restaurar perfil' : 'Aprobar perfil'}
+                                                                        </Button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 ))}
@@ -2384,6 +2940,17 @@ const SantiagoTechRDApp = () => {
                             </motion.div>
                         )}
 
+                        {adminTab === 'moderation' && (
+                            <motion.div
+                                key="moderation"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                            >
+                                <AdminModerationQueue />
+                            </motion.div>
+                        )}
+
                         {/* Settings Tab */}
                         {adminTab === 'settings' && (
                             <motion.div
@@ -2554,7 +3121,7 @@ const SantiagoTechRDApp = () => {
 
             {currentView === "home" && (
                 <HomeView
-                    technicians={technicians}
+                    technicians={visibleTechnicians}
                     filteredTechnicians={filteredTechnicians}
                     loading={loading}
                     error={directoryError || null}
@@ -2580,6 +3147,19 @@ const SantiagoTechRDApp = () => {
                         setReviewSubmitError('');
                         setShowReviewForm({ technicianId, show: true });
                     }}
+                    onReport={(technician, contentType) => {
+                        if (!technician.userId) {
+                            alert('Este perfil todavía no se puede reportar. Inténtalo de nuevo en unos minutos.');
+                            return;
+                        }
+                        setReportTarget({
+                            targetUserId: technician.userId,
+                            technicianId: technician.id,
+                            contentType,
+                            name: technician.name,
+                        });
+                    }}
+                    onBlock={handleBlockTechnician}
                     hasCompletedBooking={(technicianId) =>
                         hasCompletedBookingWithTechnician(technicianId) && !reviewedTechnicianIds.has(technicianId)
                     }
@@ -2632,7 +3212,9 @@ const SantiagoTechRDApp = () => {
                 <div className="border-t border-brand-ocean-700/60">
                     <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-5 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
                         <p>&copy; {new Date().getFullYear()} Técnicos en RD. Todos los derechos reservados.</p>
-                        <p>Hecho para conectar al Cibao.</p>
+                        <button type="button" onClick={() => setShowCommunityGuidelines(true)} className="text-left underline decoration-slate-500 underline-offset-2 hover:text-white">
+                            Normas de la comunidad y Términos de uso
+                        </button>
                     </div>
                 </div>
             </footer>
@@ -2820,6 +3402,26 @@ const SantiagoTechRDApp = () => {
                                             <p className="text-red-500 text-sm mt-1">{technicianErrors.email.message}</p>
                                         )}
                                     </div>
+                                    <div className={cn(
+                                        'rounded-xl border p-3',
+                                        technicianErrors.ugcTermsAccepted ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-700/40'
+                                    )}>
+                                        <div className="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-200">
+                                            <input
+                                                type="checkbox"
+                                                {...registerTechnician('ugcTermsAccepted')}
+                                                aria-label="Acepto las Normas de la comunidad y los Términos de uso"
+                                                className="mt-0.5 h-5 w-5 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            />
+                                            <span>
+                                                Acepto las{' '}
+                                                <button type="button" onClick={() => setShowCommunityGuidelines(true)} className="font-bold text-blue-700 underline dark:text-blue-300">
+                                                    Normas de la comunidad y los Términos de uso
+                                                </button>. Entiendo que mi perfil y fotos estarán sujetos a moderación.
+                                            </span>
+                                        </div>
+                                        {technicianErrors.ugcTermsAccepted && <p role="alert" className="mt-2 text-sm text-red-600">{technicianErrors.ugcTermsAccepted.message}</p>}
+                                    </div>
                                     <div className="flex justify-end gap-4">
                                         <Button
                                             type="button"
@@ -2889,6 +3491,7 @@ const SantiagoTechRDApp = () => {
                                 <div className="bg-green-100 dark:bg-green-900 border border-green-400 dark:border-green-600 text-green-700 dark:text-green-300 px-4 py-3 rounded relative mb-4" role="alert">
                                     <strong className="font-bold">Registro exitoso. </strong>
                                     <span className="block sm:inline">Tu cuenta ha sido creada. Por favor revisa tu correo para verificar tu cuenta.</span>
+                                    <span className="mt-2 block text-sm">Si añadiste una foto o un perfil profesional, se publicará después de la revisión de moderación.</span>
                                     <CheckCircle className="absolute top-3 left-4 w-5 h-5 text-green-500" />
                                     <Button
                                         onClick={() => {
@@ -3225,6 +3828,26 @@ const SantiagoTechRDApp = () => {
                                             </motion.div>
                                         )}
                                     </AnimatePresence>
+                                    <div className={cn(
+                                        'rounded-xl border p-3',
+                                        userErrors.ugcTermsAccepted ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-700/40'
+                                    )}>
+                                        <div className="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-200">
+                                            <input
+                                                type="checkbox"
+                                                {...registerUser('ugcTermsAccepted')}
+                                                aria-label="Acepto las Normas de la comunidad y los Términos de uso"
+                                                className="mt-0.5 h-5 w-5 shrink-0 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                            />
+                                            <span>
+                                                Acepto las{' '}
+                                                <button type="button" onClick={() => setShowCommunityGuidelines(true)} className="font-bold text-blue-700 underline dark:text-blue-300">
+                                                    Normas de la comunidad y los Términos de uso
+                                                </button>. El contenido que publique puede ser revisado o retirado si infringe estas reglas.
+                                            </span>
+                                        </div>
+                                        {userErrors.ugcTermsAccepted && <p role="alert" className="mt-2 text-sm text-red-600">{userErrors.ugcTermsAccepted.message}</p>}
+                                    </div>
                                     <div className="flex justify-end gap-4 pt-2">
                                         <Button
                                             type="button"
@@ -3296,7 +3919,7 @@ const SantiagoTechRDApp = () => {
                             <h2 id="review-dialog-title" className="text-2xl font-semibold text-gray-800 dark:text-white mb-4">
                                 Comparte tu experiencia
                             </h2>
-                            <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">Tu nombre se toma de tu cuenta verificada.</p>
+                            <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">Tu calificación será pública; la opción elegida ayuda a mantener comentarios seguros y claros.</p>
                             <form onSubmit={handleReviewSubmit((data) =>
                                 showReviewForm?.technicianId
                                     ? handleAddReview(showReviewForm.technicianId, data)
@@ -3304,18 +3927,19 @@ const SantiagoTechRDApp = () => {
                             )} className="space-y-4">
                                 <div>
                                     <label htmlFor="comment" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        Comentario
+                                        ¿Qué destacó del servicio?
                                     </label>
-                                    <Textarea
+                                    <select
                                         id="comment"
                                         {...registerReview('comment')}
                                         className={cn(
-                                            'mt-1',
+                                            'mt-1 min-h-12 w-full rounded-xl border border-gray-300 bg-white px-3 text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-white',
                                             reviewErrors.comment && 'border-red-500 focus:ring-red-500 focus:border-red-500'
                                         )}
-                                        placeholder="Escribe tu reseña aquí..."
-                                        rows={4}
-                                    />
+                                    >
+                                        <option value="">Selecciona una opción</option>
+                                        {REVIEW_FEEDBACK_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                                    </select>
                                     {reviewErrors.comment && (
                                         <p className="text-red-500 text-sm mt-1">{reviewErrors.comment.message}</p>
                                     )}
@@ -3722,6 +4346,29 @@ const SantiagoTechRDApp = () => {
                                     </div>
                                     <h2 id="profile-modal-title" className="text-xl font-bold text-white mt-3">{currentUser.name}</h2>
                                     <p className="text-white/80 text-sm">{currentUser.email}</p>
+                                    {currentUser.photoModerationStatus && (
+                                        <>
+                                            <span className={cn(
+                                                'mt-2 inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold',
+                                                currentUser.photoModerationStatus === 'PENDING'
+                                                    ? 'bg-amber-100 text-amber-950'
+                                                    : currentUser.photoModerationStatus === 'REJECTED'
+                                                        ? 'bg-rose-100 text-rose-950'
+                                                        : 'bg-emerald-100 text-emerald-950'
+                                            )}>
+                                                {currentUser.photoModerationStatus === 'PENDING'
+                                                    ? <><Clock className="h-3.5 w-3.5" /> Nueva foto en revisión</>
+                                                    : currentUser.photoModerationStatus === 'REJECTED'
+                                                        ? <><AlertCircle className="h-3.5 w-3.5" /> Foto no aprobada</>
+                                                        : <><CheckCircle2 className="h-3.5 w-3.5" /> Foto aprobada</>}
+                                            </span>
+                                            {currentUser.photoModerationReason && (
+                                                <p className="mt-2 max-w-sm rounded-lg bg-black/25 px-3 py-2 text-center text-xs leading-5 text-white">
+                                                    Motivo de la revisión: {currentUser.photoModerationReason}
+                                                </p>
+                                            )}
+                                        </>
+                                    )}
                                     <span className={cn(
                                         "mt-2 px-3 py-1 rounded-full text-xs font-semibold",
                                         currentUser.role === 'admin' ? "bg-purple-200 text-purple-800" :
@@ -3731,6 +4378,17 @@ const SantiagoTechRDApp = () => {
                                         {currentUser.role === 'admin' ? 'Administrador' :
                                             currentUser.role === 'technician' ? 'Técnico' : 'Cliente'}
                                     </span>
+                                    {currentUser.technicianModerationStatus && currentUser.technicianModerationStatus !== 'APPROVED' && (
+                                        <span className={cn(
+                                            'mt-2 rounded-full px-3 py-1 text-xs font-semibold',
+                                            currentUser.technicianModerationStatus === 'PENDING'
+                                                ? 'bg-amber-100 text-amber-900'
+                                                : 'bg-rose-100 text-rose-900'
+                                        )}>
+                                            {currentUser.technicianModerationStatus === 'PENDING' ? 'Perfil profesional en revisión' :
+                                                currentUser.technicianModerationStatus === 'SUSPENDED' ? 'Perfil profesional suspendido' : 'Perfil profesional rechazado'}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
 
@@ -3984,6 +4642,19 @@ const SantiagoTechRDApp = () => {
                                                         </div>
                                                     </div>
                                                 )}
+                                                {currentUser.role === 'technician' && currentUser.technicianModerationStatus && (
+                                                    <div className={cn(
+                                                        'rounded-lg border p-3 text-sm',
+                                                        currentUser.technicianModerationStatus === 'APPROVED'
+                                                            ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                                                            : 'border-amber-200 bg-amber-50 text-amber-950'
+                                                    )}>
+                                                        <p className="font-bold">Estado profesional: {currentUser.technicianModerationStatus === 'APPROVED' ? 'Aprobado' :
+                                                            currentUser.technicianModerationStatus === 'PENDING' ? 'En revisión' :
+                                                                currentUser.technicianModerationStatus === 'SUSPENDED' ? 'Suspendido' : 'Rechazado'}</p>
+                                                        {currentUser.technicianModerationReason && <p className="mt-1">{currentUser.technicianModerationReason}</p>}
+                                                    </div>
+                                                )}
                                                 <Button
                                                     onClick={() => {
                                                         // Initialize specializations when entering edit mode
@@ -4013,7 +4684,7 @@ const SantiagoTechRDApp = () => {
                                                 <Button
                                                     onClick={() => {
                                                         setShowProfileModal(false);
-                                                        setShowUserRegisterForm(true);
+                                                        setShowRegisterForm(true);
                                                     }}
                                                     className="w-full bg-green-600 hover:bg-green-700 text-white"
                                                 >
@@ -4021,6 +4692,19 @@ const SantiagoTechRDApp = () => {
                                                     Convertirme en Técnico
                                                 </Button>
                                             </div>
+                                        )}
+                                        {!isEditingProfile && (
+                                            <>
+                                                <BlockedUsersPanel
+                                                    blocks={moderationBlocks}
+                                                    loading={loadingBlocks}
+                                                    error={blocksError}
+                                                    unblockingUserId={unblockingUserId}
+                                                    onRetry={loadModerationBlocks}
+                                                    onUnblock={handleUnblockUser}
+                                                />
+                                                <MyReportsPanel />
+                                            </>
                                         )}
                                     </>
                                 ) : profileTab === 'availability' ? (
@@ -4405,6 +5089,46 @@ const SantiagoTechRDApp = () => {
                                 )}
                             </div>
                         </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            <ReportDialog target={reportTarget} onClose={() => setReportTarget(null)} />
+
+            <AnimatePresence>
+                {showCommunityGuidelines && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[90] flex items-center justify-center bg-brand-ink/70 p-4 backdrop-blur-sm"
+                        onMouseDown={(event) => event.target === event.currentTarget && setShowCommunityGuidelines(false)}
+                    >
+                        <motion.section
+                            initial={{ scale: 0.96, y: 12 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.96, y: 12 }}
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="community-guidelines-title"
+                            className="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-brand-cream p-6 shadow-2xl sm:p-8"
+                        >
+                            <div className="flex items-start justify-between gap-4">
+                                <div>
+                                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-ocean-50 text-brand-ocean-700"><Scale className="h-5 w-5" /></span>
+                                    <h2 id="community-guidelines-title" className="mt-3 text-2xl font-extrabold text-brand-ink">Normas de la comunidad y Términos de uso</h2>
+                                    <p className="mt-1 text-sm text-brand-muted">Versión {UGC_TERMS_VERSION}</p>
+                                </div>
+                                <button type="button" onClick={() => setShowCommunityGuidelines(false)} className="flex h-11 w-11 items-center justify-center rounded-full text-brand-muted hover:bg-brand-sand" aria-label="Cerrar normas"><X className="h-5 w-5" /></button>
+                            </div>
+                            <div className="mt-6 space-y-5 text-sm leading-6 text-brand-charcoal">
+                                <div><h3 className="font-extrabold text-brand-ink">Una comunidad profesional y segura</h3><p className="mt-1">Publica únicamente información y fotos propias, precisas y relacionadas con los servicios ofrecidos. No se permite spam, fraude, suplantación, acoso, odio, violencia, contenido sexual ni revelar datos privados.</p></div>
+                                <div><h3 className="font-extrabold text-brand-ink">Moderación y consecuencias</h3><p className="mt-1">Podemos revisar perfiles, fotos, valoraciones y reportes; rechazar o retirar contenido; advertir o suspender cuentas; y conservar evidencia necesaria para investigar incumplimientos.</p></div>
+                                <div><h3 className="font-extrabold text-brand-ink">Reportes y bloqueos</h3><p className="mt-1">Cada usuario puede reportar por separado un perfil o una foto y bloquear a otro usuario. Los reportes se revisan de forma confidencial. El abuso deliberado del sistema de reportes también puede resultar en medidas sobre la cuenta.</p></div>
+                                <div><h3 className="font-extrabold text-brand-ink">Responsabilidad</h3><p className="mt-1">Técnicos en RD facilita el contacto y las reservas, pero cada usuario es responsable de evaluar el servicio y cumplir la ley. No publiques direcciones exactas, documentos, números financieros ni otra información sensible.</p></div>
+                            </div>
+                            <button type="button" onClick={() => setShowCommunityGuidelines(false)} className="mt-7 min-h-12 w-full rounded-xl bg-brand-ink px-4 font-bold text-white hover:bg-brand-ocean-700">Entendido</button>
+                        </motion.section>
                     </motion.div>
                 )}
             </AnimatePresence>

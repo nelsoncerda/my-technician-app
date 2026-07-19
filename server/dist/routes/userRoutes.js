@@ -11,5 +11,5 @@ router.put('/:id', auth_1.requireAuth, (0, auth_1.requireSelfOrAdmin)('id'), use
 router.put('/:id/profile', auth_1.requireAuth, (0, auth_1.requireSelfOrAdmin)('id'), userController_1.updateUserProfile);
 router.put('/:id/role', auth_1.requireAuth, auth_1.requireAdmin, userController_1.updateUserRole);
 router.post('/:id/photo', auth_1.requireAuth, (0, auth_1.requireSelfOrAdmin)('id'), userController_1.uploadProfilePhoto);
-router.delete('/:id', auth_1.requireAuth, (0, auth_1.requireSelfOrAdmin)('id'), userController_1.deleteUser);
+router.delete('/:id', auth_1.requireAuthAllowSuspended, (0, auth_1.requireSelfOrActiveAdmin)('id'), userController_1.deleteUser);
 exports.default = router;

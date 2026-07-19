@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Clock, MapPin, User, Wrench, CheckCircle, XCircle, PlayCircle, AlertCircle, Mail, Phone } from 'lucide-react';
+import { Ban, Calendar, Clock, MapPin, User, Wrench, CheckCircle, XCircle, PlayCircle, AlertCircle, Mail, Phone, Flag } from 'lucide-react';
 
 interface BookingCardProps {
   booking: {
@@ -13,13 +13,16 @@ interface BookingCardProps {
     city: string;
     description?: string;
     customer?: {
+      id?: string;
       name: string;
       email?: string;
       phone?: string;
       photoUrl?: string;
     };
     technician?: {
+      id?: string;
       user: {
+        id?: string;
         name: string;
         email?: string;
         phone?: string;
@@ -32,6 +35,10 @@ interface BookingCardProps {
   onStart?: () => void;
   onComplete?: () => void;
   onCancel?: () => void;
+  onReport?: () => void;
+  onReportPhoto?: () => void;
+  onBlock?: () => void;
+  interactionBlocked?: boolean;
 }
 
 const statusConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
@@ -74,6 +81,10 @@ const BookingCard: React.FC<BookingCardProps> = ({
   onStart,
   onComplete,
   onCancel,
+  onReport,
+  onReportPhoto,
+  onBlock,
+  interactionBlocked = false,
 }) => {
   const status = statusConfig[booking.status] || statusConfig.PENDING;
 
@@ -160,7 +171,7 @@ const BookingCard: React.FC<BookingCardProps> = ({
                 <p className="font-semibold text-gray-900 dark:text-white truncate">
                   {contactPerson.name}
                 </p>
-                {contactPerson.email && (
+                {!interactionBlocked && contactPerson.email && (
                   <div className="flex items-center gap-1.5 mt-1.5">
                     <Mail className="w-3.5 h-3.5 text-gray-400" />
                     <a
@@ -171,7 +182,7 @@ const BookingCard: React.FC<BookingCardProps> = ({
                     </a>
                   </div>
                 )}
-                {contactPerson.phone && (
+                {!interactionBlocked && contactPerson.phone && (
                   <div className="flex items-center gap-1.5 mt-1">
                     <Phone className="w-3.5 h-3.5 text-gray-400" />
                     <a
@@ -193,10 +204,36 @@ const BookingCard: React.FC<BookingCardProps> = ({
             "{booking.description}"
           </p>
         )}
+
+        {interactionBlocked && (
+          <p className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+            Usuario bloqueado. Conservamos los datos históricos de esta reserva, pero no se permiten nuevas acciones.
+          </p>
+        )}
+
+        {(onReport || onReportPhoto || onBlock) && (
+          <div className="flex flex-wrap gap-1 border-t border-gray-200 pt-3 dark:border-gray-700" aria-label="Opciones de seguridad de la reserva">
+            {onReport && (
+              <button type="button" onClick={onReport} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-gray-500 hover:bg-rose-50 hover:text-rose-800">
+                <Flag className="h-3.5 w-3.5" /> Reportar conducta
+              </button>
+            )}
+            {contactPerson?.photoUrl && onReportPhoto && (
+              <button type="button" onClick={onReportPhoto} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-gray-500 hover:bg-rose-50 hover:text-rose-800">
+                <Flag className="h-3.5 w-3.5" /> Reportar foto
+              </button>
+            )}
+            {onBlock && (
+              <button type="button" onClick={onBlock} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-white">
+                <Ban className="h-3.5 w-3.5" /> Bloquear {userRole === 'customer' ? 'técnico' : 'cliente'}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Actions */}
-      {(booking.status === 'PENDING' || booking.status === 'CONFIRMED' || booking.status === 'IN_PROGRESS') && (
+      {!interactionBlocked && (booking.status === 'PENDING' || booking.status === 'CONFIRMED' || booking.status === 'IN_PROGRESS') && (
         <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900 flex gap-2 justify-end">
           {booking.status === 'PENDING' && userRole === 'technician' && onConfirm && (
             <button

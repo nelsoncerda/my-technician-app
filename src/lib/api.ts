@@ -1,5 +1,14 @@
 const AUTH_TOKEN_KEY = 'tecnicos-rd:auth-token';
 const AUTH_USER_KEY = 'tecnicos-rd:auth-user';
+export const ACCOUNT_SUSPENDED_EVENT = 'tecnicos-rd:account-suspended';
+
+export interface AccountSuspendedEventDetail {
+  accountModerationStatus: 'SUSPENDED';
+  accountModerationReason?: string | null;
+  limitedAccess: true;
+  suspensionMessage?: string;
+  supportUrl?: string;
+}
 
 const canUseStorage = () => typeof window !== 'undefined' && Boolean(window.localStorage);
 
@@ -48,6 +57,29 @@ export const apiFetch = async (input: RequestInfo | URL, init: RequestInit = {})
   }
 
   const response = await fetch(input, { ...init, headers });
+
+  if (response.status === 403 && token && canUseStorage()) {
+    const data = await response.clone().json().catch(() => null) as Record<string, unknown> | null;
+    // A response that belongs to an older session must never restrict the
+    // account that is currently signed in.
+    if (data?.code === 'ACCOUNT_SUSPENDED' && getAuthToken() === token) {
+      const detail: AccountSuspendedEventDetail = {
+        accountModerationStatus: 'SUSPENDED',
+        accountModerationReason: typeof data.accountModerationReason === 'string'
+          ? data.accountModerationReason
+          : null,
+        limitedAccess: true,
+        suspensionMessage: typeof data.message === 'string' ? data.message : undefined,
+        supportUrl: typeof data.supportUrl === 'string' ? data.supportUrl : undefined,
+      };
+      const storedUser = getStoredUser<Record<string, unknown>>();
+      if (storedUser) updateStoredUser({ ...storedUser, ...detail });
+      window.dispatchEvent(new CustomEvent<AccountSuspendedEventDetail>(
+        ACCOUNT_SUSPENDED_EVENT,
+        { detail }
+      ));
+    }
+  }
 
   if (response.status === 401 && token && canUseStorage()) {
     clearAuthSession();

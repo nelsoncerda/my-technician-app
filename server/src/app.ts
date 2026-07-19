@@ -8,6 +8,7 @@ import bookingRoutes from './routes/bookingRoutes';
 import gamificationRoutes from './routes/gamificationRoutes';
 import settingsRoutes from './routes/settingsRoutes';
 import publicRoutes from './routes/publicRoutes';
+import moderationRoutes from './routes/moderationRoutes';
 
 export const app = express();
 app.disable('x-powered-by');
@@ -56,6 +57,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/gamification', gamificationRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/moderation', moderationRoutes);
 
 app.get('/', (_req, res) => {
     res.send('Técnicos en RD API');

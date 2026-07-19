@@ -21,6 +21,8 @@ exports.safeUserSelect = {
     photoUrl: true,
     role: true,
     emailVerified: true,
+    moderationStatus: true,
+    moderationReason: true,
     createdAt: true,
     updatedAt: true,
 };

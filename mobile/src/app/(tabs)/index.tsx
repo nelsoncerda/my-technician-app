@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import {
   List as ListIcon,
   Map as MapIcon,
@@ -6,7 +6,7 @@ import {
   SlidersHorizontal,
   X,
 } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -31,6 +31,7 @@ import { api } from '@/lib/api';
 import { createTechnicianMapMarkers, resolveSelectedMarkerId } from '@/lib/map';
 import { filterTechnicians, getTechnicianSpecializations, normalizeSearchValue } from '@/lib/search';
 import { useForegroundLocation } from '@/lib/use-foreground-location';
+import { useAuth } from '@/providers/auth';
 import type { Settings, Technician } from '@/types/api';
 
 const EMPTY_SETTINGS: Settings = { locations: [], specializations: [] };
@@ -43,6 +44,7 @@ const uniqueSorted = (values: string[]) =>
 
 export default function DirectoryScreen() {
   const router = useRouter();
+  const { token } = useAuth();
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [settings, setSettings] = useState<Settings>(EMPTY_SETTINGS);
   const [query, setQuery] = useState('');
@@ -62,7 +64,7 @@ export default function DirectoryScreen() {
 
     try {
       const [technicianResult, settingsResult] = await Promise.allSettled([
-        api.technicians.list(),
+        api.technicians.list(token),
         api.settings.get(),
       ]);
 
@@ -79,12 +81,11 @@ export default function DirectoryScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [token]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => void loadDirectory(), 0);
-    return () => clearTimeout(timer);
-  }, [loadDirectory]);
+  useFocusEffect(useCallback(() => {
+    void loadDirectory();
+  }, [loadDirectory]));
 
   const services = useMemo(
     () =>

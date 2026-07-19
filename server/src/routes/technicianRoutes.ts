@@ -10,13 +10,14 @@ import {
 import {
     requireAdmin,
     requireAuth,
+    optionalAuth,
     requireRole,
     requireTechnicianOwnerOrAdmin,
 } from '../middleware/auth';
 
 const router = Router();
 
-router.get('/', getTechnicians);
+router.get('/', optionalAuth, getTechnicians);
 router.post('/', requireAuth, requireRole('user', 'technician'), registerTechnician);
 router.post('/:id/reviews', requireAuth, addTechnicianReview);
 router.put('/:id/service-area', requireAuth, requireTechnicianOwnerOrAdmin('id'), updateTechnicianServiceArea);

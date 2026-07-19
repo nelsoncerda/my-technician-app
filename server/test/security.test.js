@@ -9,6 +9,7 @@ const {
   verifyPassword,
 } = require('../dist/security/password');
 const { createAuthToken, verifyAuthToken } = require('../dist/security/token');
+const { accountIdentityDigest } = require('../dist/security/accountIdentity');
 
 test('scrypt password records verify without exposing plaintext', async () => {
   const hash = await hashPassword('correct horse battery staple');
@@ -64,4 +65,14 @@ test('production refuses to start token signing without a strong AUTH_SECRET', (
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /AUTH_SECRET/);
+});
+
+test('deleted-account identity markers are normalized, keyed, and do not expose the email', () => {
+  const first = accountIdentityDigest(' Person@Example.com ');
+  const second = accountIdentityDigest('person@example.com');
+
+  assert.equal(first, second);
+  assert.match(first, /^[a-f0-9]{64}$/);
+  assert.equal(first.includes('person'), false);
+  assert.notEqual(first, accountIdentityDigest('another@example.com'));
 });

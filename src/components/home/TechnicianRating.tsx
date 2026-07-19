@@ -4,6 +4,7 @@ import { cn } from '../../lib/utils';
 
 export interface RatedTechnician {
   rating: number;
+  ratingCount?: number;
   reviews?: Array<{ rating?: number }>;
 }
 
@@ -27,8 +28,12 @@ export const getTechnicianRatingDetails = (technician: RatedTechnician) => {
     : 0;
   const effectiveRating = storedRating > 0 ? storedRating : calculatedRating;
 
+  const storedReviewCount = Number.isInteger(technician.ratingCount) && (technician.ratingCount || 0) >= 0
+    ? technician.ratingCount!
+    : reviews.length;
+
   return {
-    reviewCount: reviews.length,
+    reviewCount: storedReviewCount,
     rating: Math.min(5, Math.max(0, effectiveRating)),
   };
 };

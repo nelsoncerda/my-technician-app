@@ -8,6 +8,17 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __rest = (this && this.__rest) || function (s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                t[p[i]] = s[p[i]];
+        }
+    return t;
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -18,13 +29,16 @@ const emailService_1 = require("../services/emailService");
 const crypto_1 = __importDefault(require("crypto"));
 const password_1 = require("../security/password");
 const token_1 = require("../security/token");
+const accountIdentity_1 = require("../security/accountIdentity");
 const safeUser_1 = require("../utils/safeUser");
 const serviceArea_1 = require("../utils/serviceArea");
+const contentModeration_1 = require("../utils/contentModeration");
+const moderationService_1 = require("../services/moderationService");
 const APP_URL = process.env.APP_URL || 'https://api.tecnicosenrd.com';
 const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { name, email, password, phone, accountType, specializations, location, photoBase64, companyName, serviceArea, mapVisible, } = req.body;
-        if (typeof name !== 'string' || !name.trim() ||
+        if (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 100 ||
             typeof email !== 'string' || !email.trim() ||
             typeof password !== 'string' || password.length < 8) {
             return res.status(400).json({ message: 'Nombre, correo y contraseña válida son requeridos' });
@@ -35,6 +49,10 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         }
         if (accountType !== 'user' && accountType !== 'technician') {
             return res.status(400).json({ message: 'El tipo de cuenta no es válido' });
+        }
+        const acceptsCurrentTerms = (0, moderationService_1.hasInlineCurrentTermsConsent)(req.body);
+        if (!acceptsCurrentTerms) {
+            return res.status(428).json((0, moderationService_1.termsRequiredPayload)());
         }
         const normalizedSpecializations = Array.isArray(specializations)
             ? specializations
@@ -58,16 +76,50 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         if (photoBase64 && (typeof photoBase64 !== 'string' || photoBase64.length > 2.8 * 1024 * 1024)) {
             return res.status(400).json({ message: 'La foto de perfil es demasiado grande' });
         }
+        if (photoBase64 && !/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(photoBase64)) {
+            return res.status(400).json({ message: 'La foto debe ser JPEG, PNG o WebP' });
+        }
+        if (companyName !== undefined && companyName !== null && (typeof companyName !== 'string' || companyName.trim().length > 120)) {
+            return res.status(400).json({ message: 'El nombre de la empresa no es válido' });
+        }
+        const nameRejection = (0, contentModeration_1.publicTextRejection)('El nombre', name.trim());
+        const companyRejection = (0, contentModeration_1.publicTextRejection)('El nombre de la empresa', typeof companyName === 'string' ? companyName.trim() : null);
+        if (nameRejection || companyRejection) {
+            return res.status(400).json({
+                code: 'OBJECTIONABLE_PUBLIC_TEXT',
+                message: nameRejection || companyRejection,
+            });
+        }
         const normalizedServiceArea = serviceArea === undefined
             ? undefined
             : (0, serviceArea_1.normalizeServiceAreaInput)(serviceArea);
-        // Check if user exists
-        const existingUser = yield prisma_1.default.user.findFirst({
-            where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
-            select: { id: true },
-        });
+        // Check both the live identity and privacy-safe deletion markers. A
+        // sanctioned account cannot evade an active safety decision by deleting
+        // itself and immediately registering the same email again.
+        const deletionIdentityDigest = (0, accountIdentity_1.accountIdentityDigest)(normalizedEmail);
+        const [existingUser, restrictedDeletionMarker] = yield Promise.all([
+            prisma_1.default.user.findFirst({
+                where: { email: { equals: normalizedEmail, mode: 'insensitive' }, deletedAt: null },
+                select: { id: true },
+            }),
+            prisma_1.default.user.findFirst({
+                where: {
+                    deletedAt: { not: null },
+                    deletionIdentityDigest,
+                    moderationStatus: 'SUSPENDED',
+                },
+                select: { id: true },
+            }),
+        ]);
         if (existingUser) {
             return res.status(400).json({ message: 'User already exists' });
+        }
+        if (restrictedDeletionMarker) {
+            return res.status(403).json({
+                code: 'ACCOUNT_RECREATION_RESTRICTED',
+                message: 'Esta cuenta no se puede volver a crear mientras exista una medida de seguridad. Contacta a soporte para apelar.',
+                supportUrl: '/support',
+            });
         }
         const verificationToken = crypto_1.default.randomBytes(32).toString('hex');
         const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -76,7 +128,7 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         const role = accountType === 'technician' ? 'technician' : 'user';
         // Create user with transaction to also create technician if needed
         const result = yield prisma_1.default.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
-            var _a, _b, _c;
+            var _a, _b, _c, _d;
             // Create user
             const user = yield tx.user.create({
                 data: {
@@ -87,7 +139,8 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                     role,
                     verificationToken,
                     verificationTokenExpires,
-                    photoUrl: photoBase64 || null, // Save profile photo if provided
+                    // Candidate photos are never public before human approval.
+                    photoUrl: null,
                 },
                 select: safeUser_1.safeUserSelect,
             });
@@ -99,9 +152,27 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                         serviceAreaLatitude: (_a = normalizedServiceArea === null || normalizedServiceArea === void 0 ? void 0 : normalizedServiceArea.latitude) !== null && _a !== void 0 ? _a : null,
                         serviceAreaLongitude: (_b = normalizedServiceArea === null || normalizedServiceArea === void 0 ? void 0 : normalizedServiceArea.longitude) !== null && _b !== void 0 ? _b : null,
                         serviceAreaRadiusKm: (_c = normalizedServiceArea === null || normalizedServiceArea === void 0 ? void 0 : normalizedServiceArea.radiusKm) !== null && _c !== void 0 ? _c : 5,
-                    })), (mapVisible !== undefined && { mapVisible })), { verified: false }),
+                    })), (mapVisible !== undefined && { mapVisible })), { verified: false, moderationStatus: 'PENDING', moderationSubmittedAt: new Date() }),
                 });
             }
+            if (acceptsCurrentTerms) {
+                yield (0, moderationService_1.recordCurrentTermsConsent)({
+                    userId: user.id,
+                    ipAddress: req.ip || ((_d = req.headers['x-forwarded-for']) === null || _d === void 0 ? void 0 : _d.toString()) || null,
+                    userAgent: req.headers['user-agent'] || null,
+                    db: tx,
+                });
+            }
+            const pendingPhoto = photoBase64
+                ? yield tx.profilePhotoSubmission.create({
+                    data: {
+                        userId: user.id,
+                        imageData: photoBase64,
+                        pendingKey: user.id,
+                    },
+                    select: { id: true, status: true, submittedAt: true },
+                })
+                : null;
             // Initialize gamification points for the new user
             yield tx.userPoints.create({
                 data: {
@@ -112,11 +183,20 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                     lifetimePoints: 0,
                 },
             });
-            return user;
+            return { user, pendingPhoto };
         }));
         // Send verification email
         yield (0, emailService_1.sendVerificationEmail)(normalizedEmail, verificationToken, name.trim());
-        res.status(201).json(result);
+        const _a = result.user, { moderationStatus: accountModerationStatus, moderationReason: accountModerationReason } = _a, registrationUser = __rest(_a, ["moderationStatus", "moderationReason"]);
+        res.status(201).json(Object.assign(Object.assign(Object.assign(Object.assign({}, registrationUser), { accountModerationStatus,
+            accountModerationReason, ugcTermsAccepted: acceptsCurrentTerms, ugcTermsVersion: acceptsCurrentTerms ? moderationService_1.CURRENT_UGC_TERMS_VERSION : null }), (result.pendingPhoto && {
+            pendingPhotoSubmissionId: result.pendingPhoto.id,
+            photoModerationStatus: result.pendingPhoto.status,
+            photoSubmittedAt: result.pendingPhoto.submittedAt,
+        })), (accountType === 'technician' && {
+            technicianModerationStatus: 'PENDING',
+            technicianModerationReason: null,
+        })));
     }
     catch (error) {
         if (error instanceof serviceArea_1.ServiceAreaValidationError) {
@@ -212,15 +292,53 @@ const resendVerification = (req, res) => __awaiter(void 0, void 0, void 0, funct
 });
 exports.resendVerification = resendVerification;
 const checkVerificationStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
     try {
         const user = yield prisma_1.default.user.findUnique({
             where: { id: req.auth.userId },
-            select: { emailVerified: true }
+            select: {
+                emailVerified: true,
+                moderationStatus: true,
+                moderationReason: true,
+                technician: {
+                    select: {
+                        moderationStatus: true,
+                        moderationReason: true,
+                    },
+                },
+                // Return only the owner's latest moderation decision. The
+                // staged image and reviewer identity are deliberately omitted.
+                profilePhotoSubmissions: {
+                    select: {
+                        id: true,
+                        status: true,
+                        submittedAt: true,
+                        reviewedAt: true,
+                        reviewNote: true,
+                    },
+                    orderBy: { submittedAt: 'desc' },
+                    take: 1,
+                },
+            },
         });
         if (!user) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
         }
-        res.json({ emailVerified: user.emailVerified });
+        const latestPhoto = user.profilePhotoSubmissions[0];
+        res.json({
+            emailVerified: user.emailVerified,
+            accountModerationStatus: user.moderationStatus,
+            accountModerationReason: user.moderationReason,
+            limitedAccess: user.moderationStatus === 'SUSPENDED',
+            technicianModerationStatus: ((_a = user.technician) === null || _a === void 0 ? void 0 : _a.moderationStatus) || null,
+            technicianModerationReason: ((_b = user.technician) === null || _b === void 0 ? void 0 : _b.moderationReason) || null,
+            photoModerationStatus: (latestPhoto === null || latestPhoto === void 0 ? void 0 : latestPhoto.status) || null,
+            photoModerationReason: (latestPhoto === null || latestPhoto === void 0 ? void 0 : latestPhoto.reviewNote) || null,
+            photoModerationSubmissionId: (latestPhoto === null || latestPhoto === void 0 ? void 0 : latestPhoto.id) || null,
+            pendingPhotoSubmissionId: (latestPhoto === null || latestPhoto === void 0 ? void 0 : latestPhoto.status) === 'PENDING' ? latestPhoto.id : null,
+            photoSubmittedAt: (latestPhoto === null || latestPhoto === void 0 ? void 0 : latestPhoto.submittedAt) || null,
+            photoModerationReviewedAt: (latestPhoto === null || latestPhoto === void 0 ? void 0 : latestPhoto.reviewedAt) || null,
+        });
     }
     catch (error) {
         console.error('Error checking verification status:', error);
@@ -334,15 +452,30 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         // Get user with technician data if applicable
         const user = yield prisma_1.default.user.findFirst({
             where: { email: { equals: email.trim().toLowerCase(), mode: 'insensitive' } },
-            select: Object.assign(Object.assign({}, safeUser_1.safeUserSelect), { password: true, technician: true }),
+            select: Object.assign(Object.assign({}, safeUser_1.safeUserSelect), { deletedAt: true, password: true, technician: true, ugcTermsConsents: {
+                    where: { termsVersion: moderationService_1.CURRENT_UGC_TERMS_VERSION },
+                    select: { termsVersion: true, acceptedAt: true },
+                    take: 1,
+                }, profilePhotoSubmissions: {
+                    select: {
+                        id: true,
+                        status: true,
+                        submittedAt: true,
+                        reviewedAt: true,
+                        reviewNote: true,
+                    },
+                    orderBy: { submittedAt: 'desc' },
+                    take: 1,
+                } }),
         });
-        if (!user) {
+        if (!user || user.deletedAt) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
         const passwordResult = yield (0, password_1.verifyPassword)(password, user.password);
         if (!passwordResult.valid) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
+        const accountSuspended = user.moderationStatus === 'SUSPENDED';
         // Transparently migrate accounts created before password hashing was added.
         if (passwordResult.needsRehash) {
             yield prisma_1.default.user.update({
@@ -352,12 +485,20 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         }
         const role = (0, token_1.normalizeAuthRole)(user.role);
         const token = (0, token_1.createAuthToken)(user.id, role);
+        const currentConsent = user.ugcTermsConsents[0];
+        const latestPhoto = user.profilePhotoSubmissions[0];
         // Return user with technician fields if applicable
-        const responseData = Object.assign(Object.assign({ id: user.id, name: user.name, email: user.email, role, phone: user.phone, photoUrl: user.photoUrl, emailVerified: user.emailVerified }, (user.technician && {
+        const responseData = Object.assign(Object.assign(Object.assign(Object.assign({ id: user.id, name: user.name, email: user.email, role, phone: user.phone, photoUrl: user.photoUrl, emailVerified: user.emailVerified, accountModerationStatus: user.moderationStatus, accountModerationReason: user.moderationReason, limitedAccess: accountSuspended }, (accountSuspended && {
+            suspensionCode: 'ACCOUNT_SUSPENDED',
+            suspensionMessage: 'Esta cuenta está suspendida. Puedes contactar a soporte o eliminar tu cuenta.',
+            supportUrl: '/support',
+        })), { ugcTermsAccepted: Boolean(currentConsent), ugcTermsVersion: (currentConsent === null || currentConsent === void 0 ? void 0 : currentConsent.termsVersion) || null, ugcTermsAcceptedAt: (currentConsent === null || currentConsent === void 0 ? void 0 : currentConsent.acceptedAt) || null, photoModerationStatus: (latestPhoto === null || latestPhoto === void 0 ? void 0 : latestPhoto.status) || null, photoModerationReason: (latestPhoto === null || latestPhoto === void 0 ? void 0 : latestPhoto.reviewNote) || null, photoModerationSubmissionId: (latestPhoto === null || latestPhoto === void 0 ? void 0 : latestPhoto.id) || null, pendingPhotoSubmissionId: (latestPhoto === null || latestPhoto === void 0 ? void 0 : latestPhoto.status) === 'PENDING' ? latestPhoto.id : null, photoSubmittedAt: (latestPhoto === null || latestPhoto === void 0 ? void 0 : latestPhoto.submittedAt) || null, photoModerationReviewedAt: (latestPhoto === null || latestPhoto === void 0 ? void 0 : latestPhoto.reviewedAt) || null }), (user.technician && {
             technicianId: user.technician.id,
             specializations: user.technician.specializations,
             location: user.technician.location,
             companyName: user.technician.companyName,
+            technicianModerationStatus: user.technician.moderationStatus,
+            technicianModerationReason: user.technician.moderationReason,
             mapVisible: user.technician.mapVisible,
             mapLocation: (0, serviceArea_1.toPublicMapLocation)(user.technician),
         })), { token });

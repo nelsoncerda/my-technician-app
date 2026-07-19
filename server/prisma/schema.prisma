@@ -18,21 +18,30 @@ generator client {
 // ============================================
 
 model User {
-  id                   String      @id @default(uuid())
-  email                String      @unique
-  password             String
-  name                 String
-  phone                String?
-  photoUrl             String?     // Profile photo URL
-  role                 String      @default("user") // "user", "technician", "admin"
-  emailVerified        Boolean     @default(false)
-  verificationToken    String?
+  id                       String               @id @default(uuid())
+  email                    String               @unique
+  password                 String
+  name                     String
+  phone                    String?
+  photoUrl                 String? // Profile photo URL
+  role                     String               @default("user") // "user", "technician", "admin"
+  emailVerified            Boolean              @default(false)
+  verificationToken        String?
   verificationTokenExpires DateTime?
-  resetPasswordToken   String?     // Token for password reset
-  resetPasswordExpires DateTime?   // Expiration time for reset token
-  createdAt            DateTime    @default(now())
-  updatedAt            DateTime    @updatedAt
-  technician           Technician?
+  resetPasswordToken       String? // Token for password reset
+  resetPasswordExpires     DateTime? // Expiration time for reset token
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+  technician               Technician?
+  moderationStatus         UserModerationStatus @default(ACTIVE)
+  moderationReason         String?
+  moderatedAt              DateTime?
+  moderatedById            String?
+  moderatedBy              User?                @relation("UserModerationReviewer", fields: [moderatedById], references: [id], onDelete: SetNull)
+  usersModerated           User[]               @relation("UserModerationReviewer")
+  deletedAt                DateTime?
+  deletionIdentityDigest   String?
+  sanctionedAtDeletion     Boolean              @default(false)
 
   // Gamification relations
   points             UserPoints?
@@ -45,7 +54,23 @@ model User {
   bookingsAsCustomer Booking[] @relation("CustomerBookings")
 
   // Profile change history
-  profileChanges     ProfileChangeHistory[]
+  profileChanges ProfileChangeHistory[]
+
+  // Trust and safety relations
+  ugcTermsConsents           UgcTermsConsent[]
+  profilePhotoSubmissions    ProfilePhotoSubmission[] @relation("ProfilePhotoOwner")
+  profilePhotosReviewed      ProfilePhotoSubmission[] @relation("ProfilePhotoReviewer")
+  blocksCreated              UserBlock[]              @relation("Blocker")
+  blocksReceived             UserBlock[]              @relation("BlockedUser")
+  reportsCreated             ContentReport[]          @relation("ReportReporter")
+  reportsReceived            ContentReport[]          @relation("ReportTargetUser")
+  reportsReviewed            ContentReport[]          @relation("ReportReviewer")
+  technicianProfilesReviewed Technician[]             @relation("TechnicianReviewer")
+  moderationAuditEntries     ModerationAuditLog[]     @relation("ModerationAuditActor")
+
+  @@index([moderationStatus])
+  @@index([deletedAt])
+  @@index([deletionIdentityDigest, moderationStatus])
 }
 
 // ============================================
@@ -53,35 +78,42 @@ model User {
 // ============================================
 
 model ProfileChangeHistory {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fieldName   String   // "name", "email", "phone", "photoUrl"
-  oldValue    String?
-  newValue    String?
-  changedBy   String?  // userId of who made the change (for admin changes)
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fieldName    String // "name", "email", "phone", "photoUrl"
+  oldValue     String?
+  newValue     String?
+  changedBy    String? // userId of who made the change (for admin changes)
   changeReason String? // Optional reason for the change
-  ipAddress   String?  // IP address from where change was made
-  createdAt   DateTime @default(now())
+  ipAddress    String? // IP address from where change was made
+  createdAt    DateTime @default(now())
 
   @@index([userId])
   @@index([createdAt])
 }
 
 model Technician {
-  id                   String   @id @default(uuid())
-  userId               String   @unique
-  user                 User     @relation(fields: [userId], references: [id])
-  specializations      String[] // Array of specializations/services the technician provides
-  location             String   // Public service-area label, never a booking/customer address
-  companyName          String?  // Optional company name for the technician
-  serviceAreaLatitude  Float?   // Deliberately rounded; never store an exact home location
-  serviceAreaLongitude Float?
-  serviceAreaRadiusKm  Float    @default(5)
-  mapVisible           Boolean  @default(true)
-  rating               Float    @default(0)
-  verified             Boolean  @default(false)
-  reviews              Review[]
+  id                    String                     @id @default(uuid())
+  userId                String                     @unique
+  user                  User                       @relation(fields: [userId], references: [id])
+  specializations       String[] // Array of specializations/services the technician provides
+  location              String // Public service-area label, never a booking/customer address
+  companyName           String? // Optional company name for the technician
+  serviceAreaLatitude   Float? // Deliberately rounded; never store an exact home location
+  serviceAreaLongitude  Float?
+  serviceAreaRadiusKm   Float                      @default(5)
+  mapVisible            Boolean                    @default(true)
+  rating                Float                      @default(0)
+  verified              Boolean                    @default(false)
+  moderationStatus      TechnicianModerationStatus @default(PENDING)
+  moderationReason      String?
+  moderationSubmittedAt DateTime                   @default(now())
+  moderatedAt           DateTime?
+  moderatedById         String?
+  moderatedBy           User?                      @relation("TechnicianReviewer", fields: [moderatedById], references: [id], onDelete: SetNull)
+  reviews               Review[]
+  reports               ContentReport[]
 
   // Booking relations
   bookings          Booking[]
@@ -93,6 +125,156 @@ model Technician {
   totalReviews       Int   @default(0)
   responseRate       Float @default(0)
   completionRate     Float @default(0)
+
+  @@index([moderationStatus, moderationSubmittedAt])
+}
+
+// ============================================
+// TRUST, SAFETY & CONTENT MODERATION
+// ============================================
+
+enum TechnicianModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum UserModerationStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum ProfilePhotoModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ReportContentType {
+  PROFILE
+  PHOTO
+  BEHAVIOR
+}
+
+enum ReportReason {
+  SPAM
+  HARASSMENT
+  HATE_SPEECH
+  SEXUAL_CONTENT
+  VIOLENCE
+  FRAUD
+  IMPERSONATION
+  PRIVACY
+  OTHER
+}
+
+enum ContentReportStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+enum ModerationAction {
+  NONE
+  CONTENT_REMOVED
+  TECHNICIAN_SUSPENDED
+  USER_SUSPENDED
+  WARNING_RECORDED
+}
+
+model UgcTermsConsent {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  termsVersion String
+  acceptedAt   DateTime @default(now())
+  ipAddress    String?
+  userAgent    String?
+
+  @@unique([userId, termsVersion])
+  @@index([acceptedAt])
+}
+
+model ProfilePhotoSubmission {
+  id           String                       @id @default(uuid())
+  userId       String
+  user         User                         @relation("ProfilePhotoOwner", fields: [userId], references: [id], onDelete: Cascade)
+  imageData    String
+  status       ProfilePhotoModerationStatus @default(PENDING)
+  submittedAt  DateTime                     @default(now())
+  reviewedAt   DateTime?
+  reviewedById String?
+  reviewedBy   User?                        @relation("ProfilePhotoReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewNote   String?
+  pendingKey   String?                      @unique
+  reports      ContentReport[]
+
+  @@index([userId, status])
+  @@index([status, submittedAt])
+}
+
+model UserBlock {
+  id            String   @id @default(uuid())
+  blockerId     String
+  blocker       User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedUserId String
+  blockedUser   User     @relation("BlockedUser", fields: [blockedUserId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+
+  @@unique([blockerId, blockedUserId])
+  @@index([blockedUserId])
+}
+
+model ContentReport {
+  id                       String                  @id @default(uuid())
+  reporterId               String
+  reporter                 User                    @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetUserId             String
+  targetUser               User                    @relation("ReportTargetUser", fields: [targetUserId], references: [id], onDelete: Cascade)
+  technicianId             String?
+  technician               Technician?             @relation(fields: [technicianId], references: [id], onDelete: SetNull)
+  profilePhotoSubmissionId String?
+  profilePhotoSubmission   ProfilePhotoSubmission? @relation(fields: [profilePhotoSubmissionId], references: [id], onDelete: SetNull)
+  contentType              ReportContentType
+  reason                   ReportReason
+  details                  String?
+  contentFingerprint       String?
+  status                   ContentReportStatus     @default(OPEN)
+  action                   ModerationAction        @default(NONE)
+  resolutionNote           String?
+  reviewedById             String?
+  reviewedBy               User?                   @relation("ReportReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt               DateTime?
+  dedupeKey                String?                 @unique
+  reporterIdentitySnapshot Json?
+  targetIdentitySnapshot   Json?
+  technicianIdSnapshot     String?
+  profilePhotoIdSnapshot   String?
+  createdAt                DateTime                @default(now())
+  updatedAt                DateTime                @updatedAt
+
+  @@index([reporterId, createdAt])
+  @@index([targetUserId, status])
+  @@index([status, createdAt])
+}
+
+model ModerationAuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  actor      User?    @relation("ModerationAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  action     String
+  targetType String
+  targetId   String
+  fromStatus String?
+  toStatus   String?
+  reason     String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([targetType, targetId])
+  @@index([actorId, createdAt])
 }
 
 model Review {
@@ -100,7 +282,7 @@ model Review {
   technicianId String
   technician   Technician @relation(fields: [technicianId], references: [id])
   author       String
-  authorId     String?    // Link to user who wrote the review
+  authorId     String? // Link to user who wrote the review
   comment      String
   rating       Int
   date         DateTime   @default(now())
@@ -114,11 +296,11 @@ model AvailabilitySlot {
   id           String     @id @default(uuid())
   technicianId String
   technician   Technician @relation(fields: [technicianId], references: [id], onDelete: Cascade)
-  dayOfWeek    Int        // 0=Sunday, 1=Monday, etc.
-  startTime    String     // "09:00" format
-  endTime      String     // "17:00" format
+  dayOfWeek    Int // 0=Sunday, 1=Monday, etc.
+  startTime    String // "09:00" format
+  endTime      String // "17:00" format
   isRecurring  Boolean    @default(true)
-  specificDate DateTime?  // For non-recurring specific date slots
+  specificDate DateTime? // For non-recurring specific date slots
   isAvailable  Boolean    @default(true)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
@@ -143,17 +325,17 @@ model Booking {
   technicianId      String
   technician        Technician    @relation(fields: [technicianId], references: [id])
   scheduledDate     DateTime
-  scheduledTime     String        // "09:00" format
+  scheduledTime     String // "09:00" format
   estimatedDuration Int           @default(60) // minutes
   status            BookingStatus @default(PENDING)
-  serviceType       String        // e.g., "Reparación", "Instalación", "Mantenimiento"
+  serviceType       String // e.g., "Reparación", "Instalación", "Mantenimiento"
   description       String?
   address           String
   city              String
   phone             String
   totalPrice        Float?
   cancelReason      String?
-  cancelledBy       String?       // "customer" | "technician" | "admin"
+  cancelledBy       String? // "customer" | "technician" | "admin"
   completedAt       DateTime?
   confirmedAt       DateTime?
   createdAt         DateTime      @default(now())
@@ -175,13 +357,13 @@ enum BookingStatus {
 }
 
 model BookingReminder {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   bookingId String
-  type      String   // "email" | "sms" | "push"
+  type      String // "email" | "sms" | "push"
   sendAt    DateTime
-  sent      Boolean  @default(false)
+  sent      Boolean   @default(false)
   sentAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 }
 
 // ============================================
@@ -204,10 +386,10 @@ model PointTransaction {
   id          String   @id @default(uuid())
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  points      Int      // Can be negative for redemptions
-  type        String   // "EARNED" | "REDEEMED" | "BONUS" | "PENALTY"
-  source      String   // "BOOKING_COMPLETED" | "REVIEW_GIVEN" | "FIRST_BOOKING" | "REFERRAL" etc.
-  sourceId    String?  // Reference to booking, review, etc. (not a foreign key to allow flexibility)
+  points      Int // Can be negative for redemptions
+  type        String // "EARNED" | "REDEEMED" | "BONUS" | "PENALTY"
+  source      String // "BOOKING_COMPLETED" | "REVIEW_GIVEN" | "FIRST_BOOKING" | "REFERRAL" etc.
+  sourceId    String? // Reference to booking, review, etc. (not a foreign key to allow flexibility)
   description String
   createdAt   DateTime @default(now())
 
@@ -216,19 +398,19 @@ model PointTransaction {
 }
 
 model Achievement {
-  id            String   @id @default(uuid())
-  code          String   @unique
+  id            String  @id @default(uuid())
+  code          String  @unique
   name          String
   nameEs        String
   description   String
   descriptionEs String
   iconUrl       String?
-  badgeColor    String   @default("#3B82F6")
-  category      String   // "MILESTONE" | "QUALITY" | "ENGAGEMENT" | "SPECIAL"
-  pointsReward  Int      @default(0)
-  isActive      Boolean  @default(true)
-  sortOrder     Int      @default(0)
-  requirements  Json     // e.g., {"jobsCompleted": 10}
+  badgeColor    String  @default("#3B82F6")
+  category      String // "MILESTONE" | "QUALITY" | "ENGAGEMENT" | "SPECIAL"
+  pointsReward  Int     @default(0)
+  isActive      Boolean @default(true)
+  sortOrder     Int     @default(0)
+  requirements  Json // e.g., {"jobsCompleted": 10}
 
   userAchievements UserAchievement[]
   createdAt        DateTime          @default(now())
@@ -260,21 +442,21 @@ model Level {
 }
 
 model Reward {
-  id            String   @id @default(uuid())
-  code          String   @unique
+  id            String    @id @default(uuid())
+  code          String    @unique
   name          String
   nameEs        String
   description   String
   descriptionEs String
   pointsCost    Int
-  category      String   // "DISCOUNT" | "FEATURE" | "PHYSICAL" | "EXPERIENCE"
-  value         Json     // e.g., {"discountPercent": 10}
+  category      String // "DISCOUNT" | "FEATURE" | "PHYSICAL" | "EXPERIENCE"
+  value         Json // e.g., {"discountPercent": 10}
   imageUrl      String?
-  isActive      Boolean  @default(true)
-  stock         Int?     // null = unlimited
+  isActive      Boolean   @default(true)
+  stock         Int? // null = unlimited
   validFrom     DateTime?
   validUntil    DateTime?
-  createdAt     DateTime @default(now())
+  createdAt     DateTime  @default(now())
 
   redemptions RewardRedemption[]
 }
@@ -290,7 +472,7 @@ model RewardRedemption {
   redeemedAt  DateTime  @default(now())
   fulfilledAt DateTime?
   expiresAt   DateTime?
-  code        String?   // Unique redemption code
+  code        String? // Unique redemption code
 
   @@index([userId])
 }
@@ -299,7 +481,7 @@ model LeaderboardEntry {
   id            String   @id @default(uuid())
   userId        String
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  period        String   // "WEEKLY" | "MONTHLY" | "ALL_TIME"
+  period        String // "WEEKLY" | "MONTHLY" | "ALL_TIME"
   periodStart   DateTime
   periodEnd     DateTime
   rank          Int

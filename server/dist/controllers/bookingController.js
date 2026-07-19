@@ -59,6 +59,7 @@ exports.getTimeOffs = getTimeOffs;
 exports.getAllBookings = getAllBookings;
 const bookingService = __importStar(require("../services/bookingService"));
 const notificationService = __importStar(require("../services/notificationService"));
+const moderationService_1 = require("../services/moderationService");
 function parseBookingDate(value) {
     if (typeof value !== 'string')
         throw new Error('Fecha inválida');
@@ -81,6 +82,9 @@ function createBooking(req, res) {
         try {
             const { technicianId, scheduledDate, scheduledTime, serviceType, description, address, city, phone, estimatedDuration } = req.body;
             const customerId = req.auth.userId;
+            if (!(yield (0, moderationService_1.hasCurrentTermsConsent)(customerId))) {
+                return res.status(428).json((0, moderationService_1.termsRequiredPayload)());
+            }
             if (!customerId || !technicianId || !scheduledDate || !scheduledTime || !serviceType || !address || !city || !phone) {
                 return res.status(400).json({ error: 'Faltan campos requeridos' });
             }
@@ -263,7 +267,7 @@ function cancelBooking(req, res) {
             const booking = yield bookingService.cancelBooking(id, req.auth, reason);
             const cancelledBy = booking.cancelledBy || 'admin';
             // Get full booking for notification
-            const fullBooking = yield bookingService.getBookingById(id);
+            const fullBooking = yield bookingService.getBookingForNotification(id);
             if (fullBooking) {
                 try {
                     yield notificationService.sendBookingCancelled(fullBooking, cancelledBy, reason);
@@ -302,11 +306,15 @@ function getAvailableSlots(req, res) {
 function setAvailability(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const { technicianId, slots } = req.body;
-            if (!technicianId || !slots || !Array.isArray(slots)) {
+            const body = req.body;
+            if (!body || typeof body !== 'object' || Array.isArray(body)) {
                 return res.status(400).json({ error: 'Datos de disponibilidad inválidos' });
             }
-            const result = yield bookingService.setAvailability(technicianId, slots);
+            const { technicianId, slots } = body;
+            if (typeof technicianId !== 'string' || !technicianId.trim() || !Array.isArray(slots)) {
+                return res.status(400).json({ error: 'Datos de disponibilidad inválidos' });
+            }
+            const result = yield bookingService.setAvailability(technicianId.trim(), slots);
             res.json(result);
         }
         catch (error) {

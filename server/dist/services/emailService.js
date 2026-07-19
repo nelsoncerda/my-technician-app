@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendPasswordResetEmail = exports.sendWelcomeEmail = exports.sendVerificationEmail = exports.sendEmail = void 0;
+exports.sendModerationReportAlert = exports.sendPasswordResetEmail = exports.sendWelcomeEmail = exports.sendVerificationEmail = exports.sendEmail = void 0;
 const nodemailer_1 = __importDefault(require("nodemailer"));
 // Configuration - use environment variables in production
 const APP_URL = process.env.APP_URL || 'https://api.tecnicosenrd.com';
@@ -308,3 +308,45 @@ const sendPasswordResetEmail = (email, token, userName) => __awaiter(void 0, voi
     }
 });
 exports.sendPasswordResetEmail = sendPasswordResetEmail;
+function escapeEmailHtml(value) {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+/**
+ * Best-effort operational alert for the 24-hour moderation queue. Raw report
+ * details and user names are deliberately omitted from email; moderators read
+ * them only after authenticating to the admin console.
+ */
+const sendModerationReportAlert = (report) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    if (!useRealSMTP) {
+        console.log(`Moderation report ${report.reportId} queued; SMTP alert skipped because SMTP is not configured`);
+        return null;
+    }
+    const supportEmail = ((_a = process.env.SUPPORT_EMAIL) === null || _a === void 0 ? void 0 : _a.trim()) || 'ncerda@hotmail.com';
+    const safeReportId = escapeEmailHtml(report.reportId);
+    const safeContentType = escapeEmailHtml(report.contentType);
+    const safeReason = escapeEmailHtml(report.reason);
+    const createdAt = report.createdAt.toISOString();
+    const text = [
+        'Nuevo reporte de moderación en Técnicos en RD.',
+        `ID: ${report.reportId}`,
+        `Tipo: ${report.contentType}`,
+        `Motivo: ${report.reason}`,
+        `Creado: ${createdAt}`,
+        'Revisa la cola administrativa dentro de 24 horas.',
+    ].join('\n');
+    return (0, exports.sendEmail)({
+        to: supportEmail,
+        subject: `[Moderación] Nuevo reporte ${report.reportId}`,
+        text,
+        html: `<p><strong>Nuevo reporte de moderación.</strong></p>
+          <p>ID: ${safeReportId}<br>Tipo: ${safeContentType}<br>Motivo: ${safeReason}<br>Creado: ${createdAt}</p>
+          <p>Revisa la cola administrativa dentro de 24 horas.</p>`,
+    });
+});
+exports.sendModerationReportAlert = sendModerationReportAlert;

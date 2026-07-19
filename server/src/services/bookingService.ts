@@ -26,9 +26,119 @@ export interface BookingActor {
   role: 'user' | 'technician' | 'admin';
 }
 
+export interface AvailabilitySlotInput {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  isAvailable: boolean;
+}
+
 // Default business hours (8 AM - 6 PM) when no availability is configured
 const DEFAULT_START_TIME = '08:00';
 const DEFAULT_END_TIME = '18:00';
+
+// Booking responses expose operational profile data but never internal
+// moderation reasons, reviewer IDs, or moderation timestamps.
+const bookingTechnicianSelect = {
+  id: true,
+  userId: true,
+  specializations: true,
+  location: true,
+  companyName: true,
+  serviceAreaLatitude: true,
+  serviceAreaLongitude: true,
+  serviceAreaRadiusKm: true,
+  mapVisible: true,
+  rating: true,
+  verified: true,
+  totalJobsCompleted: true,
+  totalReviews: true,
+  responseRate: true,
+  completionRate: true,
+  user: { select: { id: true, name: true, email: true, phone: true, photoUrl: true } },
+} satisfies Prisma.TechnicianSelect;
+
+type BookingContactShape = {
+  customerId: string;
+  phone?: unknown;
+  customer?: unknown;
+  technician?: {
+    userId?: string;
+    user?: { id?: string } | null;
+  } | null;
+};
+
+function withoutDirectContactFields<T>(value: T): T {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+
+  const safeValue = { ...value } as Record<string, unknown>;
+  delete safeValue.email;
+  delete safeValue.phone;
+  return safeValue as T;
+}
+
+function relationshipKey(firstUserId: string, secondUserId: string) {
+  return [firstUserId, secondUserId].sort().join('\u0000');
+}
+
+/**
+ * A block is mutual for privacy purposes even though UserBlock records the
+ * direction chosen by the blocker. Keep the booking facts needed for history
+ * and disputes, but remove direct contact channels from both participants.
+ */
+async function redactBlockedBookingContacts<T extends BookingContactShape>(bookings: T[]) {
+  const relationships = bookings.flatMap((booking) => {
+    const technicianUserId = booking.technician?.userId || booking.technician?.user?.id;
+    return technicianUserId
+      ? [{ customerId: booking.customerId, technicianUserId }]
+      : [];
+  });
+
+  if (relationships.length === 0) {
+    return bookings.map((booking) => ({ ...booking, interactionBlocked: false }));
+  }
+
+  const participantIds = Array.from(new Set(
+    relationships.flatMap(({ customerId, technicianUserId }) => [customerId, technicianUserId])
+  ));
+  const blocks = await prisma.userBlock.findMany({
+    where: {
+      blockerId: { in: participantIds },
+      blockedUserId: { in: participantIds },
+    },
+    select: { blockerId: true, blockedUserId: true },
+  });
+  const blockedRelationships = new Set(
+    blocks.map((block) => relationshipKey(block.blockerId, block.blockedUserId))
+  );
+
+  return bookings.map((booking) => {
+    const technicianUserId = booking.technician?.userId || booking.technician?.user?.id;
+    const interactionBlocked = Boolean(
+      technicianUserId && blockedRelationships.has(relationshipKey(booking.customerId, technicianUserId))
+    );
+
+    if (!interactionBlocked) {
+      return { ...booking, interactionBlocked: false };
+    }
+
+    const safeBooking = { ...booking } as Record<string, unknown>;
+    delete safeBooking.phone;
+    if (booking.customer) {
+      safeBooking.customer = withoutDirectContactFields(booking.customer);
+    }
+    if (booking.technician) {
+      safeBooking.technician = {
+        ...booking.technician,
+        ...(booking.technician.user
+          ? { user: withoutDirectContactFields(booking.technician.user) }
+          : {}),
+      };
+    }
+    safeBooking.interactionBlocked = true;
+    return safeBooking as T & { interactionBlocked: boolean };
+  });
+}
 
 function timeToMinutes(time: string): number | null {
   const match = /^(\d{2}):(\d{2})$/.exec(time);
@@ -52,6 +162,108 @@ function bookingDayRange(date: Date) {
 
 function overlaps(start: number, duration: number, otherStart: number, otherDuration: number) {
   return start < otherStart + otherDuration && otherStart < start + duration;
+}
+
+async function ensureBookingCanAdvance(
+  customerId: string,
+  technicianUserId: string,
+  technicianId: string,
+  db: Prisma.TransactionClient | typeof prisma = prisma
+) {
+  const [block, customer, technician] = await Promise.all([
+    db.userBlock.findFirst({
+      where: {
+        OR: [
+          { blockerId: customerId, blockedUserId: technicianUserId },
+          { blockerId: technicianUserId, blockedUserId: customerId },
+        ],
+      },
+      select: { id: true },
+    }),
+    db.user.findUnique({
+      where: { id: customerId },
+      select: { moderationStatus: true },
+    }),
+    db.technician.findUnique({
+      where: { id: technicianId },
+      select: {
+        userId: true,
+        moderationStatus: true,
+        user: { select: { moderationStatus: true } },
+      },
+    }),
+  ]);
+  if (!customer || customer.moderationStatus !== 'ACTIVE') {
+    throw new Error('La reserva no puede avanzar porque la cuenta del cliente está suspendida');
+  }
+  if (
+    !technician ||
+    technician.userId !== technicianUserId ||
+    technician.moderationStatus !== 'APPROVED' ||
+    technician.user.moderationStatus !== 'ACTIVE'
+  ) {
+    throw new Error('La reserva no puede avanzar porque el perfil técnico no está aprobado y activo');
+  }
+  if (block) {
+    throw new Error('La reserva no puede avanzar porque uno de los usuarios bloqueó al otro');
+  }
+}
+
+function validateWeeklyAvailability(slots: unknown): AvailabilitySlotInput[] {
+  if (!Array.isArray(slots)) {
+    throw new Error('Los horarios deben enviarse como una lista');
+  }
+  if (slots.length === 0) {
+    throw new Error('Incluye al menos un horario semanal');
+  }
+
+  const validated = slots.map((value, index) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw new Error(`El horario ${index + 1} no es válido`);
+    }
+
+    const slot = value as Record<string, unknown>;
+    if (!Number.isInteger(slot.dayOfWeek) || Number(slot.dayOfWeek) < 0 || Number(slot.dayOfWeek) > 6) {
+      throw new Error(`El día del horario ${index + 1} debe estar entre 0 y 6`);
+    }
+    if (typeof slot.startTime !== 'string' || timeToMinutes(slot.startTime) === null) {
+      throw new Error(`La hora de inicio del horario ${index + 1} no es válida`);
+    }
+    if (typeof slot.endTime !== 'string' || timeToMinutes(slot.endTime) === null) {
+      throw new Error(`La hora de cierre del horario ${index + 1} no es válida`);
+    }
+    if (timeToMinutes(slot.endTime)! <= timeToMinutes(slot.startTime)!) {
+      throw new Error(`La hora de cierre del horario ${index + 1} debe ser posterior a la hora de inicio`);
+    }
+    if (typeof slot.isAvailable !== 'boolean') {
+      throw new Error(`La disponibilidad del horario ${index + 1} debe ser verdadera o falsa`);
+    }
+
+    return {
+      dayOfWeek: slot.dayOfWeek as number,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      isAvailable: slot.isAvailable,
+    };
+  });
+
+  for (let dayOfWeek = 0; dayOfWeek <= 6; dayOfWeek += 1) {
+    const daySlots = validated
+      .filter((slot) => slot.dayOfWeek === dayOfWeek)
+      .map((slot) => ({
+        start: timeToMinutes(slot.startTime)!,
+        end: timeToMinutes(slot.endTime)!,
+      }))
+      .sort((left, right) => left.start - right.start);
+
+    for (let index = 1; index < daySlots.length; index += 1) {
+      if (daySlots[index].start < daySlots[index - 1].end) {
+        throw new Error(`Los horarios del día ${dayOfWeek} no pueden solaparse`);
+      }
+    }
+  }
+
+  return validated;
 }
 
 // Check if a time slot is available
@@ -139,6 +351,16 @@ export async function checkAvailability(
 
 // Get available time slots for a technician on a specific date
 export async function getAvailableSlots(technicianId: string, date: Date) {
+  const publicTechnician = await prisma.technician.findFirst({
+    where: {
+      id: technicianId,
+      moderationStatus: 'APPROVED',
+      user: { moderationStatus: 'ACTIVE' },
+    },
+    select: { id: true },
+  });
+  if (!publicTechnician) return [];
+
   const dayOfWeek = date.getUTCDay();
   const { start: dayStart, end: dayEnd } = bookingDayRange(date);
 
@@ -244,6 +466,47 @@ export async function createBooking(input: CreateBookingInput) {
   } = input;
 
   const booking = await prisma.$transaction(async (tx) => {
+    const [technician, customer] = await Promise.all([
+      tx.technician.findUnique({
+        where: { id: technicianId },
+        select: {
+          userId: true,
+          moderationStatus: true,
+          user: { select: { moderationStatus: true } },
+        },
+      }),
+      tx.user.findUnique({
+        where: { id: customerId },
+        select: { moderationStatus: true },
+      }),
+    ]);
+    if (!customer || customer.moderationStatus !== 'ACTIVE') {
+      throw new Error('Esta cuenta no puede crear nuevas reservas');
+    }
+    if (
+      !technician ||
+      technician.moderationStatus !== 'APPROVED' ||
+      technician.user.moderationStatus !== 'ACTIVE'
+    ) {
+      throw new Error('Este perfil técnico no está disponible para nuevas reservas');
+    }
+    if (technician.userId === customerId) {
+      throw new Error('No puedes reservar tu propio perfil técnico');
+    }
+
+    const block = await tx.userBlock.findFirst({
+      where: {
+        OR: [
+          { blockerId: customerId, blockedUserId: technician.userId },
+          { blockerId: technician.userId, blockedUserId: customerId },
+        ],
+      },
+      select: { id: true },
+    });
+    if (block) {
+      throw new Error('No puedes reservar servicios con este usuario');
+    }
+
     const isAvailable = await checkAvailability(
       technicianId,
       scheduledDate,
@@ -274,11 +537,7 @@ export async function createBooking(input: CreateBookingInput) {
         customer: {
           select: { id: true, name: true, email: true, phone: true },
         },
-        technician: {
-          include: {
-            user: { select: { id: true, name: true, email: true, phone: true } },
-          },
-        },
+        technician: { select: bookingTechnicianSelect },
       },
     });
   }, {
@@ -302,21 +561,30 @@ export async function createBooking(input: CreateBookingInput) {
   return booking;
 }
 
-// Get booking by ID
-export async function getBookingById(bookingId: string) {
+async function getBookingByIdWithContacts(bookingId: string) {
   return prisma.booking.findUnique({
     where: { id: bookingId },
     include: {
       customer: {
         select: { id: true, name: true, email: true, phone: true },
       },
-      technician: {
-        include: {
-          user: { select: { id: true, name: true, email: true, phone: true } },
-        },
-      },
+      technician: { select: bookingTechnicianSelect },
     },
   });
+}
+
+// Get booking by ID
+export async function getBookingById(bookingId: string) {
+  const booking = await getBookingByIdWithContacts(bookingId);
+  if (!booking) return null;
+  const [safeBooking] = await redactBlockedBookingContacts([booking]);
+  return safeBooking;
+}
+
+// Notifications are an internal delivery concern and need the destination
+// addresses. API responses must use getBookingById, which applies redaction.
+export async function getBookingForNotification(bookingId: string) {
+  return getBookingByIdWithContacts(bookingId);
 }
 
 // Get customer's bookings
@@ -335,17 +603,14 @@ export async function getCustomerBookings(customerId: string, filters?: BookingF
     where.scheduledDate = { ...where.scheduledDate, lte: filters.endDate };
   }
 
-  return prisma.booking.findMany({
+  const bookings = await prisma.booking.findMany({
     where,
     include: {
-      technician: {
-        include: {
-          user: { select: { id: true, name: true, email: true, phone: true, photoUrl: true } },
-        },
-      },
+      technician: { select: bookingTechnicianSelect },
     },
     orderBy: { scheduledDate: 'desc' },
   });
+  return redactBlockedBookingContacts(bookings);
 }
 
 // Get technician's bookings
@@ -364,15 +629,17 @@ export async function getTechnicianBookings(technicianId: string, filters?: Book
     where.scheduledDate = { ...where.scheduledDate, lte: filters.endDate };
   }
 
-  return prisma.booking.findMany({
+  const bookings = await prisma.booking.findMany({
     where,
     include: {
       customer: {
         select: { id: true, name: true, email: true, phone: true, photoUrl: true },
       },
+      technician: { select: { userId: true } },
     },
     orderBy: { scheduledDate: 'desc' },
   });
+  return redactBlockedBookingContacts(bookings);
 }
 
 // Confirm booking (technician)
@@ -392,6 +659,12 @@ export async function confirmBooking(bookingId: string, actor: BookingActor) {
     throw new Error('No autorizado');
   }
 
+  await ensureBookingCanAdvance(
+    booking.customerId,
+    booking.technician.userId,
+    booking.technicianId
+  );
+
   if (booking.status !== 'PENDING') {
     throw new Error('La reserva no puede ser confirmada');
   }
@@ -409,9 +682,7 @@ export async function confirmBooking(bookingId: string, actor: BookingActor) {
     },
     include: {
       customer: { select: { id: true, name: true, email: true, phone: true } },
-      technician: {
-        include: { user: { select: { id: true, name: true, email: true, phone: true } } },
-      },
+      technician: { select: bookingTechnicianSelect },
     },
   });
 
@@ -443,6 +714,12 @@ export async function startBooking(bookingId: string, actor: BookingActor) {
   if (actor.role !== 'admin' && booking.technician.userId !== actor.userId) {
     throw new Error('No autorizado');
   }
+
+  await ensureBookingCanAdvance(
+    booking.customerId,
+    booking.technician.userId,
+    booking.technicianId
+  );
 
   if (booking.status !== 'CONFIRMED') {
     throw new Error('La reserva debe estar confirmada primero');
@@ -477,6 +754,12 @@ export async function completeBooking(bookingId: string, actor: BookingActor, to
   if (actor.role !== 'admin' && booking.technician.user.id !== actor.userId) {
     throw new Error('No autorizado');
   }
+
+  await ensureBookingCanAdvance(
+    booking.customerId,
+    booking.technician.user.id,
+    booking.technicianId
+  );
 
   if (!['CONFIRMED', 'IN_PROGRESS'].includes(booking.status)) {
     throw new Error('La reserva no puede ser completada');
@@ -513,9 +796,7 @@ export async function completeBooking(bookingId: string, actor: BookingActor, to
       where: { id: bookingId },
       include: {
         customer: { select: { id: true, name: true, email: true, phone: true } },
-        technician: {
-          include: { user: { select: { id: true, name: true, email: true, phone: true } } },
-        },
+        technician: { select: bookingTechnicianSelect },
       },
     });
   });
@@ -583,34 +864,34 @@ export async function cancelBooking(
 // Set technician availability
 export async function setAvailability(
   technicianId: string,
-  slots: Array<{
-    dayOfWeek: number;
-    startTime: string;
-    endTime: string;
-    isAvailable?: boolean;
-  }>
+  slots: unknown
 ) {
-  // Delete existing recurring slots
-  await prisma.availabilitySlot.deleteMany({
-    where: {
-      technicianId,
-      isRecurring: true,
-    },
-  });
+  if (typeof technicianId !== 'string' || !technicianId.trim()) {
+    throw new Error('ID del técnico inválido');
+  }
 
-  // Create new slots
-  const createdSlots = await prisma.availabilitySlot.createMany({
-    data: slots.map((slot) => ({
-      technicianId,
-      dayOfWeek: slot.dayOfWeek,
-      startTime: slot.startTime,
-      endTime: slot.endTime,
-      isRecurring: true,
-      isAvailable: slot.isAvailable ?? true,
-    })),
-  });
+  const normalizedTechnicianId = technicianId.trim();
+  const validatedSlots = validateWeeklyAvailability(slots);
 
-  return createdSlots;
+  return prisma.$transaction(async (tx) => {
+    await tx.availabilitySlot.deleteMany({
+      where: {
+        technicianId: normalizedTechnicianId,
+        isRecurring: true,
+      },
+    });
+
+    return tx.availabilitySlot.createMany({
+      data: validatedSlots.map((slot) => ({
+        technicianId: normalizedTechnicianId,
+        dayOfWeek: slot.dayOfWeek,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        isRecurring: true,
+        isAvailable: slot.isAvailable,
+      })),
+    });
+  });
 }
 
 // Get technician availability
@@ -683,11 +964,7 @@ export async function getAllBookings(filters?: BookingFilters & { limit?: number
       where,
       include: {
         customer: { select: { id: true, name: true, email: true, phone: true } },
-        technician: {
-          include: {
-            user: { select: { id: true, name: true, email: true, phone: true } },
-          },
-        },
+        technician: { select: bookingTechnicianSelect },
       },
       orderBy: { createdAt: 'desc' },
       take: filters?.limit || 50,
@@ -696,5 +973,5 @@ export async function getAllBookings(filters?: BookingFilters & { limit?: number
     prisma.booking.count({ where }),
   ]);
 
-  return { bookings, total };
+  return { bookings: await redactBlockedBookingContacts(bookings), total };
 }

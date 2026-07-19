@@ -2,8 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const router = (0, express_1.Router)();
-const EFFECTIVE_DATE = '15 de julio de 2026';
-const PRIVACY_EFFECTIVE_DATE = '17 de julio de 2026';
+const EFFECTIVE_DATE = '18 de julio de 2026';
+const PRIVACY_EFFECTIVE_DATE = '18 de julio de 2026';
 function escapeHtml(value) {
     return value
         .replace(/&/g, '&amp;')
@@ -43,10 +43,7 @@ function page(title, description, content) {
 }
 function contactParagraph() {
     var _a;
-    const email = (_a = process.env.SUPPORT_EMAIL) === null || _a === void 0 ? void 0 : _a.trim();
-    if (!email) {
-        return '<p>Para ejercer tus derechos, utiliza la opción de eliminación dentro de la aplicación o el canal de soporte publicado en la ficha de la tienda.</p>';
-    }
+    const email = ((_a = process.env.SUPPORT_EMAIL) === null || _a === void 0 ? void 0 : _a.trim()) || 'ncerda@hotmail.com';
     const safeEmail = escapeHtml(email);
     return `<p>Para solicitudes de privacidad o soporte, escribe a <a href="mailto:${safeEmail}">${safeEmail}</a>.</p>`;
 }
@@ -66,22 +63,24 @@ router.get('/privacy', (_req, res) => {
       <li>Nombre, correo electrónico, teléfono y credenciales protegidas de la cuenta.</li>
       <li>Dirección, ciudad, fecha, hora y descripción que proporcionas al solicitar un servicio.</li>
       <li>Perfiles profesionales, especialidades, fotos opcionales, reservas y reseñas.</li>
+      <li>La versión y fecha de aceptación de las reglas de la comunidad, junto con datos técnicos básicos de esa aceptación.</li>
+      <li>Reportes de contenido o conducta, personas bloqueadas, decisiones de moderación y registros de auditoría administrativa. El texto del reporte se limita a 500 caracteres.</li>
       <li>La ubicación GPS del cliente se usa solo cuando pulsa “Usar mi ubicación”. Los servicios de ubicación y geocodificación del dispositivo pueden procesarla para sugerir una zona o dirección; las coordenadas no se guardan en nuestra API y no usamos ubicación en segundo plano.</li>
       <li>Si un técnico decide aparecer en el mapa, guardamos un marcador aproximado del área donde presta servicio. Redondeamos sus coordenadas antes de almacenarlas y nunca publicamos una dirección residencial ni una ubicación en vivo.</li>
       <li>Datos técnicos básicos necesarios para seguridad, diagnóstico y prevención de abuso, como dirección IP, ruta solicitada, fecha, agente de usuario y resultado HTTP.</li>
       <li>Al abrir el mapa en Android, Google Maps SDK puede recopilar metadatos de la solicitud y del dispositivo, dirección IP, un identificador seudónimo propio del SDK, métricas y trazas de fallos y, según el uso, interacciones con el mapa como desplazamientos o cambios de zoom.</li>
     </ul>
     <h2>2. Cómo usamos la información</h2>
-    <p>Usamos estos datos para operar la aplicación, permitir búsquedas por área, conectar clientes con técnicos, gestionar reservas, enviar avisos del servicio, mantener la seguridad y cumplir obligaciones legales. No vendemos información personal.</p>
+    <p>Usamos estos datos para operar la aplicación, permitir búsquedas por área, conectar clientes con técnicos, gestionar reservas, enviar avisos del servicio, moderar perfiles y fotos, investigar reportes, aplicar bloqueos, mantener la seguridad y cumplir obligaciones legales. No vendemos información personal.</p>
     <h2>3. Cuándo compartimos datos</h2>
     <p>Compartimos los detalles necesarios de una reserva entre el cliente y el técnico seleccionado. Amazon Web Services aloja la aplicación y la base de datos en Lightsail y procesa el correo transaccional mediante Amazon Simple Email Service (SES). Estos proveedores tratan la información únicamente para operar el servicio y están sujetos a obligaciones de confidencialidad y seguridad.</p>
     <p>En Android utilizamos Google Maps SDK para mostrar el mapa. El SDK transmite a Google los datos técnicos descritos arriba para prestar, proteger, mantener y mejorar sus servicios de mapas, incluida su estabilidad. Google trata esos datos conforme a su <a href="https://policies.google.com/privacy">Política de Privacidad</a>. No enviamos a Google tu nombre, correo, teléfono ni los detalles de tus reservas mediante el SDK de mapas.</p>
     <h2>4. Ubicación y sensores</h2>
     <p>Para clientes, el GPS es opcional, se solicita después de pulsar “Usar mi ubicación”, se usa en primer plano y sirve para sugerir una zona, centrar el mapa o completar una dirección. La geocodificación del dispositivo puede consultar un servicio de red para convertir la coordenada en una dirección; Técnicos en RD no guarda la latitud o longitud del cliente en su API. Puedes negar el permiso y escribir la ciudad y la dirección manualmente. Para técnicos, publicar un marcador también es opcional: representa un área de servicio, se redondea aproximadamente a nivel de sector y puede ocultarse desde el perfil. El marcador no representa el domicilio exacto ni sigue al técnico. La aplicación no utiliza acelerómetro, cámara ni micrófono.</p>
     <h2>5. Conservación y seguridad</h2>
-    <p>Conservamos la información mientras la cuenta esté activa o sea necesaria para prestar el servicio, resolver disputas y cumplir la ley. Después de eliminar una cuenta, algunos datos pueden permanecer de forma residual en respaldos de acceso restringido de la base de datos; esos respaldos se eliminan dentro de 30 días y no se utilizan para operar normalmente el servicio. Los registros técnicos de acceso, que pueden incluir dirección IP, ruta solicitada, fecha, agente de usuario y resultado HTTP, rotan diariamente y se conservan durante 14 días salvo que sean necesarios para investigar un incidente de seguridad o cumplir una obligación legal. Google determina la conservación de la telemetría de Google Maps SDK según sus propias políticas. Aplicamos controles de acceso, conexiones cifradas y almacenamiento seguro del token de sesión en el dispositivo.</p>
+    <p>Conservamos la información mientras la cuenta esté activa o sea necesaria para prestar el servicio, resolver disputas, moderar contenido y cumplir la ley. Una foto pendiente queda disponible únicamente para moderadores; al aprobarla o rechazarla, eliminamos inmediatamente la copia de revisión. La foto aprobada permanece en el perfil hasta que se sustituya o elimine. Los bloqueos se conservan hasta que la persona desbloquee la cuenta o elimine su cuenta. Los reportes, decisiones y auditorías se conservan mientras sean necesarios para seguridad, apelaciones, prevención de abuso o una obligación legal. Al eliminar una cuenta, borramos sus datos operativos y sustituimos la identidad vinculada a evidencia de seguridad por una referencia seudónima; una instantánea mínima puede conservar el nombre público, el rol y la referencia interna que existían al reportar, pero no conserva el correo original. Si había una suspensión activa, conservamos un marcador seudónimo mínimo para impedir que se evada la medida creando de nuevo la misma cuenta. La restricción puede revisarse mediante una apelación. Después de eliminar una cuenta, algunos datos también pueden permanecer de forma residual en respaldos de acceso restringido de la base de datos; esos respaldos se eliminan dentro de 30 días y no se utilizan para operar normalmente el servicio. Los registros técnicos de acceso, que pueden incluir dirección IP, ruta solicitada, fecha, agente de usuario y resultado HTTP, rotan diariamente y se conservan durante 14 días salvo que sean necesarios para investigar un incidente de seguridad o cumplir una obligación legal. Google determina la conservación de la telemetría de Google Maps SDK según sus propias políticas. Aplicamos controles de acceso, conexiones cifradas y almacenamiento seguro del token de sesión en el dispositivo.</p>
     <h2>6. Tus opciones y derechos</h2>
-    <p>Puedes cerrar sesión, negar el permiso de ubicación y eliminar permanentemente tu cuenta desde Cuenta → Eliminar cuenta. La eliminación borra el perfil y los datos asociados según lo permita la ley.</p>
+    <p>Puedes cerrar sesión, negar el permiso de ubicación, bloquear o desbloquear personas y eliminar permanentemente tu cuenta desde Cuenta → Eliminar cuenta. La eliminación borra el perfil y los datos operativos; solo se conserva de forma seudonimizada la evidencia mínima permitida para seguridad, apelaciones, prevención de fraude o cumplimiento legal. Puedes apelar una decisión de moderación mediante el canal de soporte indicado abajo.</p>
     ${contactParagraph()}
     <h2>7. Menores y cambios</h2>
     <p>Técnicos en RD no está dirigida a menores de 13 años. Podemos actualizar esta política cuando cambien la aplicación o las obligaciones aplicables; mostraremos la nueva fecha de vigencia.</p>`));
@@ -96,15 +95,19 @@ router.get('/terms', (_req, res) => {
     <p>Los técnicos ofrecen sus servicios de manera independiente. Cada cliente debe revisar el perfil, experiencia, disponibilidad, alcance y precio antes de autorizar un trabajo. La publicación de un perfil no garantiza un resultado específico.</p>
     <h2>3. Reservas, precios y cancelaciones</h2>
     <p>Una solicitud queda pendiente hasta que el técnico la confirme. El alcance, materiales, precio final y pago deben acordarse entre las partes. Las reservas pendientes o confirmadas pueden cancelarse desde la aplicación.</p>
-    <h2>4. Conducta y contenido</h2>
-    <p>No puedes suplantar personas, publicar información falsa, acosar, defraudar, vulnerar sistemas, usar datos de otros fuera del servicio ni publicar reseñas engañosas. Podemos retirar contenido o limitar cuentas para proteger a usuarios y a la plataforma.</p>
-    <h2>5. Emergencias y seguridad</h2>
+    <h2 id="community-rules">4. Reglas de la comunidad y contenido</h2>
+    <p>Al publicar un perfil, una foto, información compartida en una reserva o un reporte, aceptas estas reglas. Está prohibido publicar spam, fraude, suplantación, acoso, amenazas, discurso de odio, contenido sexual o violento, explotación o abuso sexual infantil, servicios o actividades ilegales, datos privados de otra persona, imágenes u otro material protegido sin autorización o información engañosa. Las calificaciones solo permiten frases predefinidas y no admiten comentarios libres.</p>
+    <p>Los perfiles técnicos y las fotos nuevas o modificadas pueden permanecer ocultos mientras se revisan. Utilizamos filtros automáticos limitados y revisión humana. Podemos rechazar o retirar contenido, suspender un perfil técnico o limitar una cuenta cuando sea necesario para proteger a usuarios y a la plataforma.</p>
+    <h2>5. Reportar, bloquear y apelar</h2>
+    <p>Puedes reportar por separado un perfil, una foto o una conducta desde la aplicación. El equipo revisa la cola de reportes y procura atender los casos abiertos dentro de 24 horas. También puedes bloquear a una persona; el bloqueo oculta su perfil y evita nuevas reservas entre ambas partes. Reportar no bloquea automáticamente y bloquear no crea un reporte.</p>
+    <p>Si consideras incorrecta una decisión sobre tu perfil o foto, puedes apelar por el canal de soporte. Incluye el correo de tu cuenta y una explicación; no envíes contraseñas ni documentos sensibles que no hayan sido solicitados.</p>
+    <h2>6. Emergencias y seguridad</h2>
     <p>La aplicación no es un servicio de emergencia. Ante fuego, fuga peligrosa, riesgo eléctrico, violencia o una urgencia médica, contacta primero a las autoridades o servicios de emergencia correspondientes.</p>
-    <h2>6. Disponibilidad y responsabilidad</h2>
+    <h2>7. Disponibilidad y responsabilidad</h2>
     <p>Procuramos mantener la aplicación disponible y segura, pero puede haber interrupciones. En la medida permitida por la ley, Técnicos en RD no responde por acuerdos, pagos, daños o disputas derivados directamente del trabajo independiente entre usuarios.</p>
-    <h2>7. Suspensión, eliminación y cambios</h2>
+    <h2>8. Suspensión, eliminación y cambios</h2>
     <p>Puedes eliminar tu cuenta desde la aplicación. También podemos suspender cuentas por fraude, abuso o incumplimiento. Podemos actualizar estos términos y mostraremos una nueva fecha de vigencia.</p>
-    <h2>8. Ley aplicable</h2>
+    <h2>9. Ley aplicable</h2>
     <p>Estos términos se interpretan conforme a las leyes de la República Dominicana, sin perjuicio de los derechos obligatorios que correspondan al usuario.</p>
     ${contactParagraph()}`));
 });
@@ -118,6 +121,12 @@ router.get('/support', (_req, res) => {
     <p>Limpia los filtros o busca por una especialidad más general. La disponibilidad depende de los perfiles publicados para cada zona.</p>
     <h2>Problemas con una reserva</h2>
     <p>Abre Reservas → selecciona la reserva para revisar el estado, la dirección y el contacto. Las solicitudes pendientes o confirmadas pueden cancelarse desde el detalle.</p>
+    <h2>Reportar contenido o conducta</h2>
+    <p>Abre el perfil de la persona, pulsa <strong>Reportar</strong>, selecciona si reportas el perfil, la foto o una conducta y elige el motivo. El reporte llega a una cola administrativa que procuramos revisar dentro de 24 horas. Para una emergencia o amenaza inmediata, contacta primero a las autoridades.</p>
+    <h2>Bloquear o desbloquear</h2>
+    <p>Desde el mismo perfil puedes bloquear a una persona. Esto oculta su perfil y evita nuevas reservas entre ambos; no envía un reporte automáticamente. Administra tus bloqueos desde Cuenta → Seguridad y comunidad.</p>
+    <h2>Apelar una decisión</h2>
+    <p>Si tu perfil técnico o foto fue rechazado o suspendido, responde mediante el correo de soporte indicado abajo con el correo de tu cuenta y el contexto de la apelación. Nunca envíes tu contraseña.</p>
     <h2>Permiso de ubicación</h2>
     <p>El GPS es opcional. Si no deseas utilizarlo o el permiso fue rechazado, escribe la ciudad y la dirección manualmente. Los técnicos pueden publicar u ocultar por separado un marcador aproximado de su área de servicio; ese marcador nunca muestra una dirección residencial exacta ni una ubicación en vivo.</p>
     <h2>Eliminar una cuenta</h2>
@@ -138,7 +147,7 @@ router.get('/account-deletion', (_req, res) => {
       <li>Pulsa <strong>Eliminar cuenta</strong> y confirma la acción.</li>
     </ol>
     <h2>Datos eliminados</h2>
-    <p>Se eliminan los datos del perfil, las reservas y las reseñas vinculadas a la cuenta, salvo información que debamos conservar temporalmente por obligaciones legales, prevención de fraude o resolución de disputas.</p>
+    <p>Se eliminan los datos del perfil, las reservas y las reseñas vinculadas a la cuenta. Los reportes, decisiones y referencias mínimas necesarias para seguridad, apelaciones, prevención de fraude o resolución de disputas pueden conservarse de forma seudonimizada. La evidencia puede incluir el nombre público y el rol que existían al reportar, pero la referencia de seguridad no conserva tu correo original. Si existía una suspensión activa, no podrás evadirla volviendo a registrar la misma cuenta y podrás solicitar una revisión mediante soporte.</p>
     <h2>Eliminar desde este sitio</h2>
     <p>Si ya no tienes la aplicación, inicia sesión aquí para eliminar inmediatamente tu cuenta y los datos asociados. La contraseña se envía únicamente a nuestra API mediante una conexión cifrada y no se guarda en esta página.</p>
     <form id="delete-form">

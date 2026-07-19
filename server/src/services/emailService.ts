@@ -325,3 +325,54 @@ export const sendPasswordResetEmail = async (email: string, token: string, userN
         return null;
     }
 };
+
+interface ModerationReportAlert {
+    reportId: string;
+    contentType: string;
+    reason: string;
+    createdAt: Date;
+}
+
+function escapeEmailHtml(value: string): string {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+/**
+ * Best-effort operational alert for the 24-hour moderation queue. Raw report
+ * details and user names are deliberately omitted from email; moderators read
+ * them only after authenticating to the admin console.
+ */
+export const sendModerationReportAlert = async (report: ModerationReportAlert) => {
+    if (!useRealSMTP) {
+        console.log(`Moderation report ${report.reportId} queued; SMTP alert skipped because SMTP is not configured`);
+        return null;
+    }
+
+    const supportEmail = process.env.SUPPORT_EMAIL?.trim() || 'ncerda@hotmail.com';
+    const safeReportId = escapeEmailHtml(report.reportId);
+    const safeContentType = escapeEmailHtml(report.contentType);
+    const safeReason = escapeEmailHtml(report.reason);
+    const createdAt = report.createdAt.toISOString();
+    const text = [
+        'Nuevo reporte de moderación en Técnicos en RD.',
+        `ID: ${report.reportId}`,
+        `Tipo: ${report.contentType}`,
+        `Motivo: ${report.reason}`,
+        `Creado: ${createdAt}`,
+        'Revisa la cola administrativa dentro de 24 horas.',
+    ].join('\n');
+
+    return sendEmail({
+        to: supportEmail,
+        subject: `[Moderación] Nuevo reporte ${report.reportId}`,
+        text,
+        html: `<p><strong>Nuevo reporte de moderación.</strong></p>
+          <p>ID: ${safeReportId}<br>Tipo: ${safeContentType}<br>Motivo: ${safeReason}<br>Creado: ${createdAt}</p>
+          <p>Revisa la cola administrativa dentro de 24 horas.</p>`,
+    });
+};

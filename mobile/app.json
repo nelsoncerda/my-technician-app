@@ -67,6 +67,14 @@
           "configureAndroidBackup": true,
           "faceIDPermission": false
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permite que Técnicos en RD acceda a la foto que elijas para actualizar tu perfil.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {

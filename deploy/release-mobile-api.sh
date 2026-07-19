@@ -3,12 +3,18 @@
 set -Eeuo pipefail
 
 REVISION=${1:?Usage: deploy/release-mobile-api.sh <git-revision>}
+DEPLOY_WEB=${DEPLOY_WEB:-0}
 APP_ROOT=${APP_ROOT:-/home/bitnami/apps}
 SOURCE=${SOURCE:-$APP_ROOT/release-source}
 RELEASES=$APP_ROOT/releases
 SHARED=$APP_ROOT/shared
 ENV_FILE=$SHARED/server.env
 BACKUP_ROOT=$APP_ROOT/backups
+
+if [[ "$DEPLOY_WEB" != 0 && "$DEPLOY_WEB" != 1 ]]; then
+  printf 'DEPLOY_WEB must be 0 or 1.\n' >&2
+  exit 2
+fi
 
 if [[ -s "$HOME/.nvm/nvm.sh" ]]; then
   # shellcheck disable=SC1090
@@ -54,16 +60,25 @@ if [[ -L "$APP_ROOT/technician-current" ]]; then
   printf '%s\n' "$PREVIOUS" > "$BACKUP/previous-release"
 fi
 
-# The main domain may serve the React build from technician-current. Preserve
-# that validated static artifact when making a backend-only release so an API
-# update cannot take the website offline.
-if [[ -f "$APP_ROOT/technician-current/build/index.html" ]]; then
+# By default this remains a backend-only release and preserves the validated
+# React artifact. DEPLOY_WEB=1 builds the matching frontend inside the same
+# immutable release so API and browser contracts switch atomically.
+if [[ "$DEPLOY_WEB" == 0 && -f "$APP_ROOT/technician-current/build/index.html" ]]; then
   cp -a "$APP_ROOT/technician-current/build" "$RELEASE/build"
   test -f "$RELEASE/build/index.html"
 fi
 
 ln -s "$ENV_FILE" "$RELEASE/server/.env"
 node "$RELEASE/deploy/prepare-production-env.cjs" "$ENV_FILE"
+
+if [[ "$DEPLOY_WEB" == 1 ]]; then
+  cd "$RELEASE"
+  npm ci
+  npm run typecheck
+  CI=true npm run test:ci
+  npm run build
+  test -f "$RELEASE/build/index.html"
+fi
 
 cd "$RELEASE/server"
 npm ci
@@ -100,6 +115,9 @@ curl --retry 10 --retry-connrefused --retry-delay 1 \
 for endpoint in support privacy terms account-deletion reset-password; do
   curl --fail --silent --show-error "http://127.0.0.1:3001/$endpoint" >/dev/null
 done
+if [[ "$DEPLOY_WEB" == 1 ]]; then
+  curl --fail --silent --show-error -H 'Host: tecnicosenrd.com' http://127.0.0.1/ >/dev/null
+fi
 
 cd "$APP_ROOT/technician-current/server"
 node --env-file="$ENV_FILE" <<'NODE'

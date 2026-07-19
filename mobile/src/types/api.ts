@@ -1,4 +1,7 @@
 export type UserRole = 'user' | 'technician' | 'admin';
+export type TechnicianModerationStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
+export type UserAccountModerationStatus = 'ACTIVE' | 'SUSPENDED';
+export type PhotoModerationStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface User {
   id: string;
@@ -14,10 +17,29 @@ export interface User {
   specializations?: string[];
   location?: string;
   companyName?: string | null;
+  technicianModerationStatus?: TechnicianModerationStatus;
+  technicianModerationReason?: string | null;
+  photoModerationStatus?: PhotoModerationStatus | null;
+  photoModerationReason?: string | null;
+  photoModerationSubmissionId?: string | null;
+  photoModerationReviewedAt?: string | null;
+  pendingPhotoSubmissionId?: string | null;
+  photoSubmittedAt?: string | null;
+  ugcTermsAccepted?: boolean;
+  ugcTermsVersion?: string | null;
+  ugcTermsAcceptedAt?: string | null;
+  accountModerationStatus?: UserAccountModerationStatus;
+  accountModerationReason?: string | null;
+  limitedAccess?: boolean;
+  suspensionCode?: string;
+  suspensionMessage?: string;
+  supportUrl?: string;
 }
 
 export interface Technician {
   id: string;
+  /** Account id used for safety actions such as reporting and blocking. */
+  userId?: string;
   name: string;
   specialization: string;
   specializations?: string[];
@@ -41,6 +63,19 @@ export interface TechnicianMapLocation {
   longitude: number;
   radiusKm: number;
   precision: 'approximate';
+}
+
+export interface TechnicianReview {
+  id: string;
+  author: string;
+  comment: string;
+  rating: number;
+  date: string;
+}
+
+export interface CreateTechnicianReviewInput {
+  rating: number;
+  comment: string;
 }
 
 export interface Settings {
@@ -101,6 +136,9 @@ export interface Booking {
 
 export interface LoginResponse extends User {
   token: string;
+  /** Legacy aliases returned by older API deployments. They are normalized before storage. */
+  moderationStatus?: TechnicianModerationStatus;
+  moderationReason?: string | null;
 }
 
 export interface RegisterInput {
@@ -113,6 +151,8 @@ export interface RegisterInput {
   location?: string;
   photoBase64?: string;
   companyName?: string;
+  ugcTermsAccepted: true;
+  ugcTermsVersion: string;
 }
 
 export interface CreateBookingInput {

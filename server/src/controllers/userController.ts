@@ -1,4 +1,6 @@
 import { Request, Response } from 'express';
+import crypto from 'crypto';
+import { Prisma } from '@prisma/client';
 import prisma from '../prisma';
 import { safeUserSelect } from '../utils/safeUser';
 import {
@@ -6,11 +8,33 @@ import {
     ServiceAreaValidationError,
     toPublicMapLocation,
 } from '../utils/serviceArea';
+import { publicTextRejection } from '../utils/contentModeration';
+import { hasCurrentTermsConsent, termsRequiredPayload } from '../services/moderationService';
+import { accountIdentityDigest } from '../security/accountIdentity';
 
 export const getUsers = async (req: Request, res: Response) => {
     try {
-        const users = await prisma.user.findMany({ select: safeUserSelect });
-        res.json(users);
+        const users = await prisma.user.findMany({
+            where: { deletedAt: null },
+            select: {
+                ...safeUserSelect,
+                technician: {
+                    select: {
+                        id: true,
+                        moderationStatus: true,
+                        moderationReason: true,
+                    },
+                },
+            },
+        });
+        res.json(users.map(({ technician, moderationStatus, moderationReason, ...user }) => ({
+            ...user,
+            accountModerationStatus: moderationStatus,
+            accountModerationReason: moderationReason,
+            technicianId: technician?.id,
+            technicianModerationStatus: technician?.moderationStatus,
+            technicianModerationReason: technician?.moderationReason,
+        })));
     } catch (error) {
         res.status(500).json({ message: 'Error fetching users', error });
     }
@@ -28,13 +52,55 @@ export const updateUser = async (req: Request, res: Response) => {
             return res.status(400).json({ message: 'El teléfono no es válido' });
         }
 
-        const user = await prisma.user.update({
+        const nameRejection = publicTextRejection('El nombre', name);
+        if (nameRejection) {
+            return res.status(400).json({ code: 'OBJECTIONABLE_PUBLIC_TEXT', message: nameRejection });
+        }
+
+        const existingAccount = await prisma.user.findUnique({
             where: { id },
-            data: { name: name.trim(), phone: typeof phone === 'string' && phone.trim() ? phone.trim() : null },
-            select: safeUserSelect,
+            select: { technician: { select: { id: true } } },
+        });
+        if (!existingAccount) return res.status(404).json({ message: 'Usuario no encontrado' });
+        if (existingAccount.technician && !await hasCurrentTermsConsent(id)) {
+            return res.status(428).json(termsRequiredPayload());
+        }
+
+        const user = await prisma.$transaction(async (tx) => {
+            const current = await tx.user.findUnique({
+                where: { id },
+                select: { technician: { select: { id: true, moderationStatus: true } } },
+            });
+            if (!current) return null;
+
+            const updated = await tx.user.update({
+                where: { id },
+                data: { name: name.trim(), phone: typeof phone === 'string' && phone.trim() ? phone.trim() : null },
+                select: safeUserSelect,
+            });
+            if (current.technician && current.technician.moderationStatus !== 'SUSPENDED') {
+                await tx.technician.update({
+                    where: { id: current.technician.id },
+                    data: {
+                        moderationStatus: 'PENDING',
+                        moderationReason: null,
+                        moderationSubmittedAt: new Date(),
+                        moderatedAt: null,
+                        moderatedById: null,
+                    },
+                });
+            }
+            return updated;
         });
 
-        res.json(user);
+        if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
+
+        const { moderationStatus, moderationReason, ...safeUser } = user;
+        res.json({
+            ...safeUser,
+            accountModerationStatus: moderationStatus,
+            accountModerationReason: moderationReason,
+        });
     } catch (error) {
         res.status(500).json({ message: 'Error updating user', error });
     }
@@ -65,6 +131,12 @@ export const updateUserProfile = async (req: Request, res: Response) => {
         }
         if (photoUrl !== undefined && (typeof photoUrl !== 'string' || photoUrl.length > 2.8 * 1024 * 1024)) {
             return res.status(400).json({ message: 'La foto de perfil es demasiado grande' });
+        }
+        if (photoUrl !== undefined) {
+            return res.status(400).json({
+                code: 'PHOTO_MODERATION_REQUIRED',
+                message: 'Las fotos deben enviarse mediante el flujo de moderación de fotos',
+            });
         }
         if (specializations !== undefined && (
             !Array.isArray(specializations) ||
@@ -103,6 +175,15 @@ export const updateUserProfile = async (req: Request, res: Response) => {
             ? normalizeServiceAreaInput(serviceArea)
             : undefined;
 
+        const nameRejection = publicTextRejection('El nombre', normalizedName);
+        const companyRejection = publicTextRejection('El nombre de la empresa', normalizedCompanyName);
+        if (nameRejection || companyRejection) {
+            return res.status(400).json({
+                code: 'OBJECTIONABLE_PUBLIC_TEXT',
+                message: nameRejection || companyRejection,
+            });
+        }
+
         // Get current user data with technician info
         const currentUser = await prisma.user.findUnique({
             where: { id },
@@ -136,10 +217,6 @@ export const updateUserProfile = async (req: Request, res: Response) => {
         if (normalizedPhone !== undefined && normalizedPhone !== currentUser.phone) {
             changes.push({ fieldName: 'phone', oldValue: currentUser.phone, newValue: normalizedPhone });
         }
-        if (photoUrl !== undefined && photoUrl !== currentUser.photoUrl) {
-            changes.push({ fieldName: 'photoUrl', oldValue: currentUser.photoUrl, newValue: photoUrl });
-        }
-
         // Track specializations changes for technicians
         if (normalizedSpecializations !== undefined && currentUser.technician) {
             const oldSpecs = currentUser.technician.specializations.join(', ');
@@ -187,17 +264,44 @@ export const updateUserProfile = async (req: Request, res: Response) => {
             }
         }
 
+        const hasModeratedProfileChanges = Boolean(
+            currentUser.technician &&
+            changes.some((change) => [
+                'name',
+                'specializations',
+                'location',
+                'companyName',
+                'serviceArea',
+            ].includes(change.fieldName))
+        );
+        const requiresProfileReview = Boolean(
+            hasModeratedProfileChanges && currentUser.technician?.moderationStatus !== 'SUSPENDED'
+        );
+        if (hasModeratedProfileChanges && !await hasCurrentTermsConsent(id)) {
+            return res.status(428).json(termsRequiredPayload());
+        }
+
         // If no changes, return current user with technician data
         if (changes.length === 0) {
+            const {
+                technician: currentTechnician,
+                moderationStatus: accountModerationStatus,
+                moderationReason: accountModerationReason,
+                ...safeCurrentUser
+            } = currentUser;
             return res.json({
-                ...currentUser,
-                technicianId: currentUser.technician?.id,
-                specializations: currentUser.technician?.specializations,
-                location: currentUser.technician?.location,
-                companyName: currentUser.technician?.companyName,
-                mapVisible: currentUser.technician?.mapVisible,
-                mapLocation: currentUser.technician
-                    ? toPublicMapLocation(currentUser.technician)
+                ...safeCurrentUser,
+                accountModerationStatus,
+                accountModerationReason,
+                technicianId: currentTechnician?.id,
+                specializations: currentTechnician?.specializations,
+                location: currentTechnician?.location,
+                companyName: currentTechnician?.companyName,
+                technicianModerationStatus: currentTechnician?.moderationStatus,
+                technicianModerationReason: currentTechnician?.moderationReason,
+                mapVisible: currentTechnician?.mapVisible,
+                mapLocation: currentTechnician
+                    ? toPublicMapLocation(currentTechnician)
                     : undefined,
             });
         }
@@ -222,7 +326,6 @@ export const updateUserProfile = async (req: Request, res: Response) => {
                 data: {
                     ...(normalizedName !== undefined && { name: normalizedName }),
                     ...(normalizedPhone !== undefined && { phone: normalizedPhone }),
-                    ...(photoUrl !== undefined && { photoUrl }),
                 },
                 select: safeUserSelect,
             });
@@ -234,7 +337,8 @@ export const updateUserProfile = async (req: Request, res: Response) => {
                 normalizedLocation !== undefined ||
                 normalizedCompanyName !== undefined ||
                 normalizedServiceArea !== undefined ||
-                mapVisible !== undefined
+                mapVisible !== undefined ||
+                requiresProfileReview
             )) {
                 technician = await tx.technician.update({
                     where: { userId: id },
@@ -248,6 +352,13 @@ export const updateUserProfile = async (req: Request, res: Response) => {
                             serviceAreaLongitude: normalizedServiceArea?.longitude ?? null,
                             serviceAreaRadiusKm: normalizedServiceArea?.radiusKm ?? 5,
                         }),
+                        ...(requiresProfileReview && {
+                            moderationStatus: 'PENDING',
+                            moderationReason: null,
+                            moderationSubmittedAt: new Date(),
+                            moderatedAt: null,
+                            moderatedById: null,
+                        }),
                     },
                 });
             }
@@ -256,12 +367,21 @@ export const updateUserProfile = async (req: Request, res: Response) => {
         });
 
         // Return combined user + technician data
+        const {
+            moderationStatus: accountModerationStatus,
+            moderationReason: accountModerationReason,
+            ...updatedUser
+        } = result.updatedUser;
         res.json({
-            ...result.updatedUser,
+            ...updatedUser,
+            accountModerationStatus,
+            accountModerationReason,
             technicianId: result.technician?.id,
             specializations: result.technician?.specializations,
             location: result.technician?.location,
             companyName: result.technician?.companyName,
+            technicianModerationStatus: result.technician?.moderationStatus,
+            technicianModerationReason: result.technician?.moderationReason,
             mapVisible: result.technician?.mapVisible,
             mapLocation: result.technician
                 ? toPublicMapLocation(result.technician)
@@ -300,15 +420,21 @@ export const uploadProfilePhoto = async (req: Request, res: Response) => {
         const { id } = req.params;
         const { photoBase64 } = req.body;
 
-        if (!photoBase64) {
-            return res.status(400).json({ message: 'No photo provided' });
+        if (typeof photoBase64 !== 'string' || !photoBase64) {
+            return res.status(400).json({ message: 'No se proporcionó una foto' });
         }
 
         // In a real app, you would upload to S3, Cloudinary, etc.
         // For now, we'll store the base64 string directly (not recommended for production)
         // Maximum size check (roughly 2MB in base64)
         if (photoBase64.length > 2 * 1024 * 1024 * 1.37) {
-            return res.status(400).json({ message: 'Photo too large. Maximum size is 2MB' });
+            return res.status(400).json({ message: 'La foto supera el máximo de 2 MB' });
+        }
+        if (!/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(photoBase64)) {
+            return res.status(400).json({ message: 'La foto debe ser JPEG, PNG o WebP' });
+        }
+        if (!await hasCurrentTermsConsent(id)) {
+            return res.status(428).json(termsRequiredPayload());
         }
 
         const ipAddress = req.ip || req.headers['x-forwarded-for']?.toString() || 'unknown';
@@ -316,37 +442,54 @@ export const uploadProfilePhoto = async (req: Request, res: Response) => {
         // Get current user to track old photo
         const currentUser = await prisma.user.findUnique({
             where: { id },
-            select: { photoUrl: true },
+            select: { id: true, photoUrl: true },
         });
         if (!currentUser) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
         }
 
-        // Update in transaction
+        // Stage the candidate. The currently-approved public image remains
+        // unchanged until an administrator approves this submission.
         const result = await prisma.$transaction(async (tx) => {
-            // Create history record
+            await tx.profilePhotoSubmission.updateMany({
+                where: { userId: id, status: 'PENDING' },
+                data: {
+                    imageData: '',
+                    pendingKey: null,
+                    status: 'REJECTED',
+                    reviewedAt: new Date(),
+                    reviewNote: 'Reemplazada por una entrega más reciente',
+                },
+            });
+
             await tx.profileChangeHistory.create({
                 data: {
                     userId: id,
-                    fieldName: 'photoUrl',
-                    oldValue: currentUser.photoUrl ? '[previous photo]' : null,
-                    newValue: '[new photo uploaded]',
+                    fieldName: 'pendingPhotoUrl',
+                    oldValue: null,
+                    newValue: '[photo submitted for moderation]',
                     changedBy: req.auth!.userId,
                     ipAddress,
                 },
             });
 
-            // Update user photo
-            const updatedUser = await tx.user.update({
-                where: { id },
-                data: { photoUrl: photoBase64 },
-                select: { photoUrl: true },
+            return tx.profilePhotoSubmission.create({
+                data: {
+                    userId: id,
+                    imageData: photoBase64,
+                    pendingKey: id,
+                },
+                select: { id: true, status: true, submittedAt: true },
             });
+        }, { isolationLevel: 'Serializable' });
 
-            return updatedUser;
+        res.status(202).json({
+            message: 'Foto enviada para revisión',
+            submissionId: result.id,
+            photoModerationStatus: result.status,
+            submittedAt: result.submittedAt,
+            photoUrl: currentUser.photoUrl,
         });
-
-        res.json({ message: 'Photo uploaded successfully', photoUrl: result.photoUrl });
     } catch (error) {
         console.error('Error uploading photo:', error);
         res.status(500).json({ message: 'Error uploading photo', error });
@@ -356,40 +499,205 @@ export const uploadProfilePhoto = async (req: Request, res: Response) => {
 export const deleteUser = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
+        const deletedAt = new Date();
 
-        // Delete related records first (due to foreign key constraints)
-        await prisma.$transaction(async (tx) => {
-            // Delete user points
-            await tx.userPoints.deleteMany({ where: { userId: id } });
-            // Delete point transactions
-            await tx.pointTransaction.deleteMany({ where: { userId: id } });
-            // Delete user achievements
-            await tx.userAchievement.deleteMany({ where: { userId: id } });
-            // Delete reward redemptions
-            await tx.rewardRedemption.deleteMany({ where: { userId: id } });
-            // Delete bookings where user is customer
-            await tx.booking.deleteMany({ where: { customerId: id } });
-            // Delete reviews by user
-            await tx.review.deleteMany({ where: { authorId: id } });
-            // Check if user is a technician and delete technician record
-            const technician = await tx.technician.findUnique({ where: { userId: id } });
-            if (technician) {
-                // Delete technician's bookings
-                await tx.booking.deleteMany({ where: { technicianId: technician.id } });
-                // Delete technician's reviews
-                await tx.review.deleteMany({ where: { technicianId: technician.id } });
-                // Delete technician's availability
-                await tx.availabilitySlot.deleteMany({ where: { technicianId: technician.id } });
-                // Delete technician's time off
-                await tx.timeOff.deleteMany({ where: { technicianId: technician.id } });
-                // Delete technician record
-                await tx.technician.delete({ where: { userId: id } });
+        const result = await prisma.$transaction(async (tx) => {
+            const target = await tx.user.findUnique({
+                where: { id },
+                select: {
+                    id: true,
+                    email: true,
+                    name: true,
+                    role: true,
+                    moderationStatus: true,
+                    deletedAt: true,
+                    deletionIdentityDigest: true,
+                    technician: {
+                        select: { id: true, moderationStatus: true, moderationReason: true },
+                    },
+                },
+            });
+
+            if (!target || target.deletedAt) return { outcome: 'not_found' as const };
+
+            // Administrative accounts are protected targets. An administrator
+            // may close only their own account, and never the last live admin.
+            if (target.role === 'admin' && req.auth!.userId !== target.id) {
+                return { outcome: 'protected_admin' as const };
             }
-            // Finally delete the user
-            await tx.user.delete({ where: { id } });
-        });
+            if (target.role === 'admin') {
+                const liveAdminCount = await tx.user.count({
+                    where: { role: 'admin', deletedAt: null },
+                });
+                if (liveAdminCount <= 1) return { outcome: 'last_admin' as const };
+            }
 
-        res.json({ message: 'Usuario eliminado exitosamente' });
+            const deletionIdentityDigest = accountIdentityDigest(target.email);
+            const sanctionedAtDeletion = target.moderationStatus === 'SUSPENDED'
+                || target.technician?.moderationStatus === 'SUSPENDED';
+
+            // Preserve reports and their minimum necessary evidence. We retain
+            // keyed identity digests rather than raw emails. Database triggers
+            // make these snapshots immutable once written.
+            const affectedReports = await tx.contentReport.findMany({
+                where: {
+                    OR: [{ reporterId: id }, { targetUserId: id }],
+                },
+                select: {
+                    id: true,
+                    reporterIdentitySnapshot: true,
+                    targetIdentitySnapshot: true,
+                    technicianIdSnapshot: true,
+                    profilePhotoIdSnapshot: true,
+                    technicianId: true,
+                    profilePhotoSubmissionId: true,
+                    reporter: {
+                        select: {
+                            id: true,
+                            email: true,
+                            name: true,
+                            role: true,
+                            deletedAt: true,
+                            deletionIdentityDigest: true,
+                        },
+                    },
+                    targetUser: {
+                        select: {
+                            id: true,
+                            email: true,
+                            name: true,
+                            role: true,
+                            deletedAt: true,
+                            deletionIdentityDigest: true,
+                        },
+                    },
+                },
+            });
+
+            for (const report of affectedReports) {
+                const data: Prisma.ContentReportUpdateInput = {};
+                if (!report.reporterIdentitySnapshot) {
+                    data.reporterIdentitySnapshot = {
+                        accountReference: report.reporter.id,
+                        displayName: report.reporter.deletedAt ? 'Cuenta eliminada' : report.reporter.name,
+                        role: report.reporter.role,
+                        identityDigest: report.reporter.deletionIdentityDigest
+                            || accountIdentityDigest(report.reporter.email),
+                        capturedAt: deletedAt.toISOString(),
+                    };
+                }
+                if (!report.targetIdentitySnapshot) {
+                    data.targetIdentitySnapshot = {
+                        accountReference: report.targetUser.id,
+                        displayName: report.targetUser.deletedAt ? 'Cuenta eliminada' : report.targetUser.name,
+                        role: report.targetUser.role,
+                        identityDigest: report.targetUser.deletionIdentityDigest
+                            || accountIdentityDigest(report.targetUser.email),
+                        capturedAt: deletedAt.toISOString(),
+                    };
+                }
+                if (!report.technicianIdSnapshot && report.technicianId) {
+                    data.technicianIdSnapshot = report.technicianId;
+                }
+                if (!report.profilePhotoIdSnapshot && report.profilePhotoSubmissionId) {
+                    data.profilePhotoIdSnapshot = report.profilePhotoSubmissionId;
+                }
+                if (Object.keys(data).length > 0) {
+                    await tx.contentReport.update({ where: { id: report.id }, data });
+                }
+            }
+
+            const bookingIds = await tx.booking.findMany({
+                where: {
+                    OR: [
+                        { customerId: id },
+                        ...(target.technician ? [{ technicianId: target.technician.id }] : []),
+                    ],
+                },
+                select: { id: true },
+            });
+            if (bookingIds.length > 0) {
+                await tx.bookingReminder.deleteMany({
+                    where: { bookingId: { in: bookingIds.map((booking) => booking.id) } },
+                });
+            }
+
+            await tx.userPoints.deleteMany({ where: { userId: id } });
+            await tx.pointTransaction.deleteMany({ where: { userId: id } });
+            await tx.userAchievement.deleteMany({ where: { userId: id } });
+            await tx.rewardRedemption.deleteMany({ where: { userId: id } });
+            await tx.leaderboardEntry.deleteMany({ where: { userId: id } });
+            await tx.profileChangeHistory.deleteMany({ where: { userId: id } });
+            await tx.ugcTermsConsent.deleteMany({ where: { userId: id } });
+            await tx.userBlock.deleteMany({
+                where: { OR: [{ blockerId: id }, { blockedUserId: id }] },
+            });
+            await tx.profilePhotoSubmission.deleteMany({ where: { userId: id } });
+            await tx.booking.deleteMany({
+                where: {
+                    OR: [
+                        { customerId: id },
+                        ...(target.technician ? [{ technicianId: target.technician.id }] : []),
+                    ],
+                },
+            });
+            await tx.review.deleteMany({
+                where: {
+                    OR: [
+                        { authorId: id },
+                        ...(target.technician ? [{ technicianId: target.technician.id }] : []),
+                    ],
+                },
+            });
+
+            if (target.technician) {
+                await tx.availabilitySlot.deleteMany({ where: { technicianId: target.technician.id } });
+                await tx.timeOff.deleteMany({ where: { technicianId: target.technician.id } });
+                await tx.technician.delete({ where: { id: target.technician.id } });
+            }
+
+            // Keep only a pseudonymous tombstone so trust-and-safety evidence,
+            // reviewer references, and a sanctioned-account marker survive.
+            await tx.user.update({
+                where: { id },
+                data: {
+                    email: `deleted+${id}@accounts.invalid`,
+                    password: `deleted:${crypto.randomBytes(32).toString('hex')}`,
+                    name: 'Cuenta eliminada',
+                    phone: null,
+                    photoUrl: null,
+                    role: 'user',
+                    emailVerified: false,
+                    verificationToken: null,
+                    verificationTokenExpires: null,
+                    resetPasswordToken: null,
+                    resetPasswordExpires: null,
+                    deletedAt,
+                    deletionIdentityDigest,
+                    sanctionedAtDeletion,
+                    moderationStatus: sanctionedAtDeletion ? 'SUSPENDED' : target.moderationStatus,
+                    moderationReason: target.moderationStatus === 'SUSPENDED'
+                        ? undefined
+                        : target.technician?.moderationReason || null,
+                },
+            });
+
+            return { outcome: 'deleted' as const };
+        }, { isolationLevel: 'Serializable' });
+
+        if (result.outcome === 'not_found') {
+            return res.status(404).json({ message: 'Usuario no encontrado' });
+        }
+        if (result.outcome === 'protected_admin') {
+            return res.status(403).json({ message: 'No se puede eliminar otra cuenta administrativa' });
+        }
+        if (result.outcome === 'last_admin') {
+            return res.status(409).json({ message: 'No se puede eliminar la última cuenta administrativa activa' });
+        }
+
+        res.json({
+            message: 'Cuenta eliminada. Los registros mínimos de seguridad se conservaron de forma seudonimizada.',
+        });
     } catch (error) {
         console.error('Error deleting user:', error);
         res.status(500).json({ message: 'Error deleting user', error });
@@ -425,7 +733,12 @@ export const updateUserRole = async (req: Request, res: Response) => {
             select: safeUserSelect,
         });
 
-        res.json(user);
+        const { moderationStatus, moderationReason, ...safeUser } = user;
+        res.json({
+            ...safeUser,
+            accountModerationStatus: moderationStatus,
+            accountModerationReason: moderationReason,
+        });
     } catch (error) {
         res.status(500).json({ message: 'Error updating user role', error });
     }
@@ -435,7 +748,7 @@ export const getAdminStats = async (req: Request, res: Response) => {
     try {
         // Get counts
         const [totalUsers, totalTechnicians, totalBookings, bookings, technicians] = await Promise.all([
-            prisma.user.count(),
+            prisma.user.count({ where: { deletedAt: null } }),
             prisma.technician.count(),
             prisma.booking.count(),
             prisma.booking.findMany({
@@ -465,6 +778,7 @@ export const getAdminStats = async (req: Request, res: Response) => {
         // Users by role
         const usersByRole = await prisma.user.groupBy({
             by: ['role'],
+            where: { deletedAt: null },
             _count: { role: true },
         });
 

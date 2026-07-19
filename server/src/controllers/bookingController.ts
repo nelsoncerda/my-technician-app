@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import * as bookingService from '../services/bookingService';
 import * as notificationService from '../services/notificationService';
+import { hasCurrentTermsConsent, termsRequiredPayload } from '../services/moderationService';
 
 function parseBookingDate(value: unknown): Date {
   if (typeof value !== 'string') throw new Error('Fecha inválida');
@@ -31,6 +32,10 @@ export async function createBooking(req: Request, res: Response) {
     const { technicianId, scheduledDate, scheduledTime, serviceType, description, address, city, phone, estimatedDuration } = req.body;
 
     const customerId = req.auth!.userId;
+
+    if (!await hasCurrentTermsConsent(customerId)) {
+      return res.status(428).json(termsRequiredPayload());
+    }
 
     if (!customerId || !technicianId || !scheduledDate || !scheduledTime || !serviceType || !address || !city || !phone) {
       return res.status(400).json({ error: 'Faltan campos requeridos' });
@@ -210,7 +215,7 @@ export async function cancelBooking(req: Request, res: Response) {
     const cancelledBy = booking.cancelledBy || 'admin';
 
     // Get full booking for notification
-    const fullBooking = await bookingService.getBookingById(id);
+    const fullBooking = await bookingService.getBookingForNotification(id);
     if (fullBooking) {
       try {
         await notificationService.sendBookingCancelled(fullBooking, cancelledBy, reason);
@@ -247,13 +252,18 @@ export async function getAvailableSlots(req: Request, res: Response) {
 // Set technician availability
 export async function setAvailability(req: Request, res: Response) {
   try {
-    const { technicianId, slots } = req.body;
+    const body = req.body;
 
-    if (!technicianId || !slots || !Array.isArray(slots)) {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
       return res.status(400).json({ error: 'Datos de disponibilidad inválidos' });
     }
 
-    const result = await bookingService.setAvailability(technicianId, slots);
+    const { technicianId, slots } = body;
+    if (typeof technicianId !== 'string' || !technicianId.trim() || !Array.isArray(slots)) {
+      return res.status(400).json({ error: 'Datos de disponibilidad inválidos' });
+    }
+
+    const result = await bookingService.setAvailability(technicianId.trim(), slots);
     res.json(result);
   } catch (error: any) {
     console.error('Error setting availability:', error);

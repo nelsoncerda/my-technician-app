@@ -172,12 +172,48 @@ test('rating accessibility labels use ratings-only language', () => {
   assert.equal(getRatingLabel(4.8, 12).includes('reseña'), false);
 });
 
-test('the mobile technician API does not expose review submission', () => {
+test('review submission is supported while the public directory remains ratings-only', () => {
   const apiSource = readFileSync('src/lib/api.ts', 'utf8');
+  const bookingDetailSource = readFileSync('src/app/booking-detail/[id].tsx', 'utf8');
 
   assert.match(apiSource, /\/api\/technicians\?view=ratings/);
-  assert.doesNotMatch(apiSource, /\baddReview\b/);
-  assert.doesNotMatch(apiSource, /\/reviews[^'"`]*['"`]\s*,\s*\{\s*method:\s*['"]POST['"]/s);
+  assert.match(apiSource, /\baddReview\b/);
+  assert.match(apiSource, /\/reviews[^'"`]*['"`]\s*,\s*\{\s*method:\s*['"]POST['"]/s);
+  assert.match(bookingDetailSource, /REVIEW_FEEDBACK_OPTIONS/);
+  assert.doesNotMatch(bookingDetailSource, /reviewComment/);
+});
+
+test('profile photos use the library picker without camera or microphone access', () => {
+  const appConfig = JSON.parse(readFileSync('app.json', 'utf8')) as {
+    expo?: { plugins?: unknown[] };
+  };
+  const profileEditSource = readFileSync('src/app/profile/edit.tsx', 'utf8');
+  const storeConfig = JSON.parse(readFileSync('store.config.json', 'utf8')) as {
+    apple?: { advisory?: { userGeneratedContent?: boolean } };
+  };
+  const imagePickerPlugin = appConfig.expo?.plugins?.find(
+    (plugin): plugin is [string, Record<string, unknown>] =>
+      Array.isArray(plugin) && plugin[0] === 'expo-image-picker',
+  );
+
+  assert.ok(typeof imagePickerPlugin?.[1]?.photosPermission === 'string');
+  assert.ok(String(imagePickerPlugin?.[1]?.photosPermission).length > 20);
+  assert.equal(imagePickerPlugin?.[1]?.cameraPermission, false);
+  assert.equal(imagePickerPlugin?.[1]?.microphonePermission, false);
+  assert.match(profileEditSource, /launchImageLibraryAsync/);
+  assert.doesNotMatch(profileEditSource, /requestMediaLibraryPermissionsAsync/);
+  assert.equal(storeConfig.apple?.advisory?.userGeneratedContent, true);
+});
+
+test('session persistence strips embedded photos and guards async updates by identity', () => {
+  const authSource = readFileSync('src/providers/auth.tsx', 'utf8');
+
+  assert.match(authSource, /startsWith\(['"]data:['"]\)/);
+  assert.match(authSource, /JSON\.stringify\(toPersistableSession\(session\)\)/);
+  assert.match(authSource, /matchesSessionIdentity/);
+  assert.match(authSource, /session\?\.token === expected\.token/);
+  assert.match(authSource, /session\.user\.id === expected\.userId/);
+  assert.match(authSource, /storageWriteRef/);
 });
 
 test('the iOS build declares the motion purpose string required by expo-location', () => {

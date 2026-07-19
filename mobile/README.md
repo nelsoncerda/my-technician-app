@@ -1,19 +1,29 @@
 # Técnicos en RD — aplicación móvil
 
-Aplicación nativa para clientes, creada con Expo SDK 57 y React Native. Consume la API existente de Técnicos en RD y comparte sus usuarios, técnicos, calificaciones agregadas y reservas.
+Aplicación nativa compartida para iOS y Android, creada con Expo SDK 57 y React Native. Consume la misma API que la aplicación web de Técnicos en RD y comparte cuentas, técnicos, reservas, calificaciones, perfiles y recompensas.
 
-## Alcance de la versión 1
+## Funciones compartidas con la web
 
 - Directorio de técnicos con autocompletado, filtros, perfiles y calificaciones.
 - Vista de mapa con zonas aproximadas de servicio y acceso rápido al perfil o reserva.
 - GPS opcional en primer plano para reconocer la zona y completar una dirección.
 - Solicitud de servicios con fecha, horarios disponibles y dirección manual o detectada.
-- Lista y detalle de reservas, contacto y cancelación.
-- Registro, inicio de sesión, recuperación de contraseña y almacenamiento seguro de sesión.
+- Agenda separada para servicios contratados y solicitudes recibidas por técnicos.
+- Flujo de reservas completo: confirmar, iniciar, completar, contactar y cancelar según el rol.
+- Calificación posterior a un servicio mediante estrellas y opciones de experiencia controladas.
+- Registro de clientes o profesionales, conversión de cuenta y almacenamiento seguro de sesión.
+- Edición de perfil, foto opcional, historial de cambios y verificación de correo.
+- Servicios, zona aproximada, visibilidad en el mapa y disponibilidad semanal para profesionales.
+- Puntos, niveles, logros, clasificación y canje de recompensas.
+- Panel móvil para administradores con reportes, técnicos, usuarios, reservas y catálogo.
+- Moderación previa de perfiles y fotos, consentimiento versionado de normas, reportes confidenciales y bloqueo separado.
+- Seguimiento de reportes, administración de usuarios bloqueados y cola móvil con SLA y decisiones auditables.
 - Eliminación permanente de cuenta dentro de la aplicación.
-- Política de privacidad y términos en español.
+- Página “Cómo funciona”, política de privacidad, términos y soporte en español.
 
-El acelerómetro y el acceso en segundo plano no se solicitan: no existe todavía una función de producto que los necesite.
+La selección de foto usa únicamente la biblioteca del sistema. No se solicitan cámara, micrófono, acelerómetro ni ubicación en segundo plano porque ninguna función del producto los necesita.
+
+La matriz que evita nuevas diferencias entre clientes está en [FEATURE_PARITY.md](./FEATURE_PARITY.md).
 
 ## Desarrollo local
 

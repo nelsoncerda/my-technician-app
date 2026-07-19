@@ -20,11 +20,16 @@ const existingSecret = process.env.AUTH_SECRET?.trim();
 const authSecret = existingSecret && existingSecret.length >= 32
   ? existingSecret
   : crypto.randomBytes(32).toString('hex');
+const existingIdentitySecret = process.env.ACCOUNT_IDENTITY_SECRET?.trim();
+const accountIdentitySecret = existingIdentitySecret && existingIdentitySecret.length >= 32
+  ? existingIdentitySecret
+  : crypto.randomBytes(32).toString('hex');
 
 const requiredValues = new Map([
   ['NODE_ENV', 'production'],
   ['PORT', '3001'],
   ['AUTH_SECRET', authSecret],
+  ['ACCOUNT_IDENTITY_SECRET', accountIdentitySecret],
   ['APP_URL', 'https://api.tecnicosenrd.com'],
   ['API_URL', 'https://api.tecnicosenrd.com'],
   [
@@ -59,4 +64,7 @@ fs.writeFileSync(envFile, `${updatedLines.filter((line, index, lines) => line ||
 });
 fs.chmodSync(envFile, 0o600);
 
-console.log(`Production environment prepared; AUTH_SECRET ${existingSecret?.length >= 32 ? 'preserved' : 'generated'}.`);
+console.log(
+  `Production environment prepared; AUTH_SECRET ${existingSecret?.length >= 32 ? 'preserved' : 'generated'}; ` +
+  `ACCOUNT_IDENTITY_SECRET ${existingIdentitySecret?.length >= 32 ? 'preserved' : 'generated'}.`
+);

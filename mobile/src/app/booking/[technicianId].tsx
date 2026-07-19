@@ -15,8 +15,10 @@ import {
   View,
 } from 'react-native';
 
+import { CommunityConsentCard } from '@/components/moderation';
 import { Colors, Spacing } from '@/constants/theme';
 import { api, extractApiErrorMessage } from '@/lib/api';
+import { useCommunityConsent } from '@/lib/use-community-consent';
 import { useAuth } from '@/providers/auth';
 import type { Technician } from '@/types/api';
 
@@ -72,13 +74,15 @@ export default function NewBookingScreen() {
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [consentError, setConsentError] = useState('');
+  const communityConsent = useCommunityConsent(token);
 
   const phone = phoneOverride ?? user?.phone ?? '';
 
   useEffect(() => {
     let active = true;
     void api.technicians
-      .list()
+      .list(token)
       .then((items) => {
         if (!active) return;
         const match = items.find((item) => item.id === technicianId) ?? null;
@@ -94,7 +98,7 @@ export default function NewBookingScreen() {
     return () => {
       active = false;
     };
-  }, [technicianId]);
+  }, [technicianId, token]);
 
   useEffect(() => {
     if (!technicianId || !scheduledDate) return;
@@ -159,7 +163,9 @@ export default function NewBookingScreen() {
 
     setSubmitting(true);
     setError('');
+    setConsentError('');
     try {
+      await communityConsent.acceptIfNeeded();
       const booking = await api.bookings.create(
         {
           technicianId,
@@ -177,7 +183,9 @@ export default function NewBookingScreen() {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace({ pathname: '/booking-detail/[id]', params: { id: booking.id } });
     } catch (requestError: unknown) {
-      setError(extractApiErrorMessage(requestError));
+      const message = extractApiErrorMessage(requestError);
+      if (!communityConsent.accepted) setConsentError(message);
+      setError(message);
     } finally {
       setSubmitting(false);
     }
@@ -373,6 +381,17 @@ export default function NewBookingScreen() {
           value={description}
         />
 
+        <CommunityConsentCard
+          accepted={communityConsent.accepted}
+          checked={communityConsent.checked}
+          disabled={submitting || communityConsent.isAccepting}
+          error={consentError || communityConsent.error}
+          onChange={(checked) => {
+            communityConsent.setChecked(checked);
+            setConsentError('');
+          }}
+        />
+
         {error ? (
           <View accessibilityLiveRegion="polite" style={styles.errorBox}>
             <Text style={styles.errorText}>{error}</Text>
@@ -381,7 +400,7 @@ export default function NewBookingScreen() {
 
         <Pressable
           accessibilityRole="button"
-          disabled={submitting}
+          disabled={submitting || communityConsent.isLoading || communityConsent.isAccepting}
           onPress={submitBooking}
           style={[styles.primaryButton, submitting && styles.buttonDisabled]}>
           {submitting ? <ActivityIndicator color="#FFFFFF" /> : null}
