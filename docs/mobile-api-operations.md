@@ -87,6 +87,12 @@ the installed Nginx configuration:
 DEPLOY_WEB=1 deploy/release-mobile-api.sh <revision>
 ```
 
+For trust-and-safety migrations, the workflow stops `technician-api` only for
+the migration and symlink cutover so legacy code cannot create or expose rows
+under new moderation defaults. Once a migration completes, an error attempts a
+forward recovery on the new release; it does not automatically restore an older
+API that cannot enforce the new moderation states.
+
 ### Database-backup retention
 
 After creating and validating the current release's PostgreSQL dump, the release

@@ -32,18 +32,31 @@ RELEASE=$RELEASES/${STAMP}-${REVISION:0:7}
 BACKUP=$BACKUP_ROOT/${STAMP}-mobile-api
 PREVIOUS=''
 CUTOVER_COMPLETE=0
+MIGRATION_COMPLETE=0
+API_STOPPED=0
 
 rollback_code() {
   local status=$?
   trap - ERR
-  if [[ $CUTOVER_COMPLETE -eq 1 && -n "$PREVIOUS" && -d "$PREVIOUS" ]]; then
-    ln -sfn "$PREVIOUS" "$APP_ROOT/technician-current.next"
+  set +e
+  if [[ $MIGRATION_COMPLETE -eq 1 ]]; then
+    # The previous API does not understand moderation states and could expose a
+    # newly pending or suspended profile. After the forward-only migration,
+    # keep recovery on the new release instead of blindly rolling code back.
+    ln -sfn "$RELEASE" "$APP_ROOT/technician-current.next"
     mv -Tf "$APP_ROOT/technician-current.next" "$APP_ROOT/technician-current"
     cd "$APP_ROOT/technician-current"
     pm2 startOrReload deploy/ecosystem.config.cjs --env production --update-env
     pm2 save
+    printf 'Release failed after the database migration; forward recovery was attempted and old code was not restored.\n' >&2
+  elif [[ $API_STOPPED -eq 1 ]]; then
+    cd "$APP_ROOT/technician-current"
+    pm2 startOrReload deploy/ecosystem.config.cjs --env production --update-env
+    pm2 save
+    printf 'Release failed before migration; the previous API was restarted.\n' >&2
+  else
+    printf 'Release failed before migration; production code was not changed.\n' >&2
   fi
-  printf 'Release failed; code cutover rolled back when possible. Database migrations were not reversed.\n' >&2
   exit "$status"
 }
 trap rollback_code ERR
@@ -98,28 +111,11 @@ chmod 600 "$BACKUP/database.dump"
 /usr/bin/flock -x "$SHARED/database-backup-retention.lock" \
   "$RELEASE/deploy/prune-database-backups.sh" "$APP_ROOT"
 
-npx prisma migrate deploy
 npm prune --omit=dev
 
 sudo nginx -t
-ln -sfn "$RELEASE" "$APP_ROOT/technician-current.next"
-mv -Tf "$APP_ROOT/technician-current.next" "$APP_ROOT/technician-current"
-CUTOVER_COMPLETE=1
 
-cd "$APP_ROOT/technician-current"
-pm2 startOrReload deploy/ecosystem.config.cjs --env production --update-env
-pm2 save
-
-curl --retry 10 --retry-connrefused --retry-delay 1 \
-  --fail --silent --show-error http://127.0.0.1:3001/health >/dev/null
-for endpoint in support privacy terms account-deletion reset-password; do
-  curl --fail --silent --show-error "http://127.0.0.1:3001/$endpoint" >/dev/null
-done
-if [[ "$DEPLOY_WEB" == 1 ]]; then
-  curl --fail --silent --show-error -H 'Host: tecnicosenrd.com' http://127.0.0.1/ >/dev/null
-fi
-
-cd "$APP_ROOT/technician-current/server"
+cd "$RELEASE/server"
 node --env-file="$ENV_FILE" <<'NODE'
 const nodemailer = require('nodemailer');
 
@@ -143,6 +139,32 @@ transporter.verify()
     process.exit(1);
   });
 NODE
+
+# Prevent the legacy API from accepting writes after the new moderation
+# defaults exist but before the matching code is active. The expected downtime
+# is only the migration and atomic symlink cutover.
+pm2 stop technician-api
+API_STOPPED=1
+npx prisma migrate deploy
+MIGRATION_COMPLETE=1
+
+ln -sfn "$RELEASE" "$APP_ROOT/technician-current.next"
+mv -Tf "$APP_ROOT/technician-current.next" "$APP_ROOT/technician-current"
+CUTOVER_COMPLETE=1
+
+cd "$APP_ROOT/technician-current"
+pm2 startOrReload deploy/ecosystem.config.cjs --env production --update-env
+pm2 save
+API_STOPPED=0
+
+curl --retry 10 --retry-connrefused --retry-delay 1 \
+  --fail --silent --show-error http://127.0.0.1:3001/health >/dev/null
+for endpoint in support privacy terms account-deletion reset-password; do
+  curl --fail --silent --show-error "http://127.0.0.1:3001/$endpoint" >/dev/null
+done
+if [[ "$DEPLOY_WEB" == 1 ]]; then
+  curl --fail --silent --show-error -H 'Host: tecnicosenrd.com' http://127.0.0.1/ >/dev/null
+fi
 
 sudo nginx -t
 printf 'Released %s to %s; backup: %s\n' "$REVISION" "$RELEASE" "$BACKUP"
